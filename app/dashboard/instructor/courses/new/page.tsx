@@ -1,0 +1,137 @@
+"use client";
+
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Button } from "@/components/ui";
+import { Input } from "@/components/ui";
+import { Textarea } from "@/components/ui";
+import { Label } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+
+export default function CreateCoursePage() {
+  const router = useRouter();
+  const createCourse = useMutation(api.courses.createCourse);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    title: "",
+    slug: "",
+    description: "",
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const title = e.target.value;
+    // Auto-generate a basic slug
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+    setFormData((prev) => ({ ...prev, title, slug }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title || !formData.slug || !formData.description) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const courseId = await createCourse({
+        title: formData.title,
+        slug: formData.slug,
+        description: formData.description,
+      });
+      toast.success("Course created successfully!");
+      router.push(`/dashboard/instructor/courses/${courseId}`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to create course. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/instructor")}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-2xl font-bold tracking-tight">Create New Course</h2>
+      </div>
+
+      <Card>
+        <form onSubmit={handleSubmit}>
+          <CardHeader>
+            <CardTitle>Course Details</CardTitle>
+            <CardDescription>
+              Provide the basic information for your new course. You can add more details and content later.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Course Title *</Label>
+              <Input
+                id="title"
+                name="title"
+                placeholder="e.g. Advanced Next.js Patterns"
+                value={formData.title}
+                onChange={handleTitleChange}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="slug">Course URL Slug *</Label>
+              <Input
+                id="slug"
+                name="slug"
+                placeholder="e.g. advanced-nextjs-patterns"
+                value={formData.slug}
+                onChange={handleChange}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This will be used in the URL: /courses/{formData.slug || "..."}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Short Description *</Label>
+              <Textarea
+                id="description"
+                name="description"
+                placeholder="Briefly describe what students will learn in this course."
+                value={formData.description}
+                onChange={handleChange}
+                rows={4}
+                required
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => router.push("/dashboard/instructor")}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create Course
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+}

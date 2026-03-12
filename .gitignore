@@ -44,3 +44,6 @@ next-env.d.ts
 /.clerk/
 
 .env.local
+
+implementation_plan.md
+*.md

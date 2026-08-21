@@ -4,40 +4,47 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { Button } from "@/components/ui";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/navbar";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function CoursesPage() {
+function CoursesWrapper() {
   const courses = useQuery(api.courses.listPublishedCourses) ?? [];
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q")?.toLowerCase() || "";
+
+  const filteredCourses = courses.filter((course) => {
+    return course.title.toLowerCase().includes(query) || 
+           course.description?.toLowerCase().includes(query) ||
+           course.category?.toLowerCase().includes(query);
+  });
 
   return (
-    <>
-    <Navbar />
     <main className="mx-auto max-w-6xl px-4 py-12 space-y-8">
       <header className="space-y-3 text-center">
         <Badge variant="outline" className="uppercase tracking-wide">
           Courses
         </Badge>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Explore world-class courses
+          {query ? `Search results for "${query}"` : "Explore world-class courses"}
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-          Browse published courses created by you and approved instructors.
+          {query ? "" : "Browse published courses created by you and approved instructors."}
         </p>
       </header>
 
-      {courses.length === 0 ? (
-        <p className="text-center text-muted-foreground">
-          No courses published yet. Once you add courses in Convex, they will
-          appear here.
+      {filteredCourses.length === 0 ? (
+        <p className="text-center text-muted-foreground mt-12 py-12 border border-dashed rounded-xl border-gray-200">
+          No courses found matching your search. Try different keywords!
         </p>
       ) : (
         <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
+          {filteredCourses.map((course) => (
             <Card key={course._id} className="flex flex-col">
               <CardHeader>
+                <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="w-full h-48 object-cover rounded-lg" />
                 <div className="flex flex-wrap gap-2 mb-2">
                   {course.category && (
                     <Badge variant="secondary">{course.category}</Badge>
@@ -63,7 +70,14 @@ export default function CoursesPage() {
         </section>
       )}
     </main>
-    </>
+  );
+}
+
+export default function CoursesPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-gray-500">Loading catalog...</div>}>
+      <CoursesWrapper />
+    </Suspense>
   );
 }
 

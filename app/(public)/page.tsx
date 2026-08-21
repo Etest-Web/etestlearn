@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { useUser } from "@clerk/nextjs";
-import { Navbar } from "@/components/navbar";
 
 export default function Home() {
   const { user } = useUser();
 
   return (
     <div className="min-h-screen  text-zinc-50">
-      <Navbar />
-
       <main className="mx-auto min-h-screen bg-[url('/hero-backdrop.jpg')] bg-cover bg-center flex max-w-6xl flex-col gap-16 px-4 py-14 md:py-20">
         <section className="grid gap-10 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-center">
           <div className="space-y-6">
@@ -80,7 +77,7 @@ export default function Home() {
             <Card className="border-zinc-700 bg-none shadow-md dark:shadow-none dark:bg-zinc-900/40">
               <CardHeader>
                 <CardTitle className="text-sm font-medium dark:text-zinc-200">
-                  For instructors (soon)
+                  For instructors
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm dark:text-zinc-300">
@@ -88,10 +85,11 @@ export default function Home() {
                   Apply to become an instructor, design lessons, and publish to
                   a growing marketplace of motivated learners.
                 </p>
-                <p className="text-xs dark:text-zinc-400">
-                  Instructor tools and detailed analytics will be part of the
-                  upcoming phases as we expand the platform.
-                </p>
+                <Link href="/become-instructor">
+                  <Button size="sm" variant="outline" className="border-zinc-600 mt-2">
+                    Apply now →
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

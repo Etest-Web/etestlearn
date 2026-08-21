@@ -38,6 +38,21 @@ async function getCurrentUser(ctx: any) {
   return user;
 }
 
+async function verifyAccess(ctx: any, user: any, courseId: any) {
+  if (user.role === "admin") return;
+  const course = await ctx.db.get(courseId);
+  if (course && course.instructorId === user._id) return;
+
+  const enrollment = await ctx.db
+    .query("enrollments")
+    .withIndex("by_user_course", (q: any) => q.eq("userId", user._id).eq("courseId", courseId))
+    .unique();
+
+  if (!enrollment) {
+    throw new Error("You must be enrolled in this course to participate in discussions");
+  }
+}
+
 export const createThread = mutation({
   args: {
     courseId: v.id("courses"),
@@ -45,6 +60,8 @@ export const createThread = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    await verifyAccess(ctx, user, args.courseId);
+    
     const now = Date.now();
     return await ctx.db.insert("discussionThreads", {
       courseId: args.courseId,
@@ -62,6 +79,14 @@ export const postMessage = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+    
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
+    }
+    
+    await verifyAccess(ctx, user, thread.courseId);
+
     const now = Date.now();
     return await ctx.db.insert("discussionMessages", {
       threadId: args.threadId,

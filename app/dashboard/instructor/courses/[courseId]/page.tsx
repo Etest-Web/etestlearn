@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Textarea } from "@/components/ui";
@@ -15,9 +15,10 @@ import { Switch } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { ArrowLeft, Loader2, Save, Trash2, Globe, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Globe, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, Image as ImageIcon, Upload } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -27,10 +28,15 @@ export default function CourseEditPage() {
   const courseData = useQuery(api.courses.getCourseById, { courseId: courseId as Id<"courses"> });
   const updateCourse = useMutation(api.courses.updateCourse);
   const createLesson = useMutation(api.courses.createLesson);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const getFileUrl = useMutation(api.files.getFileUrl);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [isCreatingLesson, setIsCreatingLesson] = useState(false);
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newLessonData, setNewLessonData] = useState({
     title: "",
@@ -44,6 +50,7 @@ export default function CourseEditPage() {
     category: "",
     level: "",
     published: false,
+    thumbnailUrl: "",
   });
 
   useEffect(() => {
@@ -55,6 +62,7 @@ export default function CourseEditPage() {
         category: courseData.course.category || "",
         level: courseData.course.level || "",
         published: courseData.course.published,
+        thumbnailUrl: courseData.course.thumbnailUrl || "",
       });
     }
   }, [courseData]);
@@ -87,6 +95,41 @@ export default function CourseEditPage() {
       toast.error("Failed to update course");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingThumbnail(true);
+    try {
+      // 1. Get a short-lived upload URL
+      const postUrl = await generateUploadUrl();
+
+      // 2. POST the file to the URL
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+
+      const { storageId } = await result.json();
+
+      // 3. Get the permanent public URL
+      const url = await getFileUrl({ storageId });
+
+      if (url) {
+        setFormData((prev) => ({ ...prev, thumbnailUrl: url }));
+        toast.success("Image uploaded successfully");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploadingThumbnail(false);
+      // Clear the input so it can be used again for the same file if needed
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -125,8 +168,28 @@ export default function CourseEditPage() {
 
   if (courseData === undefined) {
     return (
-      <div className="flex h-[50vh] w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-col gap-6 w-full pb-20">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <div className="flex w-full mt-4">
+          <Skeleton className="h-10 w-24 mr-2" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+        <Card className="mt-2">
+          <CardHeader>
+            <Skeleton className="h-6 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+             </div>
+             <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -225,7 +288,65 @@ export default function CourseEditPage() {
                     required
                   />
                 </div>
-
+                <div className="space-y-2">
+                  <Label htmlFor="thumbnailUrl">Thumbnail Image</Label>
+                  <div className="flex gap-4 items-start">
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        id="thumbnailUrl"
+                        name="thumbnailUrl"
+                        value={formData.thumbnailUrl}
+                        onChange={handleChange}
+                        placeholder="https://images.unsplash.com/... or upload below"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={fileInputRef}
+                          onChange={handleThumbnailUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingThumbnail}
+                        >
+                          {isUploadingThumbnail ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="mr-2 h-4 w-4" />
+                          )}
+                          Upload Image
+                        </Button>
+                        {formData.thumbnailUrl && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setFormData(prev => ({ ...prev, thumbnailUrl: "" }))}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {formData.thumbnailUrl && (
+                      <div className="w-32 h-20 bg-muted rounded-lg overflow-hidden border border-gray-100 shadow-sm shrink-0">
+                        <img 
+                          src={formData.thumbnailUrl} 
+                          alt="Thumbnail preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Upload an image or provide a valid image URL to represent this course.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>

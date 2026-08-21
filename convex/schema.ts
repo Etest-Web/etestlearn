@@ -105,5 +105,25 @@ export default defineSchema({
     body: v.string(),
     createdAt: v.number(),
   }).index("by_thread", ["threadId"]),
+
+  instructorApplications: defineTable({
+    userId: v.id("users"),
+    fullName: v.string(),
+    email: v.string(),
+    expertise: v.string(),
+    bio: v.string(),
+    portfolioUrl: v.optional(v.string()),
+    motivation: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_status", ["status"]),
 });
 

@@ -5,15 +5,13 @@ import { api } from "@/convex/_generated/api";
 import { useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress } from "@/components/ui";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
-interface DashboardCoursePageProps {
-  params: { slug: string };
-}
-
-export default function DashboardCoursePage({ params }: DashboardCoursePageProps) {
+export default function DashboardCoursePage() {
   const router = useRouter();
-  const data = useQuery(api.courses.getCourseBySlug, { slug: params.slug });
+  const params = useParams();
+  const slug = params.slug as string;
+  const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
   const enrollments = useQuery(api.enrollments.getUserEnrollments) ?? [];
   const enrollMutation = useMutation(api.enrollments.enrollInCourse);
   const issueCertificate = useMutation(api.certificates.issueCertificate);

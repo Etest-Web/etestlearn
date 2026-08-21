@@ -4,12 +4,17 @@ import Link from "next/link";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { ModeToggle } from "@/components/ui";
 import { Button } from "@/components/ui/button";
-import { BookOpen, GraduationCap, LayoutDashboard } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { BookOpen, GraduationCap, LayoutDashboard, Sparkles } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 
 export function Navbar() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/dashboard")) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
@@ -34,6 +39,15 @@ export function Navbar() {
           >
             <BookOpen className="mr-1.5 h-4 w-4" />
             Browse Courses
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => router.push("/become-instructor")}
+          >
+            <Sparkles className="mr-1.5 h-4 w-4" />
+            Become an Instructor
           </Button>
           {user && (
             <Button

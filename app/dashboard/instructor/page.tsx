@@ -8,6 +8,8 @@ import { PlusCircle, Loader2, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function InstructorCoursesPage() {
   const courses = useQuery(api.courses.listInstructorCourses);
   const router = useRouter();
@@ -16,7 +18,7 @@ export default function InstructorCoursesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Instructor Dashboard</h2>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Instructor Dashboard</h2>
           <p className="text-muted-foreground">Manage your courses and content.</p>
         </div>
         <Button onClick={() => router.push("/dashboard/instructor/courses/new")}>
@@ -26,8 +28,26 @@ export default function InstructorCoursesPage() {
       </div>
 
       {courses === undefined ? (
-        <div className="flex h-[200px] w-full items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="flex flex-col">
+              <CardHeader>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="space-y-2 w-full">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2 mt-2" />
+                  </div>
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 mt-4">
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+              <CardFooter className="pt-4 border-t">
+                <Skeleton className="h-10 w-full" />
+              </CardFooter>
+            </Card>
+          ))}
         </div>
       ) : courses.length === 0 ? (
         <div className="flex h-[400px] flex-col items-center justify-center rounded-lg border border-dashed text-center">

@@ -5,16 +5,23 @@ import {
   Montserrat,
   Bebas_Neue,
   Inter,
+  Outfit,
 } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider, ThemeProvider } from "@/components/ui";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
+import { Navbar } from "@/components/navbar";
 import { EnsureCurrentUser } from "@/components/ensure-current-user";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+});
 
 const mont = Montserrat({
   variable: "--font-mont",
@@ -51,10 +58,10 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("font-sans", inter.variable)}
+      className={cn("font-outfit", outfit.variable, inter.variable)}
     >
       <body
-        className={`${geistSans.variable} ${bebasNeue.variable} ${mont.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${bebasNeue.variable} ${mont.variable} ${geistMono.variable} ${outfit.className} antialiased`}
       >
         <ThemeProvider
           attribute="class"
@@ -65,6 +72,7 @@ export default function RootLayout({
           <ClerkProvider>
             <ConvexClientProvider>
               <EnsureCurrentUser />
+              <Navbar/>
               <TooltipProvider>{children}</TooltipProvider>
               <Toaster richColors position="top-right" />
             </ConvexClientProvider>

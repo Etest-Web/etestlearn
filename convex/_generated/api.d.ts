@@ -12,6 +12,8 @@ import type * as certificates from "../certificates.js";
 import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
+import type * as files from "../files.js";
+import type * as instructorApplications from "../instructorApplications.js";
 import type * as quizzes from "../quizzes.js";
 import type * as users from "../users.js";
 
@@ -26,6 +28,8 @@ declare const fullApi: ApiFromModules<{
   courses: typeof courses;
   discussions: typeof discussions;
   enrollments: typeof enrollments;
+  files: typeof files;
+  instructorApplications: typeof instructorApplications;
   quizzes: typeof quizzes;
   users: typeof users;
 }>;

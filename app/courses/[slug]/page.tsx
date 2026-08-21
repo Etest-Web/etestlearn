@@ -3,23 +3,20 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-import { notFound } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/navbar";
+import { notFound, useRouter, useParams } from "next/navigation";
+import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 
-interface CoursePageProps {
-  params: { slug: string };
-}
-
-export default function CoursePage({ params }: CoursePageProps) {
+export default function CoursePage() {
   const router = useRouter();
-  const data = useQuery(api.courses.getCourseBySlug, { slug: params.slug });
+  const params = useParams();
+  const slug = params.slug as string;
+  const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
 
   if (data === undefined) {
     // still loading
     return (
       <>
-        <Navbar />
         <main className="mx-auto max-w-4xl px-4 py-12">
           <p className="text-muted-foreground">Loading course...</p>
         </main>
@@ -35,10 +32,11 @@ export default function CoursePage({ params }: CoursePageProps) {
 
   return (
     <>
-    <Navbar />
     <main className="mx-auto max-w-4xl px-4 py-12 space-y-8">
       <header className="space-y-4">
+        <Button onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /> Back</Button>
         <div className="flex flex-wrap gap-2">
+          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="w-full h-full object-cover rounded-lg" />
           {course.category && <Badge variant="secondary">{course.category}</Badge>}
           {course.level && (
             <Badge variant="outline" className="text-xs">

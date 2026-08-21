@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const dbUser = useQuery(api.users.getCurrentUser);
   const isInstructor = dbUser?.role === "instructor" || dbUser?.role === "admin";
+  const isAdmin = dbUser?.role === "admin";
 
   return (
     <SidebarProvider>
@@ -146,14 +147,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               Instructor Tools
             </Link>
           )}
+          {isAdmin && (
+            <Link href="/dashboard/admin/users" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors">
+              <Users size={20} />
+              Admin Console
+            </Link>
+          )}
           <SidebarGroup className="flex">
           <Tooltip>
             <TooltipTrigger>
-              <button className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:text-gray-900 dark:hover:bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+              <Link href="/dashboard/settings" className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:text-gray-900 dark:hover:bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
                 <Settings size={15} />
-                Setting
+                Settings
                <ModeToggle/>
-              </button>
+              </Link>
             </TooltipTrigger>
             <TooltipContent side="right" className="bg-gray-900 text-white font-medium">Customize your dashboard and your account</TooltipContent>
           </Tooltip>

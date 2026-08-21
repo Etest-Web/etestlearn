@@ -3,7 +3,9 @@
 import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, CardContent } from "@/components/ui";
+import { Card, CardContent, Button } from "@/components/ui";
+import { BadgeCheck, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CertificateDetailPage() {
   const params = useParams<{ id: string }>();
@@ -54,6 +56,30 @@ export default function CertificateDetailPage() {
           </p>
         </CardContent>
       </Card>
+
+      <div className="mt-6 flex items-center justify-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const url = `${window.location.origin}/verify/${certId}`;
+            navigator.clipboard.writeText(url).then(
+              () => toast.success("Verification link copied"),
+              () => toast.error("Could not copy link"),
+            );
+          }}
+        >
+          <Copy className="mr-2 h-4 w-4" /> Copy verification link
+        </Button>
+        <a
+          href={`/verify/${certId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center text-sm font-medium text-[#5340FF] hover:underline"
+        >
+          <BadgeCheck className="mr-1.5 h-4 w-4" /> View public verification page
+        </a>
+      </div>
     </div>
   );
 }

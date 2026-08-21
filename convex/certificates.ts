@@ -78,3 +78,26 @@ export const listMyCertificates = query({
   },
 });
 
+
+// Public, read-only certificate verification — intentionally unauthenticated
+// so employers can verify a certificate from its link. Exposes only the
+// recipient's name, course title, and issue date.
+export const getCertificateForVerification = query({
+  args: { certificateId: v.id("certificates") },
+  handler: async (ctx, args) => {
+    const cert = await ctx.db.get(args.certificateId);
+    if (!cert) return null;
+
+    const [holder, course] = await Promise.all([
+      ctx.db.get(cert.userId),
+      ctx.db.get(cert.courseId),
+    ]);
+
+    return {
+      holderName: holder?.name ?? "Unknown",
+      courseTitle: course?.title ?? "Unknown course",
+      issuedAt: cert.issuedAt,
+      valid: true,
+    };
+  },
+});

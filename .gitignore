@@ -48,3 +48,7 @@ next-env.d.ts
 
 implementation_plan.md
 *.md
+
+# build logs
+build_out.txt
+build.log

@@ -24,6 +24,9 @@ export default defineSchema({
     level: v.optional(v.string()),
     published: v.boolean(),
     thumbnailUrl: v.optional(v.string()),
+    // Pricing in kobo (1 Naira = 100 kobo). Absent or 0 = free course.
+    price: v.optional(v.number()),
+    currency: v.optional(v.string()), // e.g. "NGN"
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_slug", ["slug"])
@@ -91,6 +94,25 @@ export default defineSchema({
   }).index("by_user", ["userId"])
     .index("by_course", ["courseId"])
     .index("by_user_course", ["userId", "courseId"]),
+
+  purchases: defineTable({
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+    paystackReference: v.string(),
+    amount: v.number(), // kobo
+    currency: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("paid"),
+      v.literal("failed"),
+    ),
+    paidAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_reference", ["paystackReference"])
+    .index("by_user", ["userId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_course", ["courseId"]),
 
   discussionThreads: defineTable({
     courseId: v.id("courses"),

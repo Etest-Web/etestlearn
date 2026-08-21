@@ -13,7 +13,10 @@ import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
 import type * as files from "../files.js";
+import type * as http from "../http.js";
 import type * as instructorApplications from "../instructorApplications.js";
+import type * as payments from "../payments.js";
+import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
 import type * as users from "../users.js";
 
@@ -29,7 +32,10 @@ declare const fullApi: ApiFromModules<{
   discussions: typeof discussions;
   enrollments: typeof enrollments;
   files: typeof files;
+  http: typeof http;
   instructorApplications: typeof instructorApplications;
+  payments: typeof payments;
+  paystack: typeof paystack;
   quizzes: typeof quizzes;
   users: typeof users;
 }>;

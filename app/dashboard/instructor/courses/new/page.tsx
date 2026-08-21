@@ -22,6 +22,7 @@ export default function CreateCoursePage() {
     title: "",
     slug: "",
     description: "",
+    priceNaira: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -48,10 +49,15 @@ export default function CreateCoursePage() {
 
     setIsSubmitting(true);
     try {
+      // Price is entered in Naira on the form; Convex stores kobo.
+      const naira = parseFloat(formData.priceNaira);
+      const price = Number.isFinite(naira) && naira > 0 ? Math.round(naira * 100) : undefined;
+
       const courseId = await createCourse({
         title: formData.title,
         slug: formData.slug,
         description: formData.description,
+        ...(price !== undefined ? { price, currency: "NGN" } : {}),
       });
       toast.success("Course created successfully!");
       router.push(`/dashboard/instructor/courses/${courseId}`);
@@ -119,6 +125,22 @@ export default function CreateCoursePage() {
                 rows={4}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>
+              <Input
+                id="priceNaira"
+                name="priceNaira"
+                type="number"
+                min="0"
+                step="100"
+                placeholder="Leave empty for a free course (e.g. 15000)"
+                value={formData.priceNaira}
+                onChange={handleChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Paid courses are collected via Paystack. Leave blank to make this course free.
+              </p>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2">

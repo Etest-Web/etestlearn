@@ -82,6 +82,9 @@ export const createCourse = mutation({
     category: v.optional(v.string()),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+    // Kobo; omit or 0 for free courses.
+    price: v.optional(v.number()),
+    currency: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -109,6 +112,8 @@ export const createCourse = mutation({
       level: args.level,
       published: false,
       thumbnailUrl: args.thumbnailUrl,
+      price: args.price,
+      currency: args.currency,
       createdAt: now,
       updatedAt: now,
     });
@@ -125,6 +130,8 @@ export const updateCourse = mutation({
     level: v.optional(v.string()),
     published: v.optional(v.boolean()),
     thumbnailUrl: v.optional(v.string()),
+    price: v.optional(v.number()),
+    currency: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -158,6 +165,8 @@ export const updateCourse = mutation({
     if (args.level !== undefined) updates.level = args.level;
     if (args.published !== undefined) updates.published = args.published;
     if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
+    if (args.price !== undefined) updates.price = args.price;
+    if (args.currency !== undefined) updates.currency = args.currency;
 
     updates.updatedAt = Date.now();
 

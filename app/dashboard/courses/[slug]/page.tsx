@@ -43,6 +43,20 @@ export default function DashboardCoursePage() {
   const enrollment = enrollments.find((e: any) => e.courseId === course._id);
   const progress = enrollment?.progressPercent ?? 0;
 
+  function continueHref() {
+    if (!enrollment || lessons.length === 0) return undefined;
+    const completed = new Set<string>(enrollment.completedLessonIds ?? []);
+    const target =
+      lessons.find((l: any) => !completed.has(l._id)) ?? lessons[0];
+    return lessonHref(target);
+  }
+
+  function lessonHref(lesson: { _id: string; contentType: string }) {
+    return lesson.contentType === "quiz"
+      ? `/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`
+      : `/dashboard/courses/${course.slug}/lessons/${lesson._id}`;
+  }
+
   async function handleEnroll() {
     if (!course?._id || isEnrolling) return;
     try {
@@ -85,7 +99,11 @@ export default function DashboardCoursePage() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             {enrollment ? (
               <>
-                <Button size="sm">Continue learning</Button>
+                {continueHref() ? (
+                  <Button size="sm" render={<Link href={continueHref()!} />}>
+                    Continue learning
+                  </Button>
+                ) : null}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>Progress</span>
                   <Progress value={progress} className="w-32" />
@@ -149,36 +167,35 @@ export default function DashboardCoursePage() {
         ) : (
           <Card>
             <CardContent className="divide-y px-0">
-              {lessons.map((lesson: any, index: number) => (
-                <div
-                  key={lesson._id}
-                  className="flex items-center justify-between gap-4 px-4 py-3 text-sm"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {index + 1}.{" "}
-                      {lesson.contentType === "quiz" ? (
-                        <Link
-                          href={`/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`}
-                          className="text-primary hover:underline"
-                        >
+              {lessons.map((lesson: any, index: number) => {
+                const href =
+                  lesson.contentType === "quiz"
+                    ? `/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`
+                    : `/dashboard/courses/${course.slug}/lessons/${lesson._id}`;
+                return (
+                  <div
+                    key={lesson._id}
+                    className="flex items-center justify-between gap-4 px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {index + 1}.{" "}
+                        <Link href={href} className="text-primary hover:underline">
                           {lesson.title}
                         </Link>
-                      ) : (
-                        lesson.title
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {lesson.contentType}
-                    </p>
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {lesson.contentType}
+                      </p>
+                    </div>
+                    {lesson.durationMinutes && (
+                      <span className="text-xs text-muted-foreground">
+                        {lesson.durationMinutes} min
+                      </span>
+                    )}
                   </div>
-                  {lesson.durationMinutes && (
-                    <span className="text-xs text-muted-foreground">
-                      {lesson.durationMinutes} min
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         )}

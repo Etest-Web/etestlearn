@@ -27,11 +27,17 @@ export default defineSchema({
     // Pricing in kobo (1 Naira = 100 kobo). Absent or 0 = free course.
     price: v.optional(v.number()),
     currency: v.optional(v.string()), // e.g. "NGN"
+    // Denormalized "title description category" for full-text search.
+    searchText: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_slug", ["slug"])
     .index("by_instructor", ["instructorId"])
-    .index("by_published", ["published"]),
+    .index("by_published", ["published"])
+    .searchIndex("search", {
+      searchField: "searchText",
+      filterFields: ["published"],
+    }),
 
   lessons: defineTable({
     courseId: v.id("courses"),
@@ -51,6 +57,8 @@ export default defineSchema({
     userId: v.id("users"),
     courseId: v.id("courses"),
     progressPercent: v.number(),
+    // Lesson ids the learner has completed; source of truth for progressPercent.
+    completedLessonIds: v.optional(v.array(v.id("lessons"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user_course", ["userId", "courseId"])

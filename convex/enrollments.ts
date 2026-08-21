@@ -87,3 +87,52 @@ export const getUserEnrollments = query({
   },
 });
 
+export const completeLesson = mutation({
+  args: {
+    courseId: v.id("courses"),
+    lessonId: v.id("lessons"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) throw new Error("User record not found");
+
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", user._id).eq("courseId", args.courseId),
+      )
+      .unique();
+    if (!enrollment) throw new Error("Not enrolled in this course");
+
+    const completed = new Set(enrollment.completedLessonIds ?? []);
+    if (completed.has(args.lessonId)) {
+      return enrollment.progressPercent;
+    }
+    completed.add(args.lessonId);
+
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_course_order", (q) => q.eq("courseId", args.courseId))
+      .collect();
+
+    const progressPercent =
+      lessons.length === 0
+        ? 0
+        : Math.min(100, Math.round((completed.size / lessons.length) * 100));
+
+    await ctx.db.patch(enrollment._id, {
+      completedLessonIds: [...completed],
+      progressPercent,
+      updatedAt: Date.now(),
+    });
+
+    return progressPercent;
+  },
+});
+

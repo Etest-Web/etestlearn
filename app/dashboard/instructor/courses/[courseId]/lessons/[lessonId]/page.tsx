@@ -12,10 +12,13 @@ import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function LessonEditPage() {
   const router = useRouter();
@@ -256,15 +259,36 @@ export default function LessonEditPage() {
             {formData.contentType === "article" && (
               <div className="space-y-2">
                 <Label htmlFor="content">Article Content (Markdown)</Label>
-                <Textarea
-                  id="content"
-                  name="content"
-                  rows={15}
-                  placeholder="# Hello World&#10;&#10;Write your article here using markdown."
-                  value={formData.content}
-                  onChange={handleChange}
-                  className="font-mono text-sm"
-                />
+                <Tabs defaultValue="write">
+                  <TabsList>
+                    <TabsTrigger value="write">Write</TabsTrigger>
+                    <TabsTrigger value="preview">Preview</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="write">
+                    <Textarea
+                      id="content"
+                      name="content"
+                      rows={15}
+                      placeholder="# Hello World&#10;&#10;Write your article here using markdown."
+                      value={formData.content}
+                      onChange={handleChange}
+                      className="font-mono text-sm rounded-t-none border-t-0"
+                    />
+                  </TabsContent>
+                  <TabsContent value="preview">
+                    {formData.content.trim() ? (
+                      <div className="min-h-[240px] rounded-lg border p-4 prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {formData.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[240px] items-center justify-center rounded-lg border text-sm text-muted-foreground">
+                        Nothing to preview yet — start writing in the Write tab.
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
 

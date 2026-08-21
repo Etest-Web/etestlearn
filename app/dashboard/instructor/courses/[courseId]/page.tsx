@@ -32,8 +32,8 @@ export default function CourseEditPage() {
   const pendingStorageId = useRef<Id<"_storage"> | null>(null);
   const [resolvedStorageId, setResolvedStorageId] = useState<Id<"_storage"> | null>(null);
   const resolvedFileUrl = useQuery(
-    api.files.getFileUrl,
-    resolvedStorageId ? { storageId: resolvedStorageId } : "skip",
+    api.files.validateAndResolveUpload,
+    resolvedStorageId ? { storageId: resolvedStorageId, kind: "image" as const } : "skip",
   );
   
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -9,11 +9,18 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function SearchResults() {
-  const courses = useQuery(api.courses.listPublishedCourses);
   const searchParams = useSearchParams();
-  const query = searchParams.get("q")?.toLowerCase() || "";
+  const query = searchParams.get("q")?.trim() ?? "";
 
-  if (courses === undefined) {
+  const searchedCourses = useQuery(
+    api.courses.searchCourses,
+    query ? { query } : "skip",
+  );
+  const allCourses = useQuery(api.courses.listPublishedCourses);
+
+  const loading = searchedCourses === undefined || (query ? false : allCourses === undefined);
+
+  if (loading) {
     return (
       <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
         <Skeleton className="h-20 w-[200px] rounded-xl" />
@@ -22,11 +29,10 @@ function SearchResults() {
     );
   }
 
-  const filteredCourses = courses.filter((course) => {
-    return course.title.toLowerCase().includes(query) || 
-           course.description?.toLowerCase().includes(query) ||
-           course.category?.toLowerCase().includes(query);
-  });
+  // Server-side full-text search across title, description, and category.
+  const filteredCourses = query
+    ? (searchedCourses ?? [])
+    : (allCourses ?? []);
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full">

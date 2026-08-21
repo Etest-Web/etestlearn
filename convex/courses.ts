@@ -1,6 +1,10 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+function buildSearchText(title: string, description: string, category?: string) {
+  return [title, description, category].filter(Boolean).join(" ").trim();
+}
+
 export const listPublishedCourses = query({
   args: {},
   handler: async (ctx) => {
@@ -32,6 +36,21 @@ export const listInstructorCourses = query({
       .query("courses")
       .withIndex("by_instructor", (q) => q.eq("instructorId", user._id))
       .collect();
+  },
+});
+
+export const searchCourses = query({
+  args: { query: v.string() },
+  handler: async (ctx, args) => {
+    const q = args.query.trim();
+    if (!q) return [];
+
+    return await ctx.db
+      .query("courses")
+      .withSearchIndex("search", (s) =>
+        s.search("searchText", q).eq("published", true),
+      )
+      .take(24);
   },
 });
 
@@ -114,6 +133,7 @@ export const createCourse = mutation({
       thumbnailUrl: args.thumbnailUrl,
       price: args.price,
       currency: args.currency,
+      searchText: buildSearchText(args.title, args.description, args.category),
       createdAt: now,
       updatedAt: now,
     });
@@ -167,6 +187,17 @@ export const updateCourse = mutation({
     if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
     if (args.price !== undefined) updates.price = args.price;
     if (args.currency !== undefined) updates.currency = args.currency;
+
+    if (
+      args.title !== undefined ||
+      args.description !== undefined ||
+      args.category !== undefined
+    ) {
+      const title = args.title ?? course.title;
+      const description = args.description ?? course.description;
+      const category = "category" in args ? args.category : course.category;
+      updates.searchText = buildSearchText(title, description, category);
+    }
 
     updates.updatedAt = Date.now();
 

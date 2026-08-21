@@ -10,16 +10,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 function CoursesWrapper() {
-  const courses = useQuery(api.courses.listPublishedCourses) ?? [];
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get("q")?.toLowerCase() || "";
+  const query = searchParams.get("q")?.trim() ?? "";
 
-  const filteredCourses = courses.filter((course) => {
-    return course.title.toLowerCase().includes(query) || 
-           course.description?.toLowerCase().includes(query) ||
-           course.category?.toLowerCase().includes(query);
-  });
+  // Full-text search runs against the Convex search index; empty queries list
+  // all published courses.
+  const searchedCourses = useQuery(
+    api.courses.searchCourses,
+    query ? { query } : "skip",
+  );
+  const allCourses = useQuery(api.courses.listPublishedCourses);
+  const filteredCourses =
+    (query ? (searchedCourses ?? []) : (allCourses ?? [])) ?? [];
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12 space-y-8">

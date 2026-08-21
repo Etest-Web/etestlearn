@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { gradeQuiz } from "../lib/quiz";
 
 export const getQuizForLesson = query({
   args: { lessonId: v.id("lessons") },
@@ -187,37 +188,35 @@ export const submitQuizAttempt = mutation({
       .withIndex("by_quiz_order", (q) => q.eq("quizId", quiz._id))
       .collect();
 
-    const optionsById = new Map(
-      (
-        await Promise.all(
-          questions.map((question) =>
-            ctx.db
-              .query("quizOptions")
-              .withIndex("by_question", (q) => q.eq("questionId", question._id))
-              .collect(),
-          ),
-        )
-      )
-        .flat()
-        .map((opt) => [opt._id, opt] as const),
+    const optionLists = await Promise.all(
+      questions.map((question) =>
+        ctx.db
+          .query("quizOptions")
+          .withIndex("by_question", (q) => q.eq("questionId", question._id))
+          .collect(),
+      ),
     );
 
-    let score = 0;
-    const maxScore = questions.length;
-
-    for (const question of questions) {
-      const answer = args.answers.find(
-        (a) => a.questionId === question._id,
+    const optionsByQuestion = new Map<string, string[]>();
+    for (const [question, opts] of questions.map((question, i) => [
+      question,
+      optionLists[i],
+    ] as const)) {
+      optionsByQuestion.set(
+        question._id,
+        opts.filter((o) => o.isCorrect).map((o) => o._id),
       );
-      if (!answer) continue;
-      const option = optionsById.get(answer.optionId);
-      if (option?.isCorrect) {
-        score += 1;
-      }
     }
 
-    const percent = maxScore === 0 ? 0 : (score / maxScore) * 100;
-    const passed = percent >= quiz.passingScore;
+    const grade = gradeQuiz(
+      [...optionsByQuestion].map(([id, correctOptionIds]) => ({
+        id,
+        correctOptionIds,
+      })),
+      args.answers,
+      quiz.passingScore,
+    );
+    const { score, maxScore, percent, passed } = grade;
 
     const now = Date.now();
     await ctx.db.insert("quizAttempts", {

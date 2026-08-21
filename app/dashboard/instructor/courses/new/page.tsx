@@ -12,6 +12,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { slugify } from "@/lib/slug";
 
 export default function CreateCoursePage() {
   const router = useRouter();
@@ -32,12 +33,7 @@ export default function CreateCoursePage() {
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const title = e.target.value;
-    // Auto-generate a basic slug
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
-    setFormData((prev) => ({ ...prev, title, slug }));
+    setFormData((prev) => ({ ...prev, title, slug: slugify(title) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

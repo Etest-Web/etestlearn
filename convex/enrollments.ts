@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { computeProgress } from "../lib/progress";
 
 export const enrollInCourse = mutation({
   args: { courseId: v.id("courses") },
@@ -121,10 +122,7 @@ export const completeLesson = mutation({
       .withIndex("by_course_order", (q) => q.eq("courseId", args.courseId))
       .collect();
 
-    const progressPercent =
-      lessons.length === 0
-        ? 0
-        : Math.min(100, Math.round((completed.size / lessons.length) * 100));
+    const progressPercent = computeProgress(completed.size, lessons.length);
 
     await ctx.db.patch(enrollment._id, {
       completedLessonIds: [...completed],

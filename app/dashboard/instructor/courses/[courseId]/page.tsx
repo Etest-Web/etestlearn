@@ -19,6 +19,7 @@ import { ArrowLeft, Loader2, Save, Trash2, Globe, LayoutList, PlusCircle, AlignJ
 import Link from "next/link";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { slugify } from "@/lib/slug";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -92,11 +93,7 @@ export default function CourseEditPage() {
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const title = e.target.value;
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
-    setFormData((prev) => ({ ...prev, title, slug }));
+    setFormData((prev) => ({ ...prev, title, slug: slugify(title) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

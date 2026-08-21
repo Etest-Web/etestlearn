@@ -4,6 +4,9 @@ import { v } from "convex/values";
 export const listThreadsForCourse = query({
   args: { courseId: v.id("courses") },
   handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    await verifyAccess(ctx, user, args.courseId);
+
     const threads = await ctx.db
       .query("discussionThreads")
       .withIndex("by_course", (q: any) => q.eq("courseId", args.courseId))
@@ -16,6 +19,13 @@ export const listThreadsForCourse = query({
 export const listMessagesForThread = query({
   args: { threadId: v.id("discussionThreads") },
   handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) return [];
+
+    await verifyAccess(ctx, user, thread.courseId);
+
     return await ctx.db
       .query("discussionMessages")
       .withIndex("by_thread", (q: any) => q.eq("threadId", args.threadId))
@@ -86,6 +96,17 @@ export const postMessage = mutation({
     }
     
     await verifyAccess(ctx, user, thread.courseId);
+
+    // Rate limit: max one message per 10 seconds per user per thread.
+    const recent = await ctx.db
+      .query("discussionMessages")
+      .withIndex("by_thread", (q: any) => q.eq("threadId", args.threadId))
+      .order("desc")
+      .take(20);
+    const lastMine = recent.find((m: any) => m.userId === user._id);
+    if (lastMine && Date.now() - lastMine.createdAt < 10_000) {
+      throw new Error("You're posting too quickly — please wait a moment");
+    }
 
     const now = Date.now();
     return await ctx.db.insert("discussionMessages", {

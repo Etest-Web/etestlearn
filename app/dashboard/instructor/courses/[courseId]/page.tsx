@@ -29,7 +29,12 @@ export default function CourseEditPage() {
   const updateCourse = useMutation(api.courses.updateCourse);
   const createLesson = useMutation(api.courses.createLesson);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const getFileUrl = useMutation(api.files.getFileUrl);
+  const pendingStorageId = useRef<Id<"_storage"> | null>(null);
+  const [resolvedStorageId, setResolvedStorageId] = useState<Id<"_storage"> | null>(null);
+  const resolvedFileUrl = useQuery(
+    api.files.getFileUrl,
+    resolvedStorageId ? { storageId: resolvedStorageId } : "skip",
+  );
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
@@ -37,6 +42,19 @@ export default function CourseEditPage() {
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // When the uploaded file URL resolves, attach it to the form.
+  useEffect(() => {
+    if (
+      resolvedFileUrl &&
+      pendingStorageId.current &&
+      resolvedStorageId === pendingStorageId.current
+    ) {
+      setFormData((prev) => ({ ...prev, thumbnailUrl: resolvedFileUrl }));
+      toast.success("Image uploaded successfully");
+      pendingStorageId.current = null;
+    }
+  }, [resolvedFileUrl, resolvedStorageId]);
   
   const [newLessonData, setNewLessonData] = useState({
     title: "",
@@ -116,13 +134,9 @@ export default function CourseEditPage() {
 
       const { storageId } = await result.json();
 
-      // 3. Get the permanent public URL
-      const url = await getFileUrl({ storageId });
-
-      if (url) {
-        setFormData((prev) => ({ ...prev, thumbnailUrl: url }));
-        toast.success("Image uploaded successfully");
-      }
+      // 3. Resolve the permanent URL via the getFileUrl query
+      pendingStorageId.current = storageId;
+      setResolvedStorageId(storageId);
     } catch (error) {
       console.error(error);
       toast.error("Failed to upload image");

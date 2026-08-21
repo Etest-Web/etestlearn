@@ -30,6 +30,13 @@ export default function LessonEditPage() {
   const deleteLesson = useMutation(api.courses.deleteLesson);
   
   const quizData = useQuery(api.quizzes.getQuizForLesson, { lessonId: lessonId as Id<"lessons"> });
+  const answerKey = useQuery(
+    api.quizzes.getQuizAnswerKey,
+    quizData ? { quizId: quizData.quiz._id } : "skip",
+  );
+  const correctOptionIds = new Set(
+    (answerKey ?? []).flatMap((k) => k.correctOptionIds),
+  );
   const createQuiz = useMutation(api.quizzes.createQuiz);
   const updateQuiz = useMutation(api.quizzes.updateQuiz);
   const addQuizQuestion = useMutation(api.quizzes.addQuizQuestion);
@@ -326,15 +333,15 @@ export default function LessonEditPage() {
                                   <div
                                     key={opt._id}
                                     className={`flex items-center gap-2 p-2 rounded-md border text-sm ${
-                                      opt.isCorrect ? "bg-green-500/10 border-green-500/20" : "bg-muted/50"
+                                      correctOptionIds.has(opt._id) ? "bg-green-500/10 border-green-500/20" : "bg-muted/50"
                                     }`}
                                   >
-                                    {opt.isCorrect ? (
+                                    {correctOptionIds.has(opt._id) ? (
                                       <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                                     ) : (
                                       <XCircle className="h-4 w-4 text-muted-foreground shrink-0" />
                                     )}
-                                    <span className={opt.isCorrect ? "font-medium" : "text-muted-foreground"}>
+                                    <span className={correctOptionIds.has(opt._id) ? "font-medium" : "text-muted-foreground"}>
                                       {opt.text}
                                     </span>
                                   </div>

@@ -269,3 +269,74 @@ export const deleteLesson = mutation({
   },
 });
 
+
+export const getCourseAnalytics = query({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User record not found");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+
+    if (course.instructorId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to view analytics for this course");
+    }
+
+    const enrollments = await ctx.db
+      .query("enrollments")
+      .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
+      .collect();
+
+    const completedCount = enrollments.filter(
+      (e) => e.progressPercent >= 100,
+    ).length;
+
+    // Average quiz score across all attempts on this course's quizzes.
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_course_order", (q) => q.eq("courseId", args.courseId))
+      .collect();
+
+    let attemptCount = 0;
+    let totalPercent = 0;
+
+    for (const lesson of lessons) {
+      const quiz = await ctx.db
+        .query("quizzes")
+        .withIndex("by_lesson", (q) => q.eq("lessonId", lesson._id))
+        .unique();
+      if (!quiz) continue;
+
+      const attempts = await ctx.db
+        .query("quizAttempts")
+        .withIndex("by_quiz", (q) => q.eq("quizId", quiz._id))
+        .collect();
+
+      for (const attempt of attempts) {
+        attemptCount += 1;
+        totalPercent +=
+          attempt.maxScore === 0
+            ? 0
+            : (attempt.score / attempt.maxScore) * 100;
+      }
+    }
+
+    return {
+      enrollmentCount: enrollments.length,
+      completionRate:
+        enrollments.length === 0
+          ? 0
+          : Math.round((completedCount / enrollments.length) * 100),
+      averageQuizScore: attemptCount === 0 ? null : Math.round(totalPercent / attemptCount),
+      attemptCount,
+    };
+  },
+});

@@ -2,17 +2,22 @@ import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "../convex/_generated/api";
 import schema from "../convex/schema";
+import type { GenericSchema, SchemaDefinition, DataModelFromSchemaDefinition, GenericMutationCtx } from "convex/server";
 
 // Load every Convex module (function definitions) for the in-memory backend.
 const modules = import.meta.glob("../convex/**/*.ts");
 
 // Cast schema to satisfy GenericSchema constraint (defineSchema lacks index signature)
-const testSchema = schema as any;
+const testSchema = schema as unknown as SchemaDefinition<GenericSchema, boolean>;
 
-async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
+// Extract the DataModel type from the original schema for proper type inference in run() callbacks
+type TestDataModel = DataModelFromSchemaDefinition<typeof schema>;
+type TestCtx = GenericMutationCtx<TestDataModel>;
+
+async function seedWorld(t: any) {
   const now = Date.now();
 
-  const adminId = await t.run(async (ctx) =>
+  const adminId = await t.run(async (ctx: TestCtx) =>
     ctx.db.insert("users", {
       clerkId: "clerk_admin",
       email: "admin@test.com",
@@ -22,7 +27,7 @@ async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
     }),
   );
 
-  const instructorId = await t.run(async (ctx) =>
+  const instructorId = await t.run(async (ctx: TestCtx) =>
     ctx.db.insert("users", {
       clerkId: "clerk_instructor",
       email: "instructor@test.com",
@@ -32,7 +37,7 @@ async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
     }),
   );
 
-  const studentId = await t.run(async (ctx) =>
+  const studentId = await t.run(async (ctx: TestCtx) =>
     ctx.db.insert("users", {
       clerkId: "clerk_student",
       email: "student@test.com",
@@ -42,7 +47,7 @@ async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
     }),
   );
 
-  const courseId = await t.run(async (ctx) =>
+  const courseId = await t.run(async (ctx: TestCtx) =>
     ctx.db.insert("courses", {
       title: "Paid Course",
       slug: "paid-course",
@@ -57,7 +62,7 @@ async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
     }),
   );
 
-  const freeCourseId = await t.run(async (ctx) =>
+  const freeCourseId = await t.run(async (ctx: TestCtx) =>
     ctx.db.insert("courses", {
       title: "Free Course",
       slug: "free-course",
@@ -78,7 +83,7 @@ describe("role enforcement", () => {
     const t = convexTest(testSchema, modules);
     const { studentId } = await seedWorld(t);
 
-    await t.run(async (ctx) => {
+    await t.run(async (ctx: TestCtx) => {
       const student = await ctx.db.get(studentId);
       expect(student).not.toBeNull();
     });
@@ -141,7 +146,7 @@ describe("enrollment gating", () => {
     const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
-    await t.run(async (ctx) => {
+    await t.run(async (ctx: TestCtx) => {
       const student = (
         await ctx.db.query("users").withIndex("by_clerk_id", (q) => q.eq("clerkId", "clerk_student")).unique()
       )!;
@@ -187,7 +192,7 @@ describe("lesson progress", () => {
     const t = convexTest(testSchema, modules);
     const { freeCourseId } = await seedWorld(t);
 
-    const lessonId = await t.run(async (ctx) =>
+    const lessonId = await t.run(async (ctx: TestCtx) =>
       ctx.db.insert("lessons", {
         courseId: freeCourseId,
         title: "Lesson 1",
@@ -217,7 +222,7 @@ describe("lesson progress", () => {
     const lessonIds = [];
     for (let i = 0; i < 4; i++) {
       lessonIds.push(
-        await t.run(async (ctx) =>
+        await t.run(async (ctx: TestCtx) =>
           ctx.db.insert("lessons", {
             courseId: freeCourseId,
             title: `Lesson ${i + 1}`,
@@ -248,7 +253,7 @@ describe("lesson progress", () => {
 
     expect(progress).toBe(100);
 
-    const enrollment = await t.run(async (ctx) => {
+    const enrollment = await t.run(async (ctx: TestCtx) => {
       const student = (
         await ctx.db
           .query("users")

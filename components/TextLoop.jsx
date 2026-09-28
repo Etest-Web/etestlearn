@@ -49,6 +49,7 @@ const buildPath = (shape, curviness, ribbonWidth) => {
 const TextLoop = ({
   text = 'React ✦ Bits',
   shape = 'wave',
+  path,
   speed = 90,
   direction = 'forward',
   separator = '✦',

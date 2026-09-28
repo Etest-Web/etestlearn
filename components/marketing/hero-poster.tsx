@@ -76,6 +76,7 @@ export function HeroPoster() {
               text="Glypha"
               shape="wave"
               speed={55}
+              path=""
               direction="forward"
               separator="✦"
               curviness={48}

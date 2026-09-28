@@ -19,13 +19,13 @@ export function Navbar() {
 
     return (
         <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+            <div className="mx-auto flex max-h-20 max-w-6xl items-center justify-between px-4 py-3">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 group">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-105">
-                        <Image width={40} height={40} alt="Glypha" src={"/Logo.svg"} className="h-4 w-4" />
+                    <div className="flex w-30 items-center justify-center rounded-lg transition-transform group-hover:scale-105">
+                        <Image width={10} height={10} alt="Glypha" src={"/Logo.svg"} className="w-full" />
                     </div>
-                    <span className="text-sm font-bold tracking-tight sm:text-base">Glypha Learning</span>
+                    {/*<span className="text-sm font-bold tracking-tight sm:text-base">Glypha Learning</span>*/}
                 </Link>
 
                 {/* Navigation */}

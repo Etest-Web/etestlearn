@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
-import { PlusCircle, Loader2, BookOpen } from "lucide-react";
+import { PlusCircle, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 
@@ -18,7 +18,7 @@ export default function InstructorCoursesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Instructor Dashboard</h2>
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">Instructor Dashboard</h2>
           <p className="text-muted-foreground">Manage your courses and content.</p>
         </div>
         <Button onClick={() => router.push("/dashboard/instructor/courses/new")}>

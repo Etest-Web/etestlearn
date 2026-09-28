@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { slugify } from "@/lib/slug";
 

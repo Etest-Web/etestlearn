@@ -30,22 +30,22 @@ export default function CertificateDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <Card className="border-2 border-dashed border-zinc-300 bg-white text-zinc-900 shadow-lg">
+      <Card className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-card text-foreground shadow-lg">
         <CardContent className="space-y-4 px-8 py-10 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.35em] text-zinc-500">
+          <p className="text-xs font-medium uppercase tracking-[0.35em] text-muted-foreground">
             Certificate of Completion
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">
             {course?.title ?? "Completed course"}
           </h1>
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-muted-foreground">
             Awarded to
           </p>
           <p className="text-xl font-semibold tracking-tight">
             {/* Clerk name is rendered elsewhere; this is a generic certificate */}
             You
           </p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             In recognition of successfully completing the course on{" "}
             {new Date(cert.issuedAt).toLocaleDateString(undefined, {
               year: "numeric",

@@ -24,7 +24,7 @@ export default function VerifyCertificatePage() {
   );
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-4 py-12">
+    <main className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-center gap-2 mb-8">
           <GraduationCap className="h-6 w-6 text-[#5340FF]" />
@@ -32,14 +32,14 @@ export default function VerifyCertificatePage() {
         </div>
 
         {result === undefined && (
-          <div className="bg-white rounded-2xl shadow-sm border p-10 text-center space-y-3">
+          <div className="bg-card rounded-2xl shadow-sm border p-10 text-center space-y-3">
             <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto" />
             <p className="text-muted-foreground">Verifying certificate...</p>
           </div>
         )}
 
         {result === null && (
-          <div className="bg-white rounded-2xl shadow-sm border p-10 text-center space-y-3">
+          <div className="bg-card rounded-2xl shadow-sm border p-10 text-center space-y-3">
             <XCircle className="h-12 w-12 text-red-500 mx-auto" />
             <h1 className="text-xl font-bold">Certificate not found</h1>
             <p className="text-muted-foreground text-sm">
@@ -52,7 +52,7 @@ export default function VerifyCertificatePage() {
         )}
 
         {result && (
-          <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+          <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
             <div className="bg-emerald-50 border-b border-emerald-100 p-5 flex items-start gap-3">
               <BadgeCheck className="h-6 w-6 text-emerald-600 shrink-0 mt-0.5" />
               <div>

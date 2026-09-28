@@ -13,10 +13,21 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -41,8 +52,6 @@ export default function LessonEditPage() {
     (answerKey ?? []).flatMap((k) => k.correctOptionIds),
   );
   const createQuiz = useMutation(api.quizzes.createQuiz);
-  const updateQuiz = useMutation(api.quizzes.updateQuiz);
-  const addQuizQuestion = useMutation(api.quizzes.addQuizQuestion);
   const deleteQuizQuestion = useMutation(api.quizzes.deleteQuizQuestion);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -94,10 +103,6 @@ export default function LessonEditPage() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this lesson? This action cannot be undone.")) {
-      return;
-    }
-    
     setIsDeleting(true);
     try {
       await deleteLesson({ lessonId: lessonId as Id<"lessons"> });
@@ -171,10 +176,28 @@ export default function LessonEditPage() {
           <h2 className="text-2xl font-bold tracking-tight">Edit Lesson</h2>
         </div>
         <div className="flex gap-2">
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isDeleting}>
-            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-            Delete
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger render={
+              <Button variant="destructive" size="sm" type="button" disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Delete
+              </Button>
+            } />
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this lesson?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently removes the lesson and its quiz questions. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -214,7 +237,7 @@ export default function LessonEditPage() {
               <Label htmlFor="contentType">Content Type</Label>
               <Select
                 value={formData.contentType}
-                onValueChange={(value: any) => setFormData((prev) => ({ ...prev, contentType: value }))}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -311,12 +334,12 @@ export default function LessonEditPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium">Quiz Questions</h3>
                       <Dialog>
-                        <DialogTrigger>
+                        <DialogTrigger render={
                           <Button size="sm" type="button">
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add Question
                           </Button>
-                        </DialogTrigger>
+                        } />
                         <DialogContent className="max-w-2xl">
                           <AddQuestionForm quizId={quizData.quiz._id} />
                         </DialogContent>
@@ -456,31 +479,29 @@ function AddQuestionForm({ quizId }: { quizId: Id<"quizzes"> }) {
         
         <div className="space-y-3">
           <Label>Options</Label>
-          {options.map((option, idx) => (
-            <div key={idx} className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="correct-option"
-                checked={option.isCorrect}
-                onChange={() => {
-                  const newOptions = [...options];
-                  newOptions.forEach((o, i) => o.isCorrect = i === idx);
-                  setOptions(newOptions);
-                }}
-                className="h-4 w-4"
-              />
-              <Input
-                value={option.text}
-                onChange={e => {
-                  const newOptions = [...options];
-                  newOptions[idx].text = e.target.value;
-                  setOptions(newOptions);
-                }}
-                placeholder={`Option ${idx + 1}`}
-                className={option.isCorrect ? "border-green-500" : ""}
-              />
-            </div>
-          ))}
+          <RadioGroup
+            value={String(Math.max(0, options.findIndex((o) => o.isCorrect)))}
+            onValueChange={(value) => {
+              const idx = Number(value);
+              setOptions((prev) => prev.map((o, i) => ({ ...o, isCorrect: i === idx })));
+            }}
+            className="gap-3"
+          >
+            {options.map((option, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <RadioGroupItem value={String(idx)} id={`option-${idx}`} aria-label={`Mark option ${idx + 1} as correct`} />
+                <Input
+                  value={option.text}
+                  onChange={e => {
+                    const text = e.target.value;
+                    setOptions((prev) => prev.map((o, i) => (i === idx ? { ...o, text } : o)));
+                  }}
+                  placeholder={`Option ${idx + 1}`}
+                  className={option.isCorrect ? "border-green-500" : ""}
+                />
+              </div>
+            ))}
+          </RadioGroup>
           <p className="text-xs text-muted-foreground mt-2">
             Select the radio button next to the correct option. Leave extra options blank to omit them.
           </p>

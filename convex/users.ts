@@ -1,5 +1,40 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+
+// Synced from Clerk webhooks (user.created / user.updated). This is the
+// source of truth for profile fields, since JWT claims may not carry them.
+export const upsertFromClerk = internalMutation({
+  args: {
+    clerkId: v.string(),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const profile = {
+      email: args.email,
+      name: args.name,
+      imageUrl: args.imageUrl,
+    };
+
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, profile);
+      return;
+    }
+
+    await ctx.db.insert("users", {
+      clerkId: args.clerkId,
+      ...profile,
+      role: "student",
+      createdAt: Date.now(),
+    });
+  },
+});
 
 export const ensureCurrentUser = mutation({
   args: {},

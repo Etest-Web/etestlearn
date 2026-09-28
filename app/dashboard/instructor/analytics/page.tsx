@@ -56,14 +56,13 @@ function CourseAnalyticsCard({
               <div className="rounded-lg border p-3">
                 <Target className="h-4 w-4 mx-auto text-muted-foreground" />
                 <p className="text-xl font-bold mt-1">
-                  {analytics.averageQuizScore ?? "—"}
-                  {analytics.averageQuizScore !== null && "%"}
+                  {analytics.averageQuizScore != null ? `${analytics.averageQuizScore}%` : "—"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">Avg score</p>
               </div>
             </div>
 
-            <div className="h-32">
+            <div className="h-32 text-border">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={[
@@ -78,10 +77,19 @@ function CourseAnalyticsCard({
                   ]}
                   margin={{ top: 0, right: 0, bottom: 0, left: -25 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} axisLine={false} tickLine={false} />
-                  <RechartsTooltip />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} stroke="currentColor" />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} axisLine={false} tickLine={false} stroke="currentColor" />
+                  <RechartsTooltip
+                    cursor={{ fill: "transparent" }}
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "none",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                      backgroundColor: "var(--popover)",
+                      color: "var(--popover-foreground)",
+                    }}
+                  />
                   <Bar dataKey="value" fill="#5340FF" radius={[6, 6, 0, 0]} maxBarSize={48} />
                 </BarChart>
               </ResponsiveContainer>

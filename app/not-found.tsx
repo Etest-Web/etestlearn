@@ -3,7 +3,7 @@ import { GraduationCap } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 to-slate-100">
+    <main className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-background to-muted">
       <div className="text-center space-y-5 max-w-md">
         <div className="flex items-center justify-center gap-2">
           <GraduationCap className="h-6 w-6 text-[#5340FF]" />

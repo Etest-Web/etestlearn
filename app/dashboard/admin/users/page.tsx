@@ -12,11 +12,11 @@ import { toast } from "sonner";
 function roleBadgeClass(role: string) {
   switch (role) {
     case "admin":
-      return "bg-purple-100 text-purple-800 border-purple-200";
+      return "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30";
     case "instructor":
-      return "bg-blue-100 text-blue-800 border-blue-200";
+      return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30";
     default:
-      return "bg-zinc-100 text-zinc-700 border-zinc-200";
+      return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/15 dark:text-zinc-300 dark:border-zinc-500/30";
   }
 }
 

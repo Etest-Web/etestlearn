@@ -39,7 +39,7 @@ function CoursesWrapper() {
       </header>
 
       {filteredCourses.length === 0 ? (
-        <p className="text-center text-muted-foreground mt-12 py-12 border border-dashed rounded-xl border-gray-200">
+        <p className="text-center text-muted-foreground mt-12 py-12 border border-dashed rounded-xl border-border">
           No courses found matching your search. Try different keywords!
         </p>
       ) : (
@@ -78,7 +78,7 @@ function CoursesWrapper() {
 
 export default function CoursesPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-gray-500">Loading catalog...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-muted-foreground">Loading catalog...</div>}>
       <CoursesWrapper />
     </Suspense>
   );

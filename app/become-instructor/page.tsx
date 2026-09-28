@@ -81,6 +81,16 @@ export default function BecomeInstructorPage() {
       toast.success(
         "Application submitted! We'll review it and get back to you."
       );
+      fetch("/api/instructor-applications/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      }).catch((notifyError) => {
+        console.warn(
+          "Failed to send instructor application notification:",
+          notifyError
+        );
+      });
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Failed to submit application.");

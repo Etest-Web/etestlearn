@@ -15,8 +15,7 @@ import { Switch } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { ArrowLeft, Loader2, Save, Trash2, Globe, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, Image as ImageIcon, Upload } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
@@ -70,6 +69,7 @@ export default function CourseEditPage() {
     level: "",
     published: false,
     thumbnailUrl: "",
+    priceNaira: "",
   });
 
   useEffect(() => {
@@ -82,6 +82,7 @@ export default function CourseEditPage() {
         level: courseData.course.level || "",
         published: courseData.course.published,
         thumbnailUrl: courseData.course.thumbnailUrl || "",
+        priceNaira: courseData.course.price ? String(courseData.course.price / 100) : "",
       });
     }
   }, [courseData]);
@@ -100,9 +101,22 @@ export default function CourseEditPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // Price is entered in Naira on the form; Convex stores kobo.
+      // An emptied field explicitly sets the course back to free (price 0).
+      const naira = parseFloat(formData.priceNaira);
+      const price = Number.isFinite(naira) && naira > 0 ? Math.round(naira * 100) : 0;
+
       await updateCourse({
         courseId: courseId as Id<"courses">,
-        ...formData,
+        title: formData.title,
+        slug: formData.slug,
+        description: formData.description,
+        category: formData.category || undefined,
+        level: formData.level || undefined,
+        published: formData.published,
+        thumbnailUrl: formData.thumbnailUrl || undefined,
+        price,
+        ...(price > 0 ? { currency: "NGN" } : {}),
       });
       toast.success("Course updated successfully");
     } catch (error) {
@@ -214,8 +228,6 @@ export default function CourseEditPage() {
     );
   }
 
-  const course = courseData.course;
-
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
       <div className="flex items-center gap-4">
@@ -225,8 +237,16 @@ export default function CourseEditPage() {
         <div className="flex-1">
           <h2 className="text-2xl font-bold tracking-tight">Edit Course</h2>
         </div>
-        <div className="flex gap-2">
-          {/* Actions will go here */}
+        <div className="flex items-center gap-2">
+          <Badge variant={courseData.course.published ? "default" : "secondary"}>
+            {courseData.course.published ? "Published" : "Draft"}
+          </Badge>
+          {courseData.course.slug && (
+            <Button variant="outline" size="sm" onClick={() => window.open(`/courses/${courseData.course.slug}`, "_blank")}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View public page
+            </Button>
+          )}
         </div>
       </div>
       
@@ -345,7 +365,7 @@ export default function CourseEditPage() {
                       </div>
                     </div>
                     {formData.thumbnailUrl && (
-                      <div className="w-32 h-20 bg-muted rounded-lg overflow-hidden border border-gray-100 shadow-sm shrink-0">
+                      <div className="w-32 h-20 bg-muted rounded-lg overflow-hidden border border-border shadow-sm shrink-0">
                         <img 
                           src={formData.thumbnailUrl} 
                           alt="Thumbnail preview" 
@@ -380,6 +400,22 @@ export default function CourseEditPage() {
                     />
                   </div>
                 </div>
+                <div className="space-y-2 max-w-xs">
+                  <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>
+                  <Input
+                    id="priceNaira"
+                    name="priceNaira"
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={formData.priceNaira}
+                    onChange={handleChange}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty (or 0) for a free course. Paid courses are collected via Paystack.
+                  </p>
+                </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2 border-t pt-4">
                 <Button type="submit" disabled={isSubmitting}>
@@ -399,12 +435,12 @@ export default function CourseEditPage() {
                   <CardDescription>Manage the modules and lessons for this course.</CardDescription>
                 </div>
                 <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
-                  <DialogTrigger>
+                  <DialogTrigger render={
                     <Button size="sm" type="button">
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Add Lesson
                     </Button>
-                  </DialogTrigger>
+                  } />
                   <DialogContent>
                     <form onSubmit={handleCreateLesson}>
                       <DialogHeader>
@@ -427,7 +463,7 @@ export default function CourseEditPage() {
                           <Label htmlFor="lesson-type">Content Type</Label>
                           <Select
                             value={newLessonData.contentType}
-                            onValueChange={(value: any) => setNewLessonData({ ...newLessonData, contentType: value })}
+                            onValueChange={(value) => setNewLessonData({ ...newLessonData, contentType: value as "video" | "article" | "quiz" })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select type" />
@@ -505,10 +541,9 @@ export default function CourseEditPage() {
                           <Badge variant="outline" className="capitalize text-xs font-normal">
                             {lesson.contentType}
                           </Badge>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => router.push(`/dashboard/instructor/courses/${courseData.course._id}/lessons/${lesson._id}`)}
                           >
                             Edit

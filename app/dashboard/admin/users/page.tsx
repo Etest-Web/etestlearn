@@ -12,11 +12,11 @@ import { toast } from "sonner";
 function roleBadgeClass(role: string) {
   switch (role) {
     case "admin":
-      return "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30";
+      return "bg-primary/10 text-[#6C3C78] border-primary/25 dark:bg-primary/15 dark:text-[#C090CE] dark:border-primary/30";
     case "instructor":
-      return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30";
+      return "bg-brand/20 text-brand-ink border-brand/50 dark:bg-brand/15 dark:text-brand dark:border-brand/30";
     default:
-      return "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-500/15 dark:text-zinc-300 dark:border-zinc-500/30";
+      return "bg-secondary text-secondary-foreground border-border";
   }
 }
 
@@ -61,7 +61,7 @@ export default function AdminUsersPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Manage platform users and their roles. Instructor applications live in{" "}
-          <a href="/dashboard/admin/applications" className="text-[#5340FF] hover:underline">Applications</a>.
+          <a href="/dashboard/admin/applications" className="text-[#945DA3] hover:underline">Applications</a>.
         </p>
       </div>
 

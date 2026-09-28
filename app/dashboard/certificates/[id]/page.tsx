@@ -30,7 +30,7 @@ export default function CertificateDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <Card className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-card text-foreground shadow-lg">
+      <Card className="border-2 border-dashed border-border bg-card text-foreground shadow-lg">
         <CardContent className="space-y-4 px-8 py-10 text-center">
           <p className="text-xs font-medium uppercase tracking-[0.35em] text-muted-foreground">
             Certificate of Completion
@@ -75,7 +75,7 @@ export default function CertificateDetailPage() {
           href={`/verify/${certId}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center text-sm font-medium text-[#5340FF] hover:underline"
+          className="inline-flex items-center text-sm font-medium text-[#945DA3] hover:underline"
         >
           <BadgeCheck className="mr-1.5 h-4 w-4" /> View public verification page
         </a>

@@ -21,7 +21,7 @@ function Row({ hidden }: { hidden?: boolean }) {
           <span className="px-6 font-display text-xl tracking-wider text-muted-foreground sm:text-2xl">
             {topic.toUpperCase()}
           </span>
-          <svg viewBox="0 0 24 24" className="h-3 w-3 text-brand" fill="currentColor">
+          <svg viewBox="0 0 24 24" className="h-3 w-3 text-primary" fill="currentColor">
             <path d="M12 1l2.394 7.364H22l-6.264 4.55 2.394 7.365L12 15.73l-6.13 4.549 2.394-7.365L2 8.364h7.606z" />
           </svg>
         </span>

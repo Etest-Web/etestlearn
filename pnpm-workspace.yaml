@@ -1,9 +1,11 @@
 allowBuilds:
-  '@clerk/shared': set this to true or false
-  esbuild: set this to true or false
-  msw: set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+  # Platform binary selection/verification. Vite + Vitest depend on esbuild.
+  esbuild: true
+  # Next.js image optimization; install script checks for the prebuilt libvips binary.
+  sharp: true
+  # Native binding picker used by eslint's import resolver.
+  unrs-resolver: true
+  # Telemetry notice only - no functional impact, keep it off.
+  '@clerk/shared': false
+  # Copies a worker file only when `msw.workerDirectory` is set (it isn't here).
+  msw: false

@@ -88,14 +88,14 @@ function SearchResults() {
 
                <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-                      <span className="flex items-center gap-1 text-[#5340FF] bg-[#EBE9FE] dark:bg-[#5340FF]/20 px-2 py-1 rounded-md">
+                      <span className="flex items-center gap-1 text-[#945DA3] bg-[#F2EAF7] dark:bg-[#945DA3]/20 px-2 py-1 rounded-md">
                         <PlayCircle size={14} />
                         Available
                       </span>
                   </div>
                   <Link 
                     href={`/dashboard/courses/${course.slug}`} 
-                     className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-[#5340FF] hover:border-[#5340FF] hover:text-white transition-colors"
+                     className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-[#945DA3] hover:border-[#945DA3] hover:text-white transition-colors"
                   >
                     <ArrowRight size={18} />
                   </Link>

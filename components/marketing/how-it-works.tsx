@@ -44,7 +44,7 @@ export function HowItWorks() {
               <span className="font-mono text-sm tabular-nums text-muted-foreground/70">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/15 text-brand">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/15 text-brand-ink">
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="text-lg font-semibold tracking-tight">{title}</h3>

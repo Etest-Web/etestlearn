@@ -67,19 +67,19 @@ export default function MyLessonsPage() {
         <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto mb-6 inline-flex gap-2">
           <TabsTrigger 
             value="all" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#5340FF] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             All Lessons ({enrolledCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="in-progress" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#5340FF] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             In Progress ({inProgressCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="completed" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#5340FF] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             Completed ({completedCourses.length})
           </TabsTrigger>
@@ -164,7 +164,7 @@ function CourseGrid({
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-muted-foreground">Progress</span>
-                    <span className={isCompleted ? "text-emerald-500" : "text-[#5340FF]"}>
+                    <span className={isCompleted ? "text-emerald-500" : "text-[#945DA3]"}>
                       {Math.round(item.enrollment.progressPercent)}%
                     </span>
                   </div>
@@ -183,7 +183,7 @@ function CourseGrid({
                          Completed
                        </span>
                      ) : (
-                       <span className="flex items-center gap-1 text-orange-500 bg-orange-500/10 px-2 py-1 rounded-md">
+                       <span className="flex items-center gap-1 text-brand-ink bg-brand/20 px-2 py-1 rounded-md">
                          <PlayCircle size={14} />
                          In Progress
                        </span>
@@ -191,7 +191,7 @@ function CourseGrid({
                    </div>
                    <Link 
                      href={`/dashboard/courses/${item.course.slug}`} 
-                     className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-[#5340FF] hover:border-[#5340FF] hover:text-white transition-colors"
+                     className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-[#945DA3] hover:border-[#945DA3] hover:text-white transition-colors"
                    >
                      <ArrowRight size={18} />
                    </Link>

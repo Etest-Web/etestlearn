@@ -91,8 +91,8 @@ export async function POST(request: Request) {
     .map(
       ([label, value]) =>
         `<tr>` +
-        `<td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:600;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>` +
-        `<td style="padding:8px 12px;border:1px solid #e5e7eb;">${escapeHtml(value)}</td>` +
+        `<td style="padding:8px 12px;border:1px solid #E8E3E9;font-weight:600;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>` +
+        `<td style="padding:8px 12px;border:1px solid #E8E3E9;">${escapeHtml(value)}</td>` +
         `</tr>`
     )
     .join("");

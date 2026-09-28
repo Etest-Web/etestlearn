@@ -11,6 +11,8 @@
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-bebas-neue);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-ink: var(--brand-ink);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,74 +52,94 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --brand: oklch(0.666 0.179 58.318);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  /* ── Palette derived from public/Logo.svg ─────────────────────────────
+     purple #945DA3  →  oklch(56.556% 0.121 318.82)   brand / primary
+      · --brand is the mark itself: fills, buttons, rules, highlights
+      · --brand-ink is the deepened purple (#6C3C78, 8.22:1 on white) used
+        whenever the brand must read as text or an icon on a light surface
+      · --brand-foreground is what sits ON --brand (white, 4.82:1)
+     gold    #EABE5D  →  accent only: charts, badges, progress fills
+     Neutrals carry a very low-chroma cast at the purple hue (318.82) so the
+     greys sit in the same colour family as the mark.                        */
+  --background: oklch(100% 0.006 318.82);
+  --foreground: oklch(14.5% 0.012 318.82);
+  --brand: oklch(56.556% 0.121 318.82);
+  --brand-foreground: oklch(100% 0 0);
+  --brand-ink: oklch(44% 0.109 318.82);
+  --card: oklch(100% 0.006 318.82);
+  --card-foreground: oklch(14.5% 0.012 318.82);
+  --popover: oklch(100% 0.006 318.82);
+  --popover-foreground: oklch(14.5% 0.012 318.82);
+  --primary: oklch(56.556% 0.121 318.82);
+  --primary-foreground: oklch(100% 0 0);
+  --secondary: oklch(97% 0.008 318.82);
+  --secondary-foreground: oklch(20.5% 0.011 318.82);
+  --muted: oklch(97% 0.008 318.82);
+  --muted-foreground: oklch(55.6% 0.011 318.82);
+  --accent: oklch(95.5% 0.028 318.82);
+  --accent-foreground: oklch(20.5% 0.011 318.82);
+  --destructive: oklch(57.7% 0.245 27.325);
+  --border: oklch(92.2% 0.01 318.82);
+  --input: oklch(92.2% 0.01 318.82);
+  --ring: oklch(56.556% 0.121 318.82);
+  --chart-1: oklch(56.556% 0.121 318.82);
+  --chart-2: #eabe5d;
+  --chart-3: oklch(44% 0.109 318.82);
+  --chart-4: oklch(57% 0.108 84.92);
+  --chart-5: oklch(72% 0.102 318.82);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(98.5% 0.007 318.82);
+  --sidebar-foreground: oklch(14.5% 0.012 318.82);
+  --sidebar-primary: oklch(56.556% 0.121 318.82);
+  --sidebar-primary-foreground: oklch(100% 0 0);
+  --sidebar-accent: oklch(96% 0.016 318.82);
+  --sidebar-accent-foreground: oklch(20.5% 0.011 318.82);
+  --sidebar-border: oklch(92.2% 0.01 318.82);
+  --sidebar-ring: oklch(56.556% 0.121 318.82);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --brand: oklch(0.795 0.184 86.047);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* On dark surfaces both --brand and the primary step up to
+     oklch(72% 0.102 318.82) (#C090CE): black text on it is 8.12:1, the
+     ink on --background ~7.5:1 and text-primary against --card 6.94:1,
+     versus only 2.59:1 for white on it — hence the dark
+     --brand-foreground / --primary-foreground. Gold stays legible on dark
+     (11.3:1 on --background), so it needs no step of its own. */
+  --background: oklch(14.5% 0.01 318.82);
+  --foreground: oklch(98.5% 0.006 318.82);
+  --brand: oklch(72% 0.102 318.82);
+  --brand-foreground: oklch(14.5% 0.012 318.82);
+  /* the lightened brand already reads as text on dark, so ink === brand */
+  --brand-ink: oklch(72% 0.102 318.82);
+  --card: oklch(20.5% 0.011 318.82);
+  --card-foreground: oklch(98.5% 0.006 318.82);
+  --popover: oklch(20.5% 0.011 318.82);
+  --popover-foreground: oklch(98.5% 0.006 318.82);
+  --primary: oklch(72% 0.102 318.82);
+  --primary-foreground: oklch(14.5% 0.012 318.82);
+  --secondary: oklch(26.9% 0.011 318.82);
+  --secondary-foreground: oklch(98.5% 0.006 318.82);
+  --muted: oklch(26.9% 0.011 318.82);
+  --muted-foreground: oklch(70.8% 0.012 318.82);
+  --accent: oklch(30% 0.03 318.82);
+  --accent-foreground: oklch(98.5% 0.006 318.82);
+  --destructive: oklch(70.4% 0.191 22.216);
+  --border: oklch(100% 0 0 / 10%);
+  --input: oklch(100% 0 0 / 15%);
+  --ring: oklch(72% 0.102 318.82);
+  --chart-1: oklch(56.556% 0.121 318.82);
+  --chart-2: #eabe5d;
+  --chart-3: oklch(44% 0.109 318.82);
+  --chart-4: oklch(57% 0.108 84.92);
+  --chart-5: oklch(72% 0.102 318.82);
+  --sidebar: oklch(20.5% 0.011 318.82);
+  --sidebar-foreground: oklch(98.5% 0.006 318.82);
+  --sidebar-primary: oklch(72% 0.102 318.82);
+  --sidebar-primary-foreground: oklch(14.5% 0.012 318.82);
+  --sidebar-accent: oklch(28% 0.025 318.82);
+  --sidebar-accent-foreground: oklch(98.5% 0.006 318.82);
+  --sidebar-border: oklch(100% 0 0 / 10%);
+  --sidebar-ring: oklch(72% 0.102 318.82);
 }
 
 @layer base {

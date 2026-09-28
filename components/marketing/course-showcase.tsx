@@ -61,7 +61,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
           {course.category ? (
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
               {course.category}
             </span>
           ) : (
@@ -78,7 +78,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
           </div>
         </div>
 
-        <h3 className="text-base font-semibold leading-snug text-balance group-hover:text-brand">
+        <h3 className="text-base font-semibold leading-snug text-balance group-hover:text-primary">
           {course.title}
         </h3>
         <p className="line-clamp-2 text-sm text-muted-foreground">{course.description}</p>

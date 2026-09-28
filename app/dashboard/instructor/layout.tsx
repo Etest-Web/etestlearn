@@ -34,7 +34,7 @@ export default function InstructorLayout({ children }: { children: ReactNode }) 
                   className={cn(
                     "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                     active
-                      ? "bg-[#5340FF] text-white"
+                      ? "bg-[#945DA3] text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >

@@ -53,8 +53,8 @@ export default function DashboardPage() {
     })
     .filter(Boolean) as { enrollment: any; course: any }[];
 
-  const progressColors = ["bg-[#EBE9FE] dark:bg-[#5340FF]/20", "bg-[#FCE7F3] dark:bg-[#FF4949]/20", "bg-[#E0F2FE] dark:bg-[#0284C7]/20"];
-  const iconColors = ["text-[#5340FF]", "text-[#FF4949]", "text-[#0284C7]"];
+  const progressColors = ["bg-[#F2EAF7] dark:bg-[#945DA3]/20", "bg-[#FBF1DC] dark:bg-[#EABE5D]/20", "bg-[#FDECEC] dark:bg-[#FF4949]/20"];
+  const iconColors = ["text-[#945DA3] dark:text-[#C090CE]", "text-[#8A6A1F] dark:text-[#EABE5D]", "text-[#E63B4B] dark:text-[#FF8A8A]"];
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-8">
@@ -62,9 +62,9 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         
         {/* Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#5340FF] to-[#3B28E6] p-8 md:p-12 text-white shadow-xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#945DA3] to-[#5B3368] p-8 md:p-12 text-white shadow-xl">
           <div className="relative z-10 max-w-lg">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#B3A9FF] mb-3 block">
+            <span className="text-xs font-bold uppercase tracking-widest text-white mb-3 block">
               Online Course
             </span>
             <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-8">
@@ -119,7 +119,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-foreground">Continue Watching</h2>
             <div className="flex gap-2">
               <button className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50">&lt;</button>
-              <button className="w-8 h-8 rounded-full bg-[#5340FF] flex items-center justify-center text-white shadow-sm">&gt;</button>
+              <button className="w-8 h-8 rounded-full bg-[#945DA3] flex items-center justify-center text-white shadow-sm">&gt;</button>
             </div>
           </div>
           
@@ -137,7 +137,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="p-4 flex flex-col gap-2 relative">
                     {item.course.category && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5340FF] bg-[#EBE9FE] dark:bg-[#5340FF]/20 px-2 py-1 rounded w-fit inline-block mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#945DA3] bg-[#F2EAF7] dark:bg-[#945DA3]/20 px-2 py-1 rounded w-fit inline-block mb-1">
                         {item.course.category}
                       </span>
                     )}
@@ -168,7 +168,7 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-foreground">Your Lesson</h2>
-            <Link href="/dashboard" className="text-sm font-semibold text-[#5340FF] hover:underline">See all</Link>
+            <Link href="/dashboard" className="text-sm font-semibold text-[#945DA3] hover:underline">See all</Link>
           </div>
           
           <div className="bg-card rounded-2xl shadow-sm border border-border p-2">
@@ -196,7 +196,7 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5340FF] bg-[#EBE9FE] dark:bg-[#5340FF]/20 px-2 py-1 rounded">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#945DA3] bg-[#F2EAF7] dark:bg-[#945DA3]/20 px-2 py-1 rounded">
                         {item.course.category || "General"}
                       </span>
                     </td>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/dashboard/courses/${item.course.slug}`} className="inline-flex w-8 h-8 rounded-full border border-border items-center justify-center text-[#5340FF] hover:bg-[#5340FF] hover:text-white transition-colors">
+                      <Link href={`/dashboard/courses/${item.course.slug}`} className="inline-flex w-8 h-8 rounded-full border border-border items-center justify-center text-[#945DA3] hover:bg-[#945DA3] hover:text-white transition-colors">
                          <ArrowRight size={14} />
                       </Link>
                     </td>
@@ -230,12 +230,12 @@ export default function DashboardPage() {
           <div className="relative w-32 h-32 mb-6">
             <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
               <circle cx="50" cy="50" r="45" fill="transparent" strokeWidth="8" className="stroke-muted" />
-              <circle cx="50" cy="50" r="45" fill="transparent" stroke="#5340FF" strokeWidth="8" strokeDasharray="283" strokeDashoffset={283 - (283 * 32) / 100} className="transition-all duration-1000 ease-out" />
+              <circle cx="50" cy="50" r="45" fill="transparent" stroke="#945DA3" strokeWidth="8" strokeDasharray="283" strokeDashoffset={283 - (283 * 32) / 100} className="transition-all duration-1000 ease-out" />
             </svg>
             <div className="absolute inset-0 m-auto w-24 h-24 rounded-full overflow-hidden bg-muted border-4 border-card shadow-sm">
                 <img src={user?.imageUrl || "https://i.pravatar.cc/100"} alt="User Avatar" className="w-full h-full object-cover" />
             </div>
-            <div className="absolute -top-2 -right-2 bg-[#5340FF] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+            <div className="absolute -top-2 -right-2 bg-[#945DA3] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                32%
             </div>
           </div>
@@ -249,14 +249,14 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={MOCK_BAR_DATA} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'var(--popover)', color: 'var(--popover-foreground)' }}/>
-                <Bar dataKey="value" fill="#5340FF" radius={[4, 4, 4, 4]} barSize={24}>
+                <Bar dataKey="value" fill="#945DA3" radius={[4, 4, 4, 4]} barSize={24}>
                    {
                      MOCK_BAR_DATA.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={index === 2 ? '#5340FF' : '#C7C2FF'} />
+                       <Cell key={`cell-${index}`} fill={index === 2 ? '#945DA3' : '#C090CE'} />
                      ))
                    }
                 </Bar>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} dy={10} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: 'var(--muted-foreground)'}} dy={10} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger render={
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#5340FF] text-[#5340FF] hover:bg-[#5340FF] hover:text-white transition-colors text-xs font-bold">
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#945DA3] text-[#945DA3] hover:bg-[#945DA3] hover:text-white transition-colors text-xs font-bold">
                             <UserPlus size={12} />
                             Follow
                           </button>
@@ -306,7 +306,7 @@ export default function DashboardPage() {
            <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={
-                    <button className="w-full mt-6 py-3 rounded-full bg-muted text-[#5340FF] text-sm font-bold hover:bg-[#EBE9FE] dark:hover:bg-[#5340FF]/20 transition-colors">
+                    <button className="w-full mt-6 py-3 rounded-full bg-muted text-[#945DA3] text-sm font-bold hover:bg-[#F2EAF7] dark:hover:bg-[#945DA3]/20 transition-colors">
                       See All
                     </button>
                   } />

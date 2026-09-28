@@ -90,7 +90,7 @@ function CourseAnalyticsCard({
                       color: "var(--popover-foreground)",
                     }}
                   />
-                  <Bar dataKey="value" fill="#5340FF" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="value" fill="#945DA3" radius={[6, 6, 0, 0]} maxBarSize={48} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

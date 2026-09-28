@@ -6,7 +6,10 @@ import schema from "../convex/schema";
 // Load every Convex module (function definitions) for the in-memory backend.
 const modules = import.meta.glob("../convex/**/*.ts");
 
-async function seedWorld(t: ReturnType<typeof convexTest<typeof schema>>) {
+// Cast schema to satisfy GenericSchema constraint (defineSchema lacks index signature)
+const testSchema = schema as any;
+
+async function seedWorld(t: ReturnType<typeof convexTest<typeof testSchema>>) {
   const now = Date.now();
 
   const adminId = await t.run(async (ctx) =>
@@ -72,7 +75,7 @@ async function seedWorld(t: ReturnType<typeof convexTest<typeof schema>>) {
 
 describe("role enforcement", () => {
   test("students cannot list all users", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { studentId } = await seedWorld(t);
 
     await t.run(async (ctx) => {
@@ -87,7 +90,7 @@ describe("role enforcement", () => {
   });
 
   test("non-admins cannot change roles", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { studentId, instructorId } = await seedWorld(t);
 
     const asInstructor = t.withIdentity({
@@ -103,7 +106,7 @@ describe("role enforcement", () => {
   });
 
   test("admins can promote a student to instructor", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { studentId } = await seedWorld(t);
 
     const asAdmin = t.withIdentity({
@@ -122,7 +125,7 @@ describe("role enforcement", () => {
 
 describe("enrollment gating", () => {
   test("paid courses reject enrollment without a completed purchase", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
     const asStudent = t.withIdentity({
@@ -135,7 +138,7 @@ describe("enrollment gating", () => {
   });
 
   test("paid courses allow enrollment once the purchase is paid", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
     await t.run(async (ctx) => {
@@ -166,7 +169,7 @@ describe("enrollment gating", () => {
   });
 
   test("free courses enroll immediately", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { freeCourseId } = await seedWorld(t);
 
     const asStudent = t.withIdentity({
@@ -181,7 +184,7 @@ describe("enrollment gating", () => {
 
 describe("lesson progress", () => {
   test("completeLesson rejects callers who are not enrolled", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { freeCourseId } = await seedWorld(t);
 
     const lessonId = await t.run(async (ctx) =>
@@ -208,7 +211,7 @@ describe("lesson progress", () => {
   });
 
   test("completing lessons updates progress percent", async () => {
-    const t = convexTest(schema, modules);
+    const t = convexTest(testSchema, modules);
     const { freeCourseId } = await seedWorld(t);
 
     const lessonIds = [];

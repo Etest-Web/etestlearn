@@ -134,9 +134,9 @@ export function CourseShowcase() {
           kicker="The catalog"
           title={
             <>
-              Courses picked with
+              INTENTIONAL COURSES
               <br />
-              intent, not volume.
+              HAND-PICKED AND VERIFIED.
             </>
           }
           description="Every course is reviewed before it goes live — structured lessons, real assessments, and outcomes you can show for your time."

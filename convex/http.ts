@@ -4,16 +4,28 @@ import { internal } from "./_generated/api";
 import { Webhook } from "svix";
 
 type ClerkUserEvent = {
-  type: "user.created" | "user.updated" | string;
+  type: "user.created" | "user.updated" | "user.deleted" | string;
   data: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
-    image_url: string | null;
-    primary_email_address_id: string | null;
-    email_addresses: Array<{ id: string; email_address: string }>;
+    // user.deleted carries only an id; the rest are absent.
+    first_name?: string | null;
+    last_name?: string | null;
+    image_url?: string | null;
+    primary_email_address_id?: string | null;
+    email_addresses?: Array<{ id: string; email_address: string }>;
   };
 };
+
+/** Primary email address of a Clerk user, falling back to the first on file. */
+function primaryEmailOf(
+  data: ClerkUserEvent["data"]
+): string | undefined {
+  const addresses = data.email_addresses ?? [];
+  return (
+    addresses.find((e) => e.id === data.primary_email_address_id)?.email_address ??
+    addresses[0]?.email_address
+  );
+}
 
 const http = httpRouter();
 
@@ -95,28 +107,44 @@ http.route({
       "svix-signature": request.headers.get("svix-signature") ?? "",
     };
 
-    let event: ClerkUserEvent;
+    // verify() throws on a bad signature and returns nothing on success, so
+    // the body is parsed only after verification passes.
     try {
-      event = new Webhook(secret).verify(rawBody, svixHeaders) as ClerkUserEvent;
+      new Webhook(secret).verify(rawBody, svixHeaders);
     } catch {
       return new Response("Invalid signature", { status: 401 });
     }
 
-    if (event.type === "user.created" || event.type === "user.updated") {
-      const { id, email_addresses, primary_email_address_id } = event.data;
-      const primaryEmail =
-        email_addresses.find((e) => e.id === primary_email_address_id)
-          ?.email_address ?? email_addresses[0]?.email_address;
-      const name = [event.data.first_name, event.data.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+    let event: ClerkUserEvent;
+    try {
+      event = JSON.parse(rawBody) as ClerkUserEvent;
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    if (
+      event.type === "user.created" ||
+      event.type === "user.updated" ||
+      event.type === "email_address.created" ||
+      event.type === "email_address.updated"
+    ) {
+      // An email change arrives as its own event, so all four funnel into the
+      // same idempotent upsert. Fields absent from an event are left
+      // undefined and the mutation skips them rather than clearing them.
+      const { id, first_name, last_name, image_url } = event.data;
+      const name = [first_name, last_name].filter(Boolean).join(" ").trim();
 
       await ctx.runMutation(internal.users.upsertFromClerk, {
         clerkId: id,
-        email: primaryEmail,
+        email: primaryEmailOf(event.data),
         name: name || undefined,
-        imageUrl: event.data.image_url || undefined,
+        imageUrl: image_url || undefined,
+      });
+    } else if (event.type === "user.deleted") {
+      // user.deleted carries only an id. Enrollments, purchases and attempts
+      // are left intact so financial history stays auditable.
+      await ctx.runMutation(internal.users.deleteFromClerk, {
+        clerkId: event.data.id,
       });
     }
 

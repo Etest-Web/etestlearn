@@ -86,7 +86,7 @@ export function HeroPoster() {
               uppercase
               color="#ffffff"
               ribbon
-              ribbonColor="#505050"
+              ribbonColor="#A855F7"
               ribbonWidth={86}
               pauseOnHover={false}
             />
@@ -100,18 +100,18 @@ export function HeroPoster() {
               Learn skills that move you forward
             </p>
 
-            <h1 className="font-display text-6xl leading-[0.9] tracking-wide text-balance sm:text-7xl md:text-8xl">
-              Stop scrolling.
+            <h1 className="font-poppins text-6xl leading-[0.9] tracking-wide text-balance sm:text-7xl md:text-7xl">
+              A Digital Hub
               <br />
-              Start{" "}
+              for{" "}
               <span className="relative inline-block whitespace-nowrap">
-                <span className="relative z-10">building</span>
+                <span className="relative z-10">HANDS ON</span>
                 <span
                   aria-hidden="true"
                   className="absolute inset-x-[-0.08em] bottom-[0.06em] z-1 h-[0.32em] bg-brand/70"
                 />
               </span>{" "}
-              real skills.
+              Skill Development
             </h1>
 
             <p className="max-w-xl text-base text-pretty text-muted-foreground md:text-lg">

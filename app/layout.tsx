@@ -4,6 +4,7 @@ import {
   Geist_Mono,
   Montserrat,
   Bebas_Neue,
+  Poppins,
   Inter,
   Outfit,
 } from "next/font/google";
@@ -45,6 +46,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const poppins = Poppins({
+  weight: "800",
+  variable: "--font-poppins",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
@@ -80,7 +87,7 @@ export default function RootLayout({
       className={cn("font-outfit", outfit.variable, inter.variable)}
     >
       <body
-        className={`${geistSans.variable} ${bebasNeue.variable} ${mont.variable} ${geistMono.variable} ${outfit.className} antialiased`}
+        className={`${geistSans.variable} ${bebasNeue.variable} ${poppins.variable} ${mont.variable} ${geistMono.variable} ${outfit.className} antialiased`}
       >
         <ThemeProvider
           attribute="class"

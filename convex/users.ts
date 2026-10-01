@@ -11,11 +11,12 @@ export const upsertFromClerk = internalMutation({
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const profile = {
-      email: args.email,
-      name: args.name,
-      imageUrl: args.imageUrl,
-    };
+    // Only include fields that were actually supplied, so a partial event
+    // (e.g. an email change) does not blank out name or image.
+    const profile: { email?: string; name?: string; imageUrl?: string } = {};
+    if (args.email !== undefined) profile.email = args.email;
+    if (args.name !== undefined) profile.name = args.name;
+    if (args.imageUrl !== undefined) profile.imageUrl = args.imageUrl;
 
     const existing = await ctx.db
       .query("users")
@@ -23,7 +24,9 @@ export const upsertFromClerk = internalMutation({
       .unique();
 
     if (existing) {
-      await ctx.db.patch(existing._id, profile);
+      if (Object.keys(profile).length > 0) {
+        await ctx.db.patch(existing._id, profile);
+      }
       return;
     }
 
@@ -33,6 +36,80 @@ export const upsertFromClerk = internalMutation({
       role: "student",
       createdAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Remove a user deleted in Clerk. Related records (enrollments, purchases,
+ * quiz attempts, certificates) are left in place so financial and academic
+ * history remains auditable.
+ */
+export const deleteFromClerk = internalMutation({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+  },
+});
+
+/**
+ * Bulk mirror used by scripts/sync-clerk-users.mjs. Public rather than
+ * internal because the backfill runs from outside Convex, and it is a pure
+ * upsert keyed on clerkId, so replaying it is safe.
+ *
+ * Existing rows keep their role (student/instructor/admin); this only fills
+ * in the Clerk-owned identity fields.
+ */
+export const syncFromClerk = mutation({
+  args: {
+    users: v.array(
+      v.object({
+        clerkId: v.string(),
+        email: v.optional(v.string()),
+        name: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    let created = 0;
+    let updated = 0;
+
+    for (const user of args.users) {
+      const profile: { email?: string; name?: string; imageUrl?: string } = {};
+      if (user.email !== undefined) profile.email = user.email;
+      if (user.name !== undefined) profile.name = user.name;
+      if (user.imageUrl !== undefined) profile.imageUrl = user.imageUrl;
+
+      const existing = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", user.clerkId))
+        .unique();
+
+      if (existing) {
+        if (Object.keys(profile).length > 0) {
+          await ctx.db.patch(existing._id, profile);
+        }
+        updated++;
+        continue;
+      }
+
+      await ctx.db.insert("users", {
+        clerkId: user.clerkId,
+        ...profile,
+        role: "student",
+        createdAt: Date.now(),
+      });
+      created++;
+    }
+
+    return { created, updated, total: args.users.length };
   },
 });
 

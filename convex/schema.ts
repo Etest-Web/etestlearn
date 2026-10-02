@@ -205,5 +205,36 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"])
     .index("by_status", ["status"]),
+
+  // ─── Security infrastructure ──────────────────────────────────────────
+
+  // Fixed-window rate limiter buckets, keyed by a caller-chosen string such
+  // as "submitQuizAttempt:<userId>". Database-backed so limits survive
+  // serverless cold starts — an in-memory Map resets on every cold start and
+  // is trivially bypassed by forcing new instances. Expired rows are
+  // overwritten in place on next use, so the table stays small.
+  rateLimits: defineTable({
+    key: v.string(),
+    count: v.number(),
+    resetAt: v.number(),
+  }).index("by_key", ["key"])
+    .index("by_reset", ["resetAt"]),
+
+  // Immutable trail of privileged actions: role changes, certificate
+  // revocations, instructor-application reviews, admin template operations.
+  // Append-only by convention — rows are never patched or deleted so the log
+  // stays trustworthy as an audit record.
+  auditLogs: defineTable({
+    actorId: v.id("users"),
+    action: v.string(),
+    targetType: v.optional(v.string()),
+    targetId: v.optional(v.string()),
+    // JSON-encoded payload for action-specific context (old/new role, reason).
+    // Stored as a string so any shape fits without schema migrations.
+    details: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_createdAt", ["createdAt"])
+    .index("by_actor", ["actorId"])
+    .index("by_action", ["action"]),
 });
 

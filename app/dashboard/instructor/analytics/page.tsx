@@ -43,19 +43,19 @@ function CourseAnalyticsCard({
         ) : (
           <>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border p-2 sm:p-3">
                 <Users className="h-4 w-4 mx-auto text-muted-foreground" />
-                <p className="text-xl font-bold mt-1">{analytics.enrollmentCount}</p>
+                <p className="text-lg sm:text-xl font-bold mt-1">{analytics.enrollmentCount}</p>
                 <p className="text-[11px] text-muted-foreground">Enrolled</p>
               </div>
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border p-2 sm:p-3">
                 <Trophy className="h-4 w-4 mx-auto text-muted-foreground" />
-                <p className="text-xl font-bold mt-1">{analytics.completionRate}%</p>
+                <p className="text-lg sm:text-xl font-bold mt-1">{analytics.completionRate}%</p>
                 <p className="text-[11px] text-muted-foreground">Completed</p>
               </div>
-              <div className="rounded-lg border p-3">
+              <div className="rounded-lg border p-2 sm:p-3">
                 <Target className="h-4 w-4 mx-auto text-muted-foreground" />
-                <p className="text-xl font-bold mt-1">
+                <p className="text-lg sm:text-xl font-bold mt-1">
                   {analytics.averageQuizScore != null ? `${analytics.averageQuizScore}%` : "—"}
                 </p>
                 <p className="text-[11px] text-muted-foreground">Avg score</p>

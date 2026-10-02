@@ -67,11 +67,13 @@ export function HeroPoster() {
   const primaryLabel = user ? "Go to dashboard" : "Start learning";
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden">
       <section className="relative w-full">
         {/* Fixed TextLoop Background Wrapper */}
         <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden blur">
-          <div className="w-full min-w-screen opacity-50">
+          {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
+              would hand the parent ~15px of over-wide canvas to clip. */}
+          <div className="w-full opacity-50">
             <TextLoop
               text="Glypha"
               shape="wave"
@@ -86,21 +88,24 @@ export function HeroPoster() {
               uppercase
               color="#ffffff"
               ribbon
-              ribbonColor="#A855F7"
+              ribbonColor="#EAB308"
               ribbonWidth={86}
               pauseOnHover={false}
             />
           </div>
         </div>
 
-        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-14 px-2 pb-20 pt-14 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:pb-28 md:pt-20 lg:gap-10">
-          <div className="space-y-8">
-            <p className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              <span className="h-px w-8 bg-brand" aria-hidden="true" />
+        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-4 pb-14 pt-10 sm:gap-14 sm:px-6 sm:pb-20 sm:pt-14 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:pb-28 md:pt-20 lg:gap-10">
+          <div className="space-y-6 sm:space-y-8">
+            <p className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground sm:tracking-[0.24em]">
+              <span className="h-px w-8 shrink-0 bg-brand" aria-hidden="true" />
               Learn skills that move you forward
             </p>
 
-            <h1 className="font-poppins text-6xl leading-[0.9] tracking-wide text-balance sm:text-7xl md:text-7xl">
+            {/* Fluid until sm, then the 7xl step. At 320px the clamp floors at
+                2rem, which keeps the nowrap'd "HANDS ON" (~176px) inside the
+                288px content box — text-6xl put it at ~330px and clipped. */}
+            <h1 className="font-display text-[clamp(2rem,10vw,3rem)] leading-[0.9] tracking-wide text-balance sm:text-7xl">
               A Digital Hub
               <br />
               for{" "}

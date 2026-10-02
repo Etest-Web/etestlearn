@@ -3,68 +3,85 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent, Badge } from "@/components/ui";
+import { Award } from "lucide-react";
+import { Card, CardContent, Skeleton } from "@/components/ui";
+import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
 
 export default function CertificatesPage() {
-  const certificates = useQuery(api.certificates.listMyCertificates) ?? [];
-  const courses = useQuery(api.courses.listPublishedCourses) ?? [];
+  // Joined server-side: the previous version fetched published courses
+  // separately and silently dropped certificates for unpublished courses.
+  const certificates = useQuery(api.certificates.listMyCertificates);
 
-  const items = certificates
-    .map((cert) => {
-      const course = courses.find((c) => c._id === cert.courseId);
-      return course ? { cert, course } : null;
-    })
-    .filter(Boolean) as { cert: any; course: any }[];
+  if (certificates === undefined) {
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Certificates</h1>
         <p className="text-sm text-muted-foreground">
-          Courses you&apos;ve completed and earned a certificate for.
+          {certificates.length > 0
+            ? "Download, share, or open the public verification page for any of your certificates."
+            : "Courses you complete appear here with a shareable verification link."}
         </p>
       </section>
 
-      {items.length === 0 ? (
+      {certificates.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-sm text-muted-foreground">
-            You don&apos;t have any certificates yet. Progress through your
-            courses and reach the completion threshold to unlock them.
+            You don&apos;t have any certificates yet. Finish every lesson and pass
+            every quiz in a course to earn one automatically.
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {items.map(({ cert, course }) => (
-            <Link
-              key={cert._id}
-              href={`/dashboard/certificates/${cert._id}`}
-              className="block"
-            >
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    {course.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-xs text-muted-foreground">
-                  <Badge variant="outline" className="text-[10px]">
-                    Completed
-                  </Badge>
-                  <p>
-                    Issued on{" "}
-                    {new Date(cert.issuedAt).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <ul className="grid gap-4 md:grid-cols-2">
+          {certificates.map((cert) => {
+            const revoked = isCertificateRevoked(cert);
+            return (
+              <li key={cert._id}>
+                <Link
+                  href={`/dashboard/certificates/${cert._id}`}
+                  className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Card className="h-full transition-colors hover:border-primary/40">
+                    <CardContent className="space-y-3 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <Award
+                          aria-hidden
+                          className={`mt-0.5 h-5 w-5 shrink-0 ${
+                            revoked ? "text-muted-foreground" : "text-[#945DA3]"
+                          }`}
+                        />
+                        <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                          {revoked ? "Revoked" : "Active"}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-medium leading-snug">{cert.courseTitle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Issued {formatCertificateDate(cert.issuedAt)}
+                        </p>
+                        {cert.serial && (
+                          <p className="font-mono text-[11px] text-muted-foreground">
+                            {cert.serial}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
 }
-

@@ -95,13 +95,63 @@ export default defineSchema({
     .index("by_quiz", ["quizId"])
     .index("by_user", ["userId"]),
 
+  // Admin-uploaded certificate backgrounds. Certificates are rendered by
+  // stamping the learner's data onto page 1 of the active template, so the
+  // template owns the design and we only own the text. At most one template is
+  // active at a time (enforced in convex/certificateTemplates.ts).
+  certificateTemplates: defineTable({
+    name: v.string(),
+    pdfStorageId: v.id("_storage"),
+    // Page 1 dimensions, captured at upload so text anchors can be stored as
+    // fractions of the page and stay correct if the template is re-uploaded.
+    pageWidth: v.number(),
+    pageHeight: v.number(),
+    active: v.optional(v.boolean()),
+    // Per-field text placement as fractions of page width/height. A field
+    // omitted uses the built-in default; set to null to keep it off the
+    // certificate entirely (for a template that already prints its own title).
+    layout: v.optional(
+      v.object({
+        heading: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        recipient: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        course: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        issuedOn: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        issuer: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        serial: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+      }),
+    ),
+    createdAt: v.number(),
+    createdBy: v.optional(v.id("users")),
+  }).index("by_active", ["active"]),
+
   certificates: defineTable({
     userId: v.id("users"),
     courseId: v.id("courses"),
     issuedAt: v.number(),
+    // Public-facing serial shown on the certificate, the PDF and the verify
+    // page (e.g. "GL-2026-3F9A1C77"). Unique in practice — issuance retries on
+    // collision. Optional so certificates issued before the serial existed
+    // still validate; `backfillCertificateDetails` fills them in.
+    serial: v.optional(v.string()),
+    // Names are snapshotted at issuance so a later profile or course rename
+    // cannot retroactively change what an already-issued certificate says.
+    holderName: v.optional(v.string()),
+    courseTitle: v.optional(v.string()),
+    issuerName: v.optional(v.string()),
+    // Set when an instructor or admin withdraws the certificate. A revoked
+    // certificate stays readable for audit but fails public verification.
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+    revocationReason: v.optional(v.string()),
+    // PDF rendered at issuance, stored in Convex file storage.
+    pdfStorageId: v.optional(v.id("_storage")),
+    // Template the PDF was rendered from, snapshotted at issuance so a later
+    // template swap does not change an already-issued certificate.
+    templateId: v.optional(v.id("certificateTemplates")),
   }).index("by_user", ["userId"])
     .index("by_course", ["courseId"])
-    .index("by_user_course", ["userId", "courseId"]),
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_serial", ["serial"]),
 
   purchases: defineTable({
     userId: v.id("users"),

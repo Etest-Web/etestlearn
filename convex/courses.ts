@@ -335,6 +335,9 @@ export const getCourseAnalytics = query({
       .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
       .collect();
 
+    // Completion now means the same thing it means for certificates: every
+    // lesson finished. Quiz requirements are counted separately below so the
+    // two definitions cannot drift apart again.
     const completedCount = enrollments.filter(
       (e) => e.progressPercent >= 100,
     ).length;
@@ -369,6 +372,11 @@ export const getCourseAnalytics = query({
       }
     }
 
+    const certificates = await ctx.db
+      .query("certificates")
+      .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
+      .collect();
+
     return {
       enrollmentCount: enrollments.length,
       completionRate:
@@ -377,6 +385,8 @@ export const getCourseAnalytics = query({
           : Math.round((completedCount / enrollments.length) * 100),
       averageQuizScore: attemptCount === 0 ? null : Math.round(totalPercent / attemptCount),
       attemptCount,
+      certificateCount: certificates.filter((c) => c.revokedAt === undefined).length,
+      revokedCertificateCount: certificates.filter((c) => c.revokedAt !== undefined).length,
     };
   },
 });

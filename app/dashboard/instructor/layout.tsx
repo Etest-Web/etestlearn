@@ -20,8 +20,9 @@ export default function InstructorLayout({ children }: { children: ReactNode }) 
     <InstructorGuard>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <h1 className="text-3xl font-bold tracking-tight">Instructor Panel</h1>
-          <nav className="flex gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Instructor Panel</h1>
+          {/* Three tabs run ~374px — wrap rather than overflow the phone. */}
+          <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
             {NAV_ITEMS.map((item) => {
               const active =
                 item.href === "/dashboard/instructor"
@@ -32,7 +33,7 @@ export default function InstructorLayout({ children }: { children: ReactNode }) 
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                    "inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors touch-target",
                     active
                       ? "bg-[#945DA3] text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",

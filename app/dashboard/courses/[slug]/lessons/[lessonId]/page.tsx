@@ -205,19 +205,21 @@ export default function LessonPage() {
             <LessonContent contentType={lesson.contentType} content={lesson.content ?? undefined} />
           )}
 
-          <nav aria-label="Lesson navigation" className="flex items-center justify-between gap-3 border-t pt-4">
+          {/* Prev + CTA + Next needs ~411px. Stack below sm so the primary action is
+              always reachable, then go back to a single row. */}
+          <nav aria-label="Lesson navigation" className="flex flex-col-reverse items-stretch gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             {prev ? (
               <Link
                 href={lessonHref(prev)}
-                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent touch-target"
               >
                 <ArrowLeft className="h-4 w-4" /> Previous
               </Link>
             ) : (
-              <span />
+              <span className="hidden sm:block" />
             )}
 
-            <Button onClick={handleComplete} disabled={isMarking} variant={isCompleted ? "outline" : "default"}>
+            <Button className="w-full sm:w-auto" onClick={handleComplete} disabled={isMarking} variant={isCompleted ? "outline" : "default"}>
               {isMarking ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : isCompleted ? (
@@ -231,12 +233,12 @@ export default function LessonPage() {
             {next ? (
               <Link
                 href={lessonHref(next)}
-                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent touch-target"
               >
                 Next <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <span />
+              <span className="hidden sm:block" />
             )}
           </nav>
 

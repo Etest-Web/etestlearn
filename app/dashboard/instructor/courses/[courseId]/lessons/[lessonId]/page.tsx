@@ -283,7 +283,7 @@ export default function LessonEditPage() {
               <div className="space-y-2">
                 <Label htmlFor="content">Article Content (Markdown)</Label>
                 <Tabs defaultValue="write">
-                  <TabsList>
+                  <TabsList className="touch-target">
                     <TabsTrigger value="write">Write</TabsTrigger>
                     <TabsTrigger value="preview">Preview</TabsTrigger>
                   </TabsList>

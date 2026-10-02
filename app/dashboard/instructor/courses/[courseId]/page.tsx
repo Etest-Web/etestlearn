@@ -19,6 +19,7 @@ import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, 
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
+import { CertificatesPanel } from "@/components/course-certificates-panel";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -251,18 +252,24 @@ export default function CourseEditPage() {
       </div>
       
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 touch-target">
           <TabsTrigger
             value="details"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
           >
             Details
           </TabsTrigger>
           <TabsTrigger
             value="content"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
           >
             Curriculum
+          </TabsTrigger>
+          <TabsTrigger
+            value="certificates"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
+          >
+            Certificates
           </TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-6">
@@ -523,21 +530,21 @@ export default function CourseEditPage() {
                     .map((lesson, index) => (
                       <div
                         key={lesson._id}
-                        className="flex items-center justify-between p-3 bg-muted/50 border rounded-lg hover:bg-muted transition-colors group"
+                        className="flex items-center justify-between gap-3 p-3 bg-muted/50 border rounded-lg hover:bg-muted transition-colors group"
                       >
-                        <div className="flex items-center gap-3">
-                          <button className="cursor-grab text-muted-foreground hover:text-foreground">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <button aria-label={`Reorder ${lesson.title}`} className="shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
                             <AlignJustify className="h-4 w-4" />
                           </button>
-                          <span className="text-sm font-medium w-6 text-muted-foreground">
+                          <span className="w-6 shrink-0 text-sm font-medium text-muted-foreground">
                             {index + 1}.
                           </span>
-                          <div className="flex items-center gap-2">
-                            {getIconForType(lesson.contentType)}
-                            <span className="font-medium text-sm">{lesson.title}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0">{getIconForType(lesson.contentType)}</span>
+                            <span className="truncate font-medium text-sm">{lesson.title}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-2">
                           <Badge variant="outline" className="capitalize text-xs font-normal">
                             {lesson.contentType}
                           </Badge>
@@ -555,6 +562,9 @@ export default function CourseEditPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="certificates" className="pt-6">
+          <CertificatesPanel courseId={courseData.course._id as Id<"courses">} />
         </TabsContent>
       </Tabs>
     </div>

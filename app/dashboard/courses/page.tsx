@@ -64,26 +64,30 @@ export default function MyLessonsPage() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto mb-6 inline-flex gap-2">
+        {/* Three triggers need ~444px. Let them scroll horizontally instead of
+            stretching the document; touch-target lifts them to 44px. */}
+        <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
           <TabsTrigger 
             value="all" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             All Lessons ({enrolledCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="in-progress" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             In Progress ({inProgressCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="completed" 
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
           >
             Completed ({completedCourses.length})
           </TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="all" className="mt-0 outline-none">
           <CourseGrid items={enrolledCourses} />

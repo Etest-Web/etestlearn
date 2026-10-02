@@ -6,6 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress } from "@/components/ui";
 import { useRouter, useParams } from "next/navigation";
+import { toast } from "sonner";
 
 export default function DashboardCoursePage() {
   const router = useRouter();
@@ -15,6 +16,10 @@ export default function DashboardCoursePage() {
   const enrollments = useQuery(api.enrollments.getUserEnrollments) ?? [];
   const enrollMutation = useMutation(api.enrollments.enrollInCourse);
   const issueCertificate = useMutation(api.certificates.issueCertificate);
+  const certStatus = useQuery(
+    api.certificates.getCourseCertificateStatus,
+    data?.course._id ? { courseId: data.course._id as any } : "skip",
+  );
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
 
@@ -74,7 +79,11 @@ export default function DashboardCoursePage() {
     try {
       setIsIssuing(true);
       await issueCertificate({ courseId: course._id });
-      router.refresh();
+      toast.success("Your certificate is ready");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not issue certificate",
+      );
     } finally {
       setIsIssuing(false);
     }
@@ -109,7 +118,17 @@ export default function DashboardCoursePage() {
                   <Progress value={progress} className="w-32" />
                   <span>{Math.round(progress)}%</span>
                 </div>
-                {progress >= 80 && (
+                {certStatus?.certificate ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    render={<Link href={`/dashboard/certificates/${certStatus.certificate._id}`} />}
+                  >
+                    {certStatus.certificate.revokedAt
+                      ? "View revoked certificate"
+                      : "View certificate"}
+                  </Button>
+                ) : certStatus?.completion?.eligible ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -118,7 +137,12 @@ export default function DashboardCoursePage() {
                   >
                     {isIssuing ? "Generating..." : "Get certificate"}
                   </Button>
-                )}
+                ) : certStatus?.completion ? (
+                  <p className="text-xs text-muted-foreground">
+                    To earn your certificate:{" "}
+                    {certStatus.completion.blockers.join(" ")}
+                  </p>
+                ) : null}
               </>
             ) : (
               <Button size="sm" onClick={handleEnroll} disabled={isEnrolling}>

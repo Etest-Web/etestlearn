@@ -1,22 +1,236 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { generateCertificateSerial } from "../lib/certificates";
+import {
+  canManageCourse,
+  isStaff,
+  requireUser,
+  type Id,
+  type UserDoc,
+  type WriteCtx,
+} from "./helpers/auth";
+import { evaluateForLearner } from "./helpers/completion";
 
+/** Fresh entropy for a serial. crypto.randomUUID is available in the runtime. */
+function entropy(): string {
+  const uuid = crypto.randomUUID().replace(/-/g, "");
+  return uuid;
+}
+
+/**
+ * Issues a certificate if it doesn't exist yet, returns the existing one
+ * otherwise. `override` lets an instructor or admin issue on a learner's
+ * behalf without the completion bar (for manual awards).
+ */
+async function issueForUser(
+  ctx: WriteCtx,
+  user: UserDoc,
+  courseId: Id<"courses">,
+  opts: {
+    issuedBy?: UserDoc;
+    override?: boolean;
+    templateId?: Id<"certificateTemplates"> | null;
+  } = {},
+) {
+  const existing = await ctx.db
+    .query("certificates")
+    .withIndex("by_user_course", (q) =>
+      q.eq("userId", user._id).eq("courseId", courseId),
+    )
+    .unique();
+  if (existing) return existing._id;
+
+  if (!opts.override) {
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", user._id).eq("courseId", courseId),
+      )
+      .unique();
+    if (!enrollment) {
+      throw new Error("You are not enrolled in this course");
+    }
+
+    const completion = await evaluateForLearner(
+      ctx,
+      courseId,
+      user._id,
+      enrollment.completedLessonIds,
+    );
+    if (!completion.eligible) {
+      throw new Error(completion.blockers.join(" "));
+    }
+  }
+
+  const [course, holder, issuer] = await Promise.all([
+    ctx.db.get(courseId),
+    ctx.db.get(user._id),
+    opts.issuedBy ? ctx.db.get(opts.issuedBy._id) : Promise.resolve(null),
+  ]);
+  if (!course) throw new Error("Course not found");
+
+  const holderName = holder?.name ?? holder?.email ?? "Unknown learner";
+  // An admin award is attributed to whoever pressed the button; a self-serve
+  // award to the course owner.
+  const issuerName =
+    issuer?.name ?? (await ctx.db.get(course.instructorId))?.name ?? "Glypha Learn";
+
+  const issuedAt = Date.now();
+
+  // Resolve the active template at issuance time. Recorded on the certificate so
+  // a later template swap cannot retroactively change what was issued. Callers
+  // that pass an explicit id (including null to force plain artwork) opt out of
+  // this lookup entirely.
+  let templateId = opts.templateId;
+  if (templateId === undefined) {
+    const active = await ctx.db
+      .query("certificateTemplates")
+      .withIndex("by_active", (q) => q.eq("active", true))
+      .unique();
+    templateId = active?._id ?? null;
+  }
+
+  // Serials are public identifiers, so collisions have to be impossible rather
+  // than merely unlikely. 8 hex chars of UUID entropy makes a clash negligible,
+  // but retry anyway — a duplicate serial would make a verify link ambiguous.
+  let serial = "";
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = generateCertificateSerial(issuedAt, entropy());
+    const clash = await ctx.db
+      .query("certificates")
+      .withIndex("by_serial", (q) => q.eq("serial", candidate))
+      .unique();
+    if (!clash) {
+      serial = candidate;
+      break;
+    }
+  }
+  if (!serial) throw new Error("Could not allocate a certificate serial");
+
+  const certificateId = await ctx.db.insert("certificates", {
+    userId: user._id,
+    courseId,
+    issuedAt,
+    serial,
+    holderName,
+    courseTitle: course.title,
+    issuerName,
+    templateId: templateId ?? undefined,
+  });
+
+  // PDF render + email are best-effort side effects: the certificate is valid
+  // without them, so they are scheduled rather than run inline. Mutations
+  // cannot call runAction (only queries and actions can), so this goes through
+  // the scheduler to fire right after this transaction commits.
+  await ctx.scheduler.runAfter(
+    0,
+    internal.certificateArtifacts.issueCertificateArtifacts,
+    {
+      certificateId,
+      serial,
+      holderName,
+      holderEmail: holder?.email ?? undefined,
+      courseTitle: course.title,
+      issuerName,
+      issuedAt,
+      // Snapshot the template in use so the PDF matches what the admin had
+      // active at issuance, even if they swap templates later.
+      templateId: templateId ?? undefined,
+    },
+  );
+
+  return certificateId;
+}
+
+/**
+ * Learner-initiated issuance. Idempotent: clicking twice returns the same
+ * certificate. The completion bar is every lesson done plus every quiz passed.
+ */
 export const issueCertificate = mutation({
   args: { courseId: v.id("courses") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    const user = await requireUser(ctx);
+    return await issueForUser(ctx, user, args.courseId);
+  },
+});
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+/**
+ * Issues automatically once the learner crosses the completion bar. Called at
+ * the end of lesson completion and quiz submission so a learner never has to
+ * hunt for a "Get certificate" button. Silently does nothing until they are
+ * actually eligible.
+ */
+export const issueIfEligible = internalMutation({
+  args: {
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+
+    const existing = await ctx.db
+      .query("certificates")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", args.userId).eq("courseId", args.courseId),
+      )
       .unique();
+    if (existing) return existing._id;
 
-    if (!user) {
-      throw new Error("User record not found");
-    }
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", args.userId).eq("courseId", args.courseId),
+      )
+      .unique();
+    if (!enrollment) return null;
+
+    const completion = await evaluateForLearner(
+      ctx,
+      args.courseId,
+      args.userId,
+      enrollment.completedLessonIds,
+    );
+    if (!completion.eligible) return null;
+
+    return await issueForUser(ctx, user, args.courseId);
+  },
+});
+
+/** One of the caller's own certificates, for the detail page. */
+export const getMyCertificate = query({
+  args: { certificateId: v.id("certificates") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const cert = await ctx.db.get(args.certificateId);
+    if (!cert || cert.userId !== user._id) return null;
+
+    const [course, pdfUrl] = await Promise.all([
+      ctx.db.get(cert.courseId),
+      cert.pdfStorageId ? ctx.storage.getUrl(cert.pdfStorageId) : null,
+    ]);
+
+    return {
+      _id: cert._id,
+      serial: cert.serial ?? null,
+      courseId: cert.courseId,
+      courseTitle: cert.courseTitle ?? course?.title ?? "Course",
+      holderName: cert.holderName ?? user.name ?? "You",
+      issuerName: cert.issuerName ?? null,
+      issuedAt: cert.issuedAt,
+      revokedAt: cert.revokedAt ?? null,
+      revocationReason: cert.revocationReason ?? null,
+      pdfUrl: typeof pdfUrl === "string" ? pdfUrl : null,
+    };
+  },
+});
+
+/** Completion status for a course, so the UI can show what's still missing. */
+export const getCourseCertificateStatus = query({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
 
     const enrollment = await ctx.db
       .query("enrollments")
@@ -25,79 +239,326 @@ export const issueCertificate = mutation({
       )
       .unique();
 
-    if (!enrollment) {
-      throw new Error("You are not enrolled in this course");
-    }
-
-    // Simple completion rule for now: 80%+ progress.
-    if (enrollment.progressPercent < 80) {
-      throw new Error("You must reach at least 80% progress to get a certificate");
-    }
-
-    const existing = await ctx.db
+    const certificate = await ctx.db
       .query("certificates")
       .withIndex("by_user_course", (q) =>
         q.eq("userId", user._id).eq("courseId", args.courseId),
       )
       .unique();
 
-    if (existing) {
-      return existing._id;
+    if (!enrollment) {
+      return {
+        enrolled: false,
+        certificate: null,
+        completion: null,
+      };
     }
 
-    const now = Date.now();
-    return await ctx.db.insert("certificates", {
-      userId: user._id,
-      courseId: args.courseId,
-      issuedAt: now,
-    });
+    const completion = await evaluateForLearner(
+      ctx,
+      args.courseId,
+      user._id,
+      enrollment.completedLessonIds,
+    );
+
+    return {
+      enrolled: true,
+      certificate: certificate ?? null,
+      completion,
+    };
   },
 });
 
+/**
+ * Learner's certificates with course title and PDF URL joined in. The list page
+ * previously fetched published courses separately and dropped any certificate
+ * whose course was unpublished — this is the single source for that view.
+ */
 export const listMyCertificates = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      return [];
-    }
-
-    return await ctx.db
+    const certificates = await ctx.db
       .query("certificates")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
       .collect();
+
+    return await Promise.all(
+      certificates.map(async (cert) => {
+        const [course, pdfUrl] = await Promise.all([
+          ctx.db.get(cert.courseId),
+          cert.pdfStorageId
+            ? ctx.storage.getUrl(cert.pdfStorageId)
+            : Promise.resolve(null),
+        ]);
+        return {
+          _id: cert._id,
+          serial: cert.serial ?? null,
+          courseId: cert.courseId,
+          courseTitle: cert.courseTitle ?? course?.title ?? "Course",
+          holderName: cert.holderName ?? user.name ?? "You",
+          issuerName: cert.issuerName ?? null,
+          issuedAt: cert.issuedAt,
+          revokedAt: cert.revokedAt ?? null,
+          revocationReason: cert.revocationReason ?? null,
+          pdfUrl,
+        };
+      }),
+    );
   },
 });
 
-
-// Public, read-only certificate verification — intentionally unauthenticated
-// so employers can verify a certificate from its link. Exposes only the
-// recipient's name, course title, and issue date.
+/**
+ * Public, read-only certificate verification. Intentionally unauthenticated so
+ * an employer can follow the link. Takes a serial (e.g. GL-2026-3F9A1C77)
+ * rather than a document id so the URL does not leak a Convex id.
+ */
 export const getCertificateForVerification = query({
-  args: { certificateId: v.id("certificates") },
+  args: { ref: v.string() },
   handler: async (ctx, args) => {
-    const cert = await ctx.db.get(args.certificateId);
-    if (!cert) return null;
+    const ref = args.ref.trim();
+
+    const bySerial = await ctx.db
+      .query("certificates")
+      .withIndex("by_serial", (q) => q.eq("serial", ref))
+      .unique();
+
+    // Certificates issued before serials existed can still be verified by id,
+    // so an old link keeps working.
+    const cert =
+      bySerial ??
+      (ctx.db.normalizeId("certificates", ref)
+        ? await ctx.db.get(ctx.db.normalizeId("certificates", ref)!)
+        : null);
+
+    if (!cert) {
+      return null;
+    }
 
     const [holder, course] = await Promise.all([
       ctx.db.get(cert.userId),
       ctx.db.get(cert.courseId),
     ]);
+    const issuer = course ? await ctx.db.get(course.instructorId) : null;
+
+    const revoked = typeof cert.revokedAt === "number";
 
     return {
-      holderName: holder?.name ?? "Unknown",
-      courseTitle: course?.title ?? "Unknown course",
+      serial: cert.serial ?? null,
+      holderName: cert.holderName ?? holder?.name ?? "Unknown",
+      courseTitle: cert.courseTitle ?? course?.title ?? "Unknown course",
+      issuerName: cert.issuerName ?? issuer?.name ?? null,
       issuedAt: cert.issuedAt,
-      valid: true,
+      valid: !revoked,
+      revokedAt: cert.revokedAt ?? null,
+      revocationReason: cert.revocationReason ?? null,
     };
+  },
+});
+
+// ─── Instructor / admin management ─────────────────────────────────────────
+
+/**
+ * Manual issue on a learner's behalf. Instructors may only do this for their
+ * own courses; admins may do it for any course. Bypasses the completion bar
+ * because that is the point of a manual award.
+ */
+export const issueCertificateForLearner = mutation({
+  args: {
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireUser(ctx);
+    if (!isStaff(actor)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!(await canManageCourse(ctx, actor, course))) {
+      throw new Error("Not authorized to issue certificates for this course");
+    }
+
+    const learner = await ctx.db.get(args.userId);
+    if (!learner) throw new Error("Learner not found");
+
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", args.userId).eq("courseId", args.courseId),
+      )
+      .unique();
+    if (!enrollment) {
+      throw new Error("That learner is not enrolled in this course");
+    }
+
+    return await issueForUser(ctx, learner, args.courseId, {
+      issuedBy: actor,
+      override: true,
+    });
+  },
+});
+
+/** Certificates issued for one of the instructor's own courses. */
+export const listCourseCertificates = query({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const actor = await requireUser(ctx);
+    const course = await ctx.db.get(args.courseId);
+    if (!(await canManageCourse(ctx, actor, course))) {
+      throw new Error("Not authorized to view certificates for this course");
+    }
+
+    const certificates = await ctx.db
+      .query("certificates")
+      .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
+      .order("desc")
+      .collect();
+
+    return await Promise.all(
+      certificates.map(async (cert) => {
+        const holder = await ctx.db.get(cert.userId);
+        return {
+          _id: cert._id,
+          serial: cert.serial ?? null,
+          holderName: cert.holderName ?? holder?.name ?? holder?.email ?? "Unknown",
+          holderEmail: holder?.email ?? null,
+          courseTitle: cert.courseTitle ?? course?.title ?? "Course",
+          issuedAt: cert.issuedAt,
+          revokedAt: cert.revokedAt ?? null,
+          revocationReason: cert.revocationReason ?? null,
+        };
+      }),
+    );
+  },
+});
+
+/** Every certificate on the platform. Admin only. */
+export const listAllCertificates = query({
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireUser(ctx);
+    if (actor.role !== "admin") throw new Error("Not authorized");
+
+    const certificates = await ctx.db
+      .query("certificates")
+      .order("desc")
+      .take(200);
+
+    return await Promise.all(
+      certificates.map(async (cert) => {
+        const [holder, course] = await Promise.all([
+          ctx.db.get(cert.userId),
+          ctx.db.get(cert.courseId),
+        ]);
+        return {
+          _id: cert._id,
+          serial: cert.serial ?? null,
+          holderName: cert.holderName ?? holder?.name ?? holder?.email ?? "Unknown",
+          holderEmail: holder?.email ?? null,
+          courseTitle: cert.courseTitle ?? course?.title ?? "Course",
+          issuedAt: cert.issuedAt,
+          revokedAt: cert.revokedAt ?? null,
+          revocationReason: cert.revocationReason ?? null,
+        };
+      }),
+    );
+  },
+});
+
+/**
+ * Withdraw a certificate. The row is kept (it is an audit record) but public
+ * verification reports it as revoked and the PDF is not served.
+ */
+export const revokeCertificate = mutation({
+  args: {
+    certificateId: v.id("certificates"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireUser(ctx);
+    const cert = await ctx.db.get(args.certificateId);
+    if (!cert) throw new Error("Certificate not found");
+
+    const course = await ctx.db.get(cert.courseId);
+    if (!(await canManageCourse(ctx, actor, course))) {
+      throw new Error("Not authorized to revoke this certificate");
+    }
+
+    await ctx.db.patch(args.certificateId, {
+      revokedAt: Date.now(),
+      revokedBy: actor._id,
+      revocationReason: args.reason?.trim() || undefined,
+    });
+  },
+});
+
+/** Undo a revocation, keeping the original issue date. */
+export const reinstateCertificate = mutation({
+  args: { certificateId: v.id("certificates") },
+  handler: async (ctx, args) => {
+    const actor = await requireUser(ctx);
+    const cert = await ctx.db.get(args.certificateId);
+    if (!cert) throw new Error("Certificate not found");
+
+    const course = await ctx.db.get(cert.courseId);
+    if (!(await canManageCourse(ctx, actor, course))) {
+      throw new Error("Not authorized to reinstate this certificate");
+    }
+
+    await ctx.db.patch(args.certificateId, {
+      revokedAt: undefined,
+      revokedBy: undefined,
+      revocationReason: undefined,
+    });
+  },
+});
+
+/** Attaches the rendered PDF. Called only by the artifact action. */
+export const recordPdfArtifact = internalMutation({
+  args: {
+    certificateId: v.id("certificates"),
+    pdfStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.certificateId, { pdfStorageId: args.pdfStorageId });
+  },
+});
+
+/**
+ * Backfills serial and snapshot fields on certificates issued before those
+ * existed, so old rows keep verifying and rendering correctly.
+ */
+export const backfillCertificateDetails = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const certificates = await ctx.db.query("certificates").collect();
+    let patched = 0;
+
+    for (const cert of certificates) {
+      if (cert.serial && cert.holderName && cert.courseTitle) continue;
+
+      const [holder, course] = await Promise.all([
+        ctx.db.get(cert.userId),
+        ctx.db.get(cert.courseId),
+      ]);
+
+      const serial =
+        cert.serial ??
+        generateCertificateSerial(
+          cert.issuedAt,
+          entropy().slice(0, 8) + String(patched),
+        );
+
+      await ctx.db.patch(cert._id, {
+        serial,
+        holderName: cert.holderName ?? holder?.name ?? holder?.email ?? "Unknown learner",
+        courseTitle: cert.courseTitle ?? course?.title ?? "Course",
+        issuerName: cert.issuerName ?? "Glypha Learn",
+      });
+      patched += 1;
+    }
+
+    return { patched, total: certificates.length };
   },
 });

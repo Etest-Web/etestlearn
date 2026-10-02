@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   Geist,
   Geist_Mono,
@@ -51,6 +51,18 @@ const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Match the browser chrome to the brand so the URL bar and the notch area
+  // don't read as a white band above a purple page. Values mirror --brand
+  // (light) and --background (dark) in app/globals.css.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#945DA3" },
+    { media: "(prefers-color-scheme: dark)", color: "#231C27" },
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),

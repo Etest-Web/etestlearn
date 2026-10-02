@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                   <th className="py-3 pr-4">User</th>
@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
                 {(users ?? []).map((u) => (
                   <tr key={u._id} className="border-b last:border-0">
                     <td className="py-3 pr-4 font-medium">{u.name ?? "Unnamed user"}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">{u.email ?? "—"}</td>
+                    <td className="py-3 pr-4 text-muted-foreground break-all">{u.email ?? "—"}</td>
                     <td className="py-3 pr-4">
                       <Badge variant="outline" className={roleBadgeClass(u.role)}>
                         {u.role}

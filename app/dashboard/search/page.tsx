@@ -23,8 +23,8 @@ function SearchResults() {
   if (loading) {
     return (
       <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
-        <Skeleton className="h-20 w-[200px] rounded-xl" />
-        <Skeleton className="h-12 w-[300px] rounded-xl" />
+        <Skeleton className="h-20 w-[200px] max-w-full rounded-xl" />
+        <Skeleton className="h-12 w-[300px] max-w-full rounded-xl" />
       </div>
     );
   }
@@ -38,10 +38,10 @@ function SearchResults() {
     <div className="flex flex-col gap-8 max-w-6xl w-full">
       {/* Header section */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">
+        <h1 className="text-2xl font-bold text-foreground text-balance sm:text-3xl">
           Search Results {query && `for "${query}"`}
         </h1>
-        <p className="text-muted-foreground font-medium">
+        <p className="text-sm text-muted-foreground font-medium">
           Found {filteredCourses.length} available course{filteredCourses.length === 1 ? "" : "s"} matching your search.
         </p>
       </div>

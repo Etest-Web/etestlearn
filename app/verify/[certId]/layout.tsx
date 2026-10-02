@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Verify Certificate",
-    description: "Verify the authenticity of an Glypha Learning certificate by its verification link.",
+    description: "Verify the authenticity of a Glypha Learn certificate by its verification link.",
     robots: { index: false },
 };
 

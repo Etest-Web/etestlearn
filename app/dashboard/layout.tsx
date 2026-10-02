@@ -4,9 +4,11 @@ import { api } from "@/convex/_generated/api";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import {
+    Award,
     Bell,
     BookOpen,
     ClipboardList,
+    FileStack,
     GraduationCap,
     Inbox,
     LayoutDashboard,
@@ -21,6 +23,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 
 import {
+    Button,
     Input,
     ModeToggle,
     Sidebar,
@@ -109,6 +112,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                         <Link href="/dashboard/courses" className="text-[15px] font-medium">
                                             Lesson
                                         </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5"
+                                        render={<Link href="/dashboard/certificates" />}
+                                    >
+                                        <Award className="text-[#945DA3]" />
+                                        <span className="text-[15px] font-medium">
+                                            Certificates
+                                        </span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
 
@@ -208,6 +223,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             Admin Console
                         </Link>
                     )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/certificates"
+                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                        >
+                            <Award size={20} />
+                            Certificates
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/certificate-templates"
+                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                        >
+                            <FileStack size={20} />
+                            Templates
+                        </Link>
+                    )}
                     <SidebarGroup className="flex items-center gap-2 px-3">
                         <Tooltip>
                             <TooltipTrigger
@@ -246,9 +279,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </SidebarFooter>
             </Sidebar>
 
-            <SidebarInset className="bg-background min-h-screen">
-                <header className="flex h-20 items-center justify-between px-8 bg-transparent">
-                    <div className="flex items-center gap-4 flex-1">
+            <SidebarInset className="bg-background min-h-dvh">
+                <header className="flex h-20 items-center justify-between gap-3 px-4 bg-transparent sm:px-6 lg:px-8">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                         <SidebarTrigger className="lg:hidden" />
                         <form
                             action="/dashboard/search"
@@ -266,19 +299,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 className="pl-11 h-12 rounded-full border-0 bg-card shadow-sm ring-1 ring-border text-[15px] focus-visible:ring-[#945DA3]/20"
                             />
                         </form>
+                        {/* Below md the search form above is hidden, so the
+                            trigger has to live in the icon cluster instead. */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="md:hidden"
+                            aria-label="Search your courses"
+                            render={<Link href="/dashboard/search" />}
+                        >
+                            <Search className="h-5 w-5" />
+                        </Button>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <button className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
+                    <div className="flex shrink-0 items-center gap-3 sm:gap-4 lg:gap-6">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <button aria-label="Messages" className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
                                 <Mail size={18} className="text-muted-foreground" />
                             </button>
-                            <button className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
+                            <button aria-label="Notifications" className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
                                 <Bell size={18} className="text-muted-foreground" />
                                 <span className="absolute top-2.5 right-3 w-1.5 h-1.5 bg-[#FF4949] rounded-full" />
                             </button>
                         </div>
-                        <div className="flex items-center gap-3 pl-6 border-l border-border">
+                        <div className="flex items-center gap-3 pl-3 border-l border-border sm:pl-6">
                             <UserButton appearance={{ elements: { avatarBox: "w-10 h-10" } }} />
                             <span className="font-semibold text-foreground hidden sm:block">
                                 {user?.fullName || "Student"}
@@ -287,7 +331,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     </div>
                 </header>
 
-                <main className="p-8 pt-2">{children}</main>
+                <main className="p-4 pt-2 sm:p-6 sm:pt-2 lg:p-8 lg:pt-2">{children}</main>
             </SidebarInset>
         </SidebarProvider>
     );

@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { computeProgress } from "../lib/progress";
 
@@ -128,6 +129,13 @@ export const completeLesson = mutation({
       completedLessonIds: [...completed],
       progressPercent,
       updatedAt: Date.now(),
+    });
+
+    // Issues the certificate automatically if this was the last outstanding
+    // requirement. No-ops until the learner actually qualifies.
+    await ctx.runMutation(internal.certificates.issueIfEligible, {
+      userId: user._id,
+      courseId: args.courseId,
     });
 
     return progressPercent;

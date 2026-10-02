@@ -140,8 +140,8 @@ export default function AdminApplicationsPage() {
         </p>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2">
+      {/* Filter Tabs — wrap so all four stay reachable on a narrow phone */}
+      <div className="flex flex-wrap gap-2">
         {(
           [
             { value: "pending", label: "Pending" },
@@ -185,15 +185,15 @@ export default function AdminApplicationsPage() {
           {applications.map((app) => (
             <Card key={app._id} className="overflow-hidden">
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {app.fullName}
+                      <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{app.fullName}</span>
                     </CardTitle>
                     <CardDescription className="flex items-center gap-1 mt-1">
-                      <Mail className="h-3 w-3" />
-                      {app.email}
+                      <Mail className="h-3 w-3 shrink-0" />
+                      <span className="break-all">{app.email}</span>
                     </CardDescription>
                   </div>
                   {statusBadge(app.status)}
@@ -223,13 +223,13 @@ export default function AdminApplicationsPage() {
                   </p>
                 </div>
                 {app.portfolioUrl && (
-                  <div className="flex items-center gap-1">
-                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  <div className="flex items-start gap-1">
+                    <ExternalLink className="h-3 w-3 shrink-0 mt-1 text-muted-foreground" />
                     <a
                       href={app.portfolioUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary underline text-xs"
+                      className="text-primary underline text-xs break-all"
                     >
                       {app.portfolioUrl}
                     </a>

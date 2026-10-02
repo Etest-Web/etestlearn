@@ -8,11 +8,16 @@
  * @module
  */
 
+import type * as certificateArtifacts from "../certificateArtifacts.js";
+import type * as certificateTemplateActions from "../certificateTemplateActions.js";
+import type * as certificateTemplates from "../certificateTemplates.js";
 import type * as certificates from "../certificates.js";
 import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
 import type * as files from "../files.js";
+import type * as helpers_auth from "../helpers/auth.js";
+import type * as helpers_completion from "../helpers/completion.js";
 import type * as http from "../http.js";
 import type * as instructorApplications from "../instructorApplications.js";
 import type * as payments from "../payments.js";
@@ -27,11 +32,16 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  certificateArtifacts: typeof certificateArtifacts;
+  certificateTemplateActions: typeof certificateTemplateActions;
+  certificateTemplates: typeof certificateTemplates;
   certificates: typeof certificates;
   courses: typeof courses;
   discussions: typeof discussions;
   enrollments: typeof enrollments;
   files: typeof files;
+  "helpers/auth": typeof helpers_auth;
+  "helpers/completion": typeof helpers_completion;
   http: typeof http;
   instructorApplications: typeof instructorApplications;
   payments: typeof payments;

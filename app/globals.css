@@ -185,6 +185,52 @@
   .group\/cert:hover .tilt-card {
     transform: perspective(900px) rotateY(-4deg) rotateX(0deg) translateY(-6px);
   }
+
+  /* WCAG 2.5.5 opt-in: grow a link/label-style control to a 44px hit area,
+     touch devices only. Use on anchors and <label>s the element selectors in
+     the pointer:coarse block below can't reach (e.g. tab strips, filter
+     pills) — desktop keeps its compact density. */
+  .touch-target {
+    @media (pointer: coarse) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+}
+
+/* ── Touch ergonomics ──────────────────────────────────────────────────────
+   WCAG 2.5.5 asks for a 44×44px target. Rather than inflating ~28 controls
+   at their call sites, grow them once here for pointer:coarse only.
+
+   This block is intentionally unlayered, so its min-height wins over
+   Tailwind's `h-*` (utilities live in @layer utilities). That is the intent —
+   but it means every matched control grows, so exclusions matter:
+     · checkbox / switch — the box IS the visual, so they extend their hit
+       area with an ::after pseudo-element instead (see checkbox.tsx).
+     · tabs-trigger — height is derived from the TabsList (`h-9`); growing
+       the trigger alone would overflow it. Put `touch-target` on the list. */
+@media (pointer: coarse) {
+  button:not([data-slot="checkbox"]):not([data-slot="switch"]):not(
+      [data-slot="tabs-trigger"]
+    ),
+  [role="button"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="tab"],
+  summary,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+  }
+
+  /* Icon-only buttons are square, so height alone can't grow the hit area. */
+  button:has(> svg:only-child),
+  [role="button"]:has(> svg:only-child) {
+    min-width: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -201,5 +247,26 @@
   .group\/cert:hover .tilt-card {
     transform: none;
     transition: none;
+  }
+
+  /* The named cases above are the load-bearing ones (a marquee that stops
+     still has to read as a marquee; a .reveal that never transitions must
+     still end up visible). Everything else is a plain decorative loop or a
+     state transition, so it collapses to an instant change. */
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-ping,
+  .animate-pulse-slow {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

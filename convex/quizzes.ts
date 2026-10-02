@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { gradeQuiz } from "../lib/quiz";
 
@@ -226,6 +227,13 @@ export const submitQuizAttempt = mutation({
       maxScore,
       passed,
       createdAt: now,
+    });
+
+    // Passing a quiz can be the last thing standing between the learner and
+    // their certificate, so re-check eligibility here too.
+    await ctx.runMutation(internal.certificates.issueIfEligible, {
+      userId: user._id,
+      courseId: course._id,
     });
 
     return { score, maxScore, percent, passed };

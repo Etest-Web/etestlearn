@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { escapeHtml, isSmtpConfigured, sendMail } from "@/lib/mail";
 
 type InstructorApplicationPayload = {
   fullName: string;
@@ -10,20 +10,8 @@ type InstructorApplicationPayload = {
   motivation: string;
 };
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
 export async function POST(request: Request) {
   const destinationEmail = process.env.INSTRUCTOR_APPLICATION_EMAIL;
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = Number(process.env.SMTP_PORT ?? "587");
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
 
   if (!destinationEmail) {
     return NextResponse.json(
@@ -71,7 +59,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+  if (!isSmtpConfigured()) {
     return NextResponse.json(
       { error: "SMTP settings are not configured." },
       { status: 500 }
@@ -98,18 +86,7 @@ export async function POST(request: Request) {
     .join("");
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || smtpUser,
+    await sendMail({
       to: destinationEmail,
       replyTo: application.email,
       subject: `New Instructor Application — ${application.fullName}`,
@@ -117,7 +94,7 @@ export async function POST(request: Request) {
         .map(([label, value]) => `${label}: ${value}`)
         .join("\n"),
       html:
-        `<p>A new instructor application was submitted on Etest Learning:</p>` +
+        `<p>A new instructor application was submitted on Glypha Learn:</p>` +
         `<table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">${tableRows}</table>`,
     });
   } catch (error) {

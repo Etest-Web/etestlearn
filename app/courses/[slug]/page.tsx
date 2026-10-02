@@ -101,11 +101,13 @@ export default function CoursePage() {
 
   return (
     <>
-    <main className="mx-auto max-w-4xl px-4 py-12 space-y-8">
+    <main className="mx-auto max-w-4xl px-4 py-8 sm:py-12 space-y-8">
       <header className="space-y-4">
         <Button onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /> Back</Button>
         <div className="flex flex-wrap gap-2 items-center">
-          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="w-full h-full object-cover rounded-lg" />
+          {/* Fixed square so it sits inline with the badges — w-full in a
+              flex-wrap row claimed a whole line at 1:1 on phones. */}
+          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
           {course.category && <Badge variant="secondary">{course.category}</Badge>}
           {course.level && (
             <Badge variant="outline" className="text-xs">
@@ -114,7 +116,7 @@ export default function CoursePage() {
           )}
           <Badge variant={isPaidCourse ? "default" : "secondary"}>{formatNaira(course.price)}</Badge>
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{course.title}</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-balance">{course.title}</h1>
         <p className="text-muted-foreground">{course.description}</p>
         {renderCta()}
       </header>

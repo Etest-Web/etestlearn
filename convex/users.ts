@@ -1,6 +1,20 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+/**
+ * Constant-time string compare. A plain `!==` on a shared secret leaks its
+ * contents through response timing, which is enough to recover it byte by byte
+ * against an unauthenticated endpoint.
+ */
+function timingSafeEqualString(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 // Synced from Clerk webhooks (user.created / user.updated). This is the
 // source of truth for profile fields, since JWT claims may not carry them.
 export const upsertFromClerk = internalMutation({
@@ -59,15 +73,21 @@ export const deleteFromClerk = internalMutation({
 });
 
 /**
- * Bulk mirror used by scripts/sync-clerk-users.mjs. Public rather than
- * internal because the backfill runs from outside Convex, and it is a pure
- * upsert keyed on clerkId, so replaying it is safe.
+ * Shared secret for the one-off backfill in scripts/sync-clerk-users.mjs.
  *
- * Existing rows keep their role (student/instructor/admin); this only fills
- * in the Clerk-owned identity fields.
+ * This mutation stays `mutation` rather than `internalMutation` because the
+ * backfill is invoked from outside Convex, where `ConvexHttpClient` cannot
+ * call internal functions. That makes it publicly reachable, so it is gated on
+ * a bearer token: previously it had no guard at all, which let anyone with the
+ * deployment URL (it ships in NEXT_PUBLIC_CONVEX_URL) insert or overwrite user
+ * rows — including the email and name of existing admins.
+ *
+ * Roles are never taken from the payload: existing rows keep theirs, and new
+ * rows are always created as "student".
  */
 export const syncFromClerk = mutation({
   args: {
+    token: v.string(),
     users: v.array(
       v.object({
         clerkId: v.string(),
@@ -78,6 +98,21 @@ export const syncFromClerk = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    // Read inside the handler, not at module scope: a module-level capture
+    // would freeze the value at import time and silently ignore later config.
+    const syncToken = process.env.CLERK_SYNC_TOKEN;
+
+    if (!syncToken) {
+      // Fail closed: an unset token must never mean "no token required".
+      throw new Error("syncFromClerk is not configured");
+    }
+    if (
+      args.token.length !== syncToken.length ||
+      !timingSafeEqualString(args.token, syncToken)
+    ) {
+      throw new Error("Not authorized");
+    }
+
     let created = 0;
     let updated = 0;
 

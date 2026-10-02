@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { ArrowRight, BadgeCheck, LockKeyhole, Star } from "lucide-react";
 import Link from "next/link";
 import TextLoop from "@/components/TextLoop";
+import Image from "next/image";
 
 const TRUST_POINTS = [
   { icon: BadgeCheck, label: "Verified certificates" },
@@ -14,44 +15,15 @@ const TRUST_POINTS = [
 
 function CertificateMock() {
   return (
-    <div className="group/cert relative mx-auto w-full max-w-sm md:max-w-none">
-      <div className="tilt-card relative rounded-2xl border border-border bg-card p-6 shadow-[0_24px_60px_-24px_oklch(0_0_0/0.25)] sm:p-8">
-        <div className="flex items-start justify-between gap-4 border-b border-dashed pb-5">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-              Glypha Learning
-            </p>
-            <p className="mt-1 font-display text-2xl tracking-wide">
-              Certificate of Completion
-            </p>
-          </div>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
-            <Star className="h-6 w-6 fill-current" />
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-5">
-          <p className="text-xs text-muted-foreground">This certifies that</p>
-          <p className="font-display text-3xl tracking-wide">Adaeze Okafor</p>
-          <p className="text-xs text-muted-foreground">
-            has completed all lessons and passed the final assessment of
-          </p>
-          <p className="text-sm font-semibold leading-snug text-balance">
-            Graphic Design Masterclass — From Brief to Brand
-          </p>
-        </div>
-
-        <div className="mt-6 flex items-center justify-between rounded-lg bg-brand/15 px-3 py-2.5">
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-            ETL-CRT-8F42-K91
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-ink">
-            <BadgeCheck className="h-3.5 w-3.5" />
-            Publicly verifiable
-          </span>
-        </div>
-      </div>
-
+    <div className="group/cert relative mx-auto max-w-sm md:max-w-none">
+      <Image
+        src="/IMG-20260925-WA0018.jpg"
+        alt="Certificate preview"
+        width={1600}
+        height={1140}
+        className="tilt-card w-full h-auto shadow-lg dark:shadow-none"
+        priority
+      />
       <div
         aria-hidden="true"
         className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-2xl border border-border/60 bg-muted/50"
@@ -70,10 +42,10 @@ export function HeroPoster() {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden">
       <section className="relative w-full">
         {/* Fixed TextLoop Background Wrapper */}
-        <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden blur">
+        <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden">
           {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
               would hand the parent ~15px of over-wide canvas to clip. */}
-          <div className="w-full opacity-50">
+          <div className="w-full">
             <TextLoop
               text="Glypha"
               shape="wave"
@@ -88,8 +60,9 @@ export function HeroPoster() {
               uppercase
               color="#ffffff"
               ribbon
-              ribbonColor="#EAB308"
+              ribbonColor="#d046f6"
               ribbonWidth={86}
+              className="hidden sm:flex"
               pauseOnHover={false}
             />
           </div>

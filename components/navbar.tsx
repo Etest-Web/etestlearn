@@ -36,7 +36,7 @@ export function Navbar() {
     : NAV_LINKS;
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-60 border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-h-20 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2 group">

@@ -27,6 +27,22 @@ function primaryEmailOf(
   );
 }
 
+/**
+ * Constant-time comparison of two hex digests.
+ *
+ * This endpoint is reachable without authentication, so a `!==` on the
+ * signature leaks the expected MAC one byte at a time via response timing —
+ * enough to forge a `charge.success` payload and mark any reference paid.
+ */
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 const http = httpRouter();
 
 // Paystack webhook: POST /webhook/paystack
@@ -61,7 +77,7 @@ http.route({
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    if (computed !== signature) {
+    if (!timingSafeEqualHex(computed, signature)) {
       return new Response("Invalid signature", { status: 401 });
     }
 

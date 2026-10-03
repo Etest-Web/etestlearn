@@ -133,7 +133,7 @@ export default function LessonEditPage() {
   if (courseData === undefined) {
     return (
       <div className="flex flex-col gap-6 w-full pb-20">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <Skeleton className="h-8 w-48" />
         </div>
@@ -168,7 +168,7 @@ export default function LessonEditPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/instructor/courses/${courseId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -488,7 +488,7 @@ function AddQuestionForm({ quizId }: { quizId: Id<"quizzes"> }) {
             className="gap-3"
           >
             {options.map((option, idx) => (
-              <div key={idx} className="flex items-center gap-3">
+              <div key={idx} className="flex flex-wrap items-center gap-3">
                 <RadioGroupItem value={String(idx)} id={`option-${idx}`} aria-label={`Mark option ${idx + 1} as correct`} />
                 <Input
                   value={option.text}

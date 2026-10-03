@@ -23,8 +23,8 @@ function SearchResults() {
   if (loading) {
     return (
       <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
-        <Skeleton className="h-20 w-[200px] max-w-full rounded-xl" />
-        <Skeleton className="h-12 w-[300px] max-w-full rounded-xl" />
+        <Skeleton className="h-20 w-full max-w-[200px] rounded-xl" />
+        <Skeleton className="h-12 w-full max-w-[300px] rounded-xl" />
       </div>
     );
   }

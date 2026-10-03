@@ -89,8 +89,8 @@ export default function DashboardPage() {
         {/* Quick Stats Pills */}
         <div className="flex flex-wrap gap-4">
           {enrolledCourses.slice(0, 3).map((item, idx) => (
-            <div key={item.course._id} className="flex-1 min-w-[200px] flex items-center justify-between rounded-2xl bg-card p-4 shadow-sm border border-border">
-              <div className="flex items-center gap-4">
+            <div key={item.course._id} className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-card p-4 shadow-sm border border-border">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0 flex-1">
                 <div className={`w-12 h-12 flex items-center justify-center rounded-xl ${progressColors[idx % 3]}`}>
                   <Play className={iconColors[idx % 3]} size={20} fill="currentColor" />
                 </div>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
               letting it push a page-wide scrollbar on phones. */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-2 overflow-hidden">
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[460px] text-left border-collapse">
+            <table className="w-full min-w-[400px] text-left border-collapse">
               <thead>
                 <tr className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border">
                   <th className="font-normal px-4 py-3">Mentor</th>

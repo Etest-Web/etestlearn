@@ -199,7 +199,7 @@ export default function DashboardCoursePage() {
                 return (
                   <div
                     key={lesson._id}
-                    className="flex items-center justify-between gap-4 px-4 py-3 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm"
                   >
                     <div>
                       <p className="font-medium">

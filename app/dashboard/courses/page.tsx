@@ -23,8 +23,8 @@ export default function MyLessonsPage() {
   if (enrollments === undefined || courses === undefined) {
     return (
       <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
-        <Skeleton className="h-20 w-[200px] rounded-xl" />
-        <Skeleton className="h-12 w-[300px] rounded-xl" />
+        <Skeleton className="h-20 w-full max-w-[200px] rounded-xl" />
+        <Skeleton className="h-12 w-full max-w-[300px] rounded-xl" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Skeleton className="h-72 rounded-[24px]" />
           <Skeleton className="h-72 rounded-[24px]" />

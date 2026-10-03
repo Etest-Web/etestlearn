@@ -80,7 +80,7 @@ export default function InstructorCoursesPage() {
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
-                <div className="flex gap-4 text-sm text-muted-foreground mt-4">
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mt-4">
                   {course.category && (
                     <span className="flex items-center gap-1">
                       <BookOpen className="h-4 w-4" />

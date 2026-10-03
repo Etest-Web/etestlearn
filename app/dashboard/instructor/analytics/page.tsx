@@ -42,7 +42,7 @@ function CourseAnalyticsCard({
           <Skeleton className="h-24 w-full rounded-lg" />
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2 text-center">
               <div className="rounded-lg border p-2 sm:p-3">
                 <Users className="h-4 w-4 mx-auto text-muted-foreground" />
                 <p className="text-lg sm:text-xl font-bold mt-1">{analytics.enrollmentCount}</p>

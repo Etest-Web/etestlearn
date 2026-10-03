@@ -268,7 +268,7 @@ export default function CourseEditPage() {
   if (courseData === undefined) {
     return (
       <div className="flex flex-col gap-6 w-full pb-20">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <Skeleton className="h-8 w-48" />
         </div>
@@ -304,7 +304,7 @@ export default function CourseEditPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/instructor")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>

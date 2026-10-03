@@ -364,7 +364,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     </div>
                 </header>
 
-                <main className="p-4 pt-2 sm:p-6 sm:pt-2 lg:p-8 lg:pt-2">{children}</main>
+                <main className="p-4 pt-2 sm:p-6 sm:pt-2 lg:p-8 lg:pt-2 px-[clamp(1rem,3vw,2rem)] py-[clamp(1rem,3vw,2rem)]">{children}</main>
             </SidebarInset>
         </SidebarProvider>
     );

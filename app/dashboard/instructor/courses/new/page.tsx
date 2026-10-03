@@ -66,7 +66,7 @@ export default function CreateCoursePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/instructor")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>

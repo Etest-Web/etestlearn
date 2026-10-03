@@ -115,7 +115,7 @@ export default function AdminCertificatesPage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full min-w-[520px] text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                     <th className="py-3 pr-4">Holder</th>

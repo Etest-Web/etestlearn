@@ -74,7 +74,7 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                   <th className="py-3 pr-4">User</th>
@@ -103,7 +103,7 @@ export default function AdminUsersPage() {
                             if (role) handleRoleChange(u._id, role);
                           }}
                         >
-                          <SelectTrigger className="w-[140px] h-8 text-xs">
+                          <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs">
                             <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>

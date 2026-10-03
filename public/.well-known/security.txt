@@ -1,0 +1,7 @@
+# NOTE: verify that the security@glypha.com.ng mailbox exists and is actually
+# monitored before deploying — a dead contact is worse than no security.txt.
+# Also re-date the Expires field below (RFC 9116 recommends < 1 year out).
+Contact: mailto:security@glypha.com.ng
+Expires: 2027-10-01T00:00:00.000Z
+Policy: https://glypha.com.ng
+Preferred-Languages: en

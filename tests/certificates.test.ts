@@ -397,6 +397,10 @@ describe("certificate access control", () => {
         certificateId: cert._id,
       }),
     ).rejects.toThrow(/Not authorized/);
+
+    // A refused revoke must leave no trail claiming otherwise.
+    const rows = await t.run((ctx: TestCtx) => ctx.db.query("auditLogs").collect());
+    expect(rows).toHaveLength(0);
   });
 
   test("manual issue requires an enrollment", async () => {
@@ -478,5 +482,94 @@ describe("public verification", () => {
         ref: "GL-2026-NOPE",
       }),
     ).resolves.toBeNull();
+  });
+
+  test("accepts only the serial, never a raw document id", async () => {
+    const t = convexTest(testSchema, modules);
+    const ids = await seedWorld(t);
+    await completeAllLessons(t, ids.articleCourseId);
+
+    const [cert] = await t.run((ctx: TestCtx) => ctx.db.query("certificates").collect());
+    expect(cert?.serial).toBeTruthy();
+
+    // A real, live certificate referenced by its Convex id must not resolve:
+    // the id is an internal identifier that leaks out through authenticated
+    // responses, and the public endpoint has exactly one accepted format.
+    await expect(
+      t.query(api.certificates.getCertificateForVerification, { ref: cert._id }),
+    ).resolves.toBeNull();
+
+    // Surrounding whitespace still normalizes, so a copied link keeps working.
+    const verified = await t.query(api.certificates.getCertificateForVerification, {
+      ref: `  ${cert.serial}  `,
+    });
+    expect(verified?.serial).toBe(cert.serial);
+    expect(verified?.valid).toBe(true);
+  });
+});
+
+describe("privileged certificate actions are audited", () => {
+  test("manual issue, revoke and reinstate each leave a row naming the actor", async () => {
+    const t = convexTest(testSchema, modules);
+    const ids = await seedWorld(t);
+
+    const instructor = as(t, "clerk_instructor");
+    await as(t, "clerk_student").mutation(api.enrollments.enrollInCourse, {
+      courseId: ids.articleCourseId,
+    });
+
+    await instructor.mutation(api.certificates.issueCertificateForLearner, {
+      userId: ids.studentId,
+      courseId: ids.articleCourseId,
+    });
+    const [cert] = await t.run((ctx: TestCtx) => ctx.db.query("certificates").collect());
+
+    await instructor.mutation(api.certificates.revokeCertificate, {
+      certificateId: cert._id,
+      reason: "Issued in error",
+    });
+    await instructor.mutation(api.certificates.reinstateCertificate, {
+      certificateId: cert._id,
+    });
+
+    const rows = await t.run((ctx: TestCtx) => ctx.db.query("auditLogs").collect());
+    expect(rows).toHaveLength(3);
+    expect(new Set(rows.map((row) => row.action))).toEqual(
+      new Set([
+        "certificate.issue_override",
+        "certificate.revoke",
+        "certificate.reinstate",
+      ]),
+    );
+    expect(rows.every((row) => row.actorId === ids.instructorId)).toBe(true);
+    expect(rows.every((row) => row.targetId === cert._id)).toBe(true);
+    expect(rows.every((row) => row.targetType === "certificate")).toBe(true);
+
+    // Looked up by action so the assertions do not depend on row order.
+    const byAction = new Map(rows.map((row) => [row.action, row]));
+    expect(
+      JSON.parse(byAction.get("certificate.issue_override")!.details!),
+    ).toEqual({
+      learnerUserId: ids.studentId,
+      courseId: ids.articleCourseId,
+    });
+    expect(JSON.parse(byAction.get("certificate.revoke")!.details!)).toEqual({
+      serial: cert.serial,
+      reason: "Issued in error",
+    });
+    expect(
+      JSON.parse(byAction.get("certificate.reinstate")!.details!),
+    ).toEqual({ serial: cert.serial });
+  });
+
+  test("a learner earning their own certificate is not audited", async () => {
+    const t = convexTest(testSchema, modules);
+    const ids = await seedWorld(t);
+    await completeAllLessons(t, ids.articleCourseId);
+
+    // Self-service issuance is gated by the completion rules, not by
+    // discretion — logging it would bury the privileged rows in routine ones.
+    const rows = await t.run((ctx: TestCtx) => ctx.db.query("auditLogs").collect());
+    expect(rows).toHaveLength(0);
   });
 });

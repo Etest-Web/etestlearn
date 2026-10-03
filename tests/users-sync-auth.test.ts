@@ -140,4 +140,47 @@ describe("syncFromClerk", () => {
       restoreEnv();
     }
   });
+
+  it("rejects a batch beyond the server-side cap, before writing anything", async () => {
+    const t = await setup("tok");
+    try {
+      const tooMany = Array.from({ length: 501 }, (_, i) => ({
+        clerkId: `user_${i}`,
+      }));
+
+      await expect(
+        t.mutation(api.users.syncFromClerk, { token: "tok", users: tooMany }),
+      ).rejects.toThrow(/500/);
+
+      // Oversized calls are rejected atomically — no partial sync.
+      const rows = await t.run((ctx) => ctx.db.query("users").collect());
+      expect(rows).toHaveLength(0);
+    } finally {
+      restoreEnv();
+    }
+  });
+
+  it("accepts a batch exactly at the cap, so honest backfills can chunk", async () => {
+    const t = await setup("tok");
+    try {
+      const atCap = Array.from({ length: 500 }, (_, i) => ({
+        clerkId: `user_${i}`,
+      }));
+
+      const result = await t.mutation(api.users.syncFromClerk, {
+        token: "tok",
+        users: atCap,
+      });
+      expect(result).toEqual({ created: 500, updated: 0, total: 500 });
+
+      // Deliberately not audited: auditLogs.actorId is required and this path
+      // has no Convex identity — only a shared secret. See convex/users.ts.
+      const auditRows = await t.run((ctx) =>
+        ctx.db.query("auditLogs").collect(),
+      );
+      expect(auditRows).toHaveLength(0);
+    } finally {
+      restoreEnv();
+    }
+  });
 });

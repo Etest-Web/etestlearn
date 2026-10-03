@@ -46,6 +46,22 @@ export const validateAndResolveUpload = query({
   },
 });
 
+/**
+ * Returns a signed URL for any stored blob the caller can name by id.
+ *
+ * Residual risk, documented rather than papered over: the only gate is
+ * "authenticated". Convex's `_storage` metadata records size and content type
+ * but nothing about who uploaded the blob, so an ownership check is
+ * impossible today without a schema change — there is simply no uploader to
+ * compare the caller against. The exposure is bounded by two facts: storage
+ * ids are unguessable, so a caller must already hold the exact id, and
+ * learning one implies the app rendered it to them in a course, lesson or
+ * certificate they could see. Prefer `validateAndResolveUpload` for
+ * user-uploaded content, which at least re-checks size and MIME type against
+ * the stored file. Follow-up (needs a schema change): record the uploader
+ * when a blob is attached to a document and reject ids the caller does not
+ * own.
+ */
 export const getFileUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {

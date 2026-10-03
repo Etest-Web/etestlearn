@@ -1,8 +1,56 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { slugify } from "../lib/slug";
+import { type Id, type WriteCtx } from "./helpers/auth";
 
 function buildSearchText(title: string, description: string, category?: string) {
   return [title, description, category].filter(Boolean).join(" ").trim();
+}
+
+/**
+ * Normalizes a requested slug and refuses one already claimed by another
+ * course.
+ *
+ * Why this exists: `courses.by_slug` is a plain index, not a unique one (the
+ * schema is shared foundation and off-limits here), so the database itself
+ * never rejects a duplicate. Without this check two courses could share a
+ * slug, after which `getCourseBySlug`'s `.unique()` throws on *every* read of
+ * either course — one bad write would take the public course page down for
+ * everyone. The lookup therefore uses `.first()`, not `.unique()`: if dirty
+ * data already contains duplicates we must report "taken" rather than crash.
+ *
+ * Known limitation (documented, not solved): this is check-then-insert in
+ * application code rather than a DB constraint. Convex mutations are
+ * serializable transactions, so two concurrent creates of the same slug
+ * cannot both pass this read — the loser retries against committed state and
+ * sees the winner — but any future write path that bypasses
+ * `createCourse`/`updateCourse` could still introduce a duplicate. The real
+ * guarantee would be a `.unique()` index on `slug`, which needs a schema
+ * change plus a dedupe backfill of existing rows.
+ */
+async function requireAvailableSlug(
+  ctx: WriteCtx,
+  rawSlug: string,
+  opts: { excludeCourseId?: Id<"courses"> } = {},
+): Promise<string> {
+  // Same normalization the UI applies, re-run server-side: clients can post
+  // anything, and "Paid Course" vs "paid-course" must not be two different
+  // routes to the same course.
+  const slug = slugify(rawSlug.trim());
+  if (!slug) {
+    throw new Error("A URL slug is required");
+  }
+
+  const existing = await ctx.db
+    .query("courses")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .first();
+
+  if (existing && existing._id !== opts.excludeCourseId) {
+    throw new Error("That slug is already taken");
+  }
+
+  return slug;
 }
 
 export const listPublishedCourses = query({
@@ -120,11 +168,13 @@ export const createCourse = mutation({
       throw new Error("Not authorized to create courses");
     }
 
+    const slug = await requireAvailableSlug(ctx, args.slug);
+
     const now = Date.now();
 
     return await ctx.db.insert("courses", {
       title: args.title,
-      slug: args.slug,
+      slug,
       description: args.description,
       instructorId: user._id,
       category: args.category,
@@ -179,7 +229,13 @@ export const updateCourse = mutation({
 
     const updates: any = {};
     if (args.title !== undefined) updates.title = args.title;
-    if (args.slug !== undefined) updates.slug = args.slug;
+    // Excluding this course lets an edit keep its own slug; every other
+    // course's slug stays off-limits, same rule as creation.
+    if (args.slug !== undefined) {
+      updates.slug = await requireAvailableSlug(ctx, args.slug, {
+        excludeCourseId: args.courseId,
+      });
+    }
     if (args.description !== undefined) updates.description = args.description;
     if (args.category !== undefined) updates.category = args.category;
     if (args.level !== undefined) updates.level = args.level;

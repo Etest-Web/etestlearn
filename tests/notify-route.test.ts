@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Guards for the hardening added to the instructor-application notify route:
- * origin enforcement, field length caps and portfolio URL scheme validation.
+ * origin enforcement, field length caps, portfolio URL scheme validation, and
+ * the durable (Convex-backed) rate limiter layered over the in-memory one.
  *
  * The route reads env at call time, so each test sets what it needs and
  * restores afterwards rather than relying on module-load-time capture.
@@ -16,7 +17,19 @@ vi.mock("@/lib/mail", () => ({
     v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
 }));
 
+// The durable limiter lives in its own module precisely so tests can replace
+// it wholesale: no Convex deployment, no network. Default = allowed, so the
+// pre-existing tests keep exercising their own paths unchanged.
+const consumeDurableRateLimit = vi.fn();
+vi.mock("@/lib/durable-rate-limit", () => ({ consumeDurableRateLimit }));
+
 const { POST } = await import("@/app/api/instructor-applications/notify/route");
+
+beforeEach(() => {
+  sendMail.mockReset();
+  consumeDurableRateLimit.mockReset();
+  consumeDurableRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+});
 
 const BASE_ENV = {
   INSTRUCTOR_APPLICATION_EMAIL: "admin@example.com",
@@ -204,5 +217,59 @@ describe("notify route — rate limiting", () => {
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
     expect(statuses[5]).toBe(429);
     expect(retryAfter).toBeTruthy();
+  });
+});
+
+describe("notify route — durable rate limiting", () => {
+  it("returns 429 from the durable limiter without sending the mail", async () => {
+    // In-memory limiter still has budget for this IP (fresh key), so the 429
+    // must come from the durable counter being exhausted.
+    consumeDurableRateLimit.mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 3_600_000,
+    });
+
+    const res = await withEnv(() =>
+      POST(
+        sameOriginRequest(VALID_BODY, { "x-forwarded-for": freshIp() }),
+      ),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBeTruthy();
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when the durable limiter cannot be consulted", async () => {
+    // Fail closed: an unreachable limiter (missing env, Convex down) must
+    // disable the endpoint, never fall through to "allowed".
+    consumeDurableRateLimit.mockRejectedValue(
+      new Error("Durable rate limiter is not configured."),
+    );
+
+    const res = await withEnv(() =>
+      POST(
+        sameOriginRequest(VALID_BODY, { "x-forwarded-for": freshIp() }),
+      ),
+    );
+
+    expect(res.status).toBe(503);
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("consults the durable limiter with the IP key and the 5/hour window", async () => {
+    const ip = freshIp();
+
+    const res = await withEnv(() =>
+      POST(sameOriginRequest(VALID_BODY, { "x-forwarded-for": ip })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(consumeDurableRateLimit).toHaveBeenCalledTimes(1);
+    expect(consumeDurableRateLimit).toHaveBeenCalledWith(
+      `instructorApplicationNotify:${ip}`,
+      5,
+      60 * 60 * 1000,
+    );
   });
 });

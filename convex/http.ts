@@ -43,6 +43,74 @@ function timingSafeEqualHex(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Hard cap on webhook request bodies (256 KB).
+ *
+ * A real Paystack charge event is under 1 KB and a Clerk user event a few KB,
+ * so anything past this is either a misconfiguration or an attempt to make an
+ * unauthenticated endpoint buffer (and then parse) megabytes. The cap is
+ * enforced twice — see `readBodyWithinLimit` — because Content-Length alone is
+ * client-controlled: it may be absent (chunked bodies have none) or simply
+ * lie about the real size.
+ */
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+
+/**
+ * CORS is deliberately absent from both webhook routes — do not "fix" that.
+ *
+ * These are server-to-server endpoints. Paystack and Clerk/svix sign their
+ * POSTs and deliver them from their own backends; CORS is a browser-only
+ * mechanism and never applies to those deliveries. Adding
+ * `Access-Control-Allow-Origin: *` would grant the real callers nothing while
+ * advertising to every browser on the internet that it may read responses
+ * from this endpoint. Signature verification is the authentication here, and
+ * without CORS headers a browser can never read a response either way.
+ *
+ * As a cheap early filter, requests that DO carry a browser `Origin` header
+ * are refused outright: no supported webhook provider sends one (their docs
+ * prescribe signature validation and IP allow-listing, not browser calls), so
+ * its presence means the request was driven by browser code — a probe, a CSRF
+ * attempt, or someone "testing" the URL from a page. Such callers cannot
+ * forge a signature anyway; this only turns them away sooner and without
+ * buffering their body. If a provider ever starts sending Origin and events
+ * stop landing, this check is the first thing to revisit — the signature
+ * verification behind it stays regardless.
+ */
+function refuseBrowserOrigin(request: Request): Response | null {
+  if (request.headers.get("origin") !== null) {
+    return new Response("Unexpected origin", { status: 403 });
+  }
+  return null;
+}
+
+/**
+ * Reads the request body, returning either the bytes or the response to send.
+ *
+ * The declared Content-Length is checked first so an honestly-labelled
+ * oversized body is refused before it is buffered at all; the actual byte
+ * count is checked after reading, so a header that lies (smaller than the
+ * body) or is missing entirely cannot carry a larger payload past the cap.
+ * Returns the raw bytes rather than text because both signatures are
+ * computed over the exact bytes on the wire.
+ */
+async function readBodyWithinLimit(
+  request: Request,
+): Promise<ArrayBuffer | Response> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null) {
+    const size = Number.parseInt(declared, 10);
+    if (Number.isFinite(size) && size > MAX_WEBHOOK_BODY_BYTES) {
+      return new Response("Payload Too Large", { status: 413 });
+    }
+  }
+
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength > MAX_WEBHOOK_BODY_BYTES) {
+    return new Response("Payload Too Large", { status: 413 });
+  }
+  return bytes;
+}
+
 const http = httpRouter();
 
 // Paystack webhook: POST /webhook/paystack
@@ -57,13 +125,21 @@ http.route({
       return new Response("Webhook not configured", { status: 500 });
     }
 
-    const rawBody = await request.text();
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+
+    // Size cap before signature work: no point HMAC-ing a body we would refuse.
+    const bytes = await readBodyWithinLimit(request);
+    if (bytes instanceof Response) return bytes;
+
     const signature = request.headers.get("x-paystack-signature");
     if (!signature) {
       return new Response("Missing signature", { status: 401 });
     }
 
-    // Compute HMAC-SHA512 with Web Crypto.
+    // Compute HMAC-SHA512 with Web Crypto, over the bytes exactly as received —
+    // that is precisely what Paystack signs, while re-encoding through a JS
+    // string first would change the digest for any non-ASCII character.
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
@@ -72,7 +148,7 @@ http.route({
       false,
       ["sign"],
     );
-    const mac = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
+    const mac = await crypto.subtle.sign("HMAC", key, bytes);
     const computed = Array.from(new Uint8Array(mac))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
@@ -81,6 +157,10 @@ http.route({
       return new Response("Invalid signature", { status: 401 });
     }
 
+    // Verification (401) and the size cap (413) are done, so the payload is
+    // authenticated before it is decoded or parsed — an unauthenticated
+    // caller never reaches the JSON parser.
+    const rawBody = new TextDecoder().decode(bytes);
     let event: { event?: string; data?: { reference?: string } };
     try {
       event = JSON.parse(rawBody);
@@ -116,7 +196,13 @@ http.route({
       return new Response("Webhook not configured", { status: 500 });
     }
 
-    const rawBody = await request.text();
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+
+    const bytes = await readBodyWithinLimit(request);
+    if (bytes instanceof Response) return bytes;
+
+    const rawBody = new TextDecoder().decode(bytes);
     const svixHeaders = {
       "svix-id": request.headers.get("svix-id") ?? "",
       "svix-timestamp": request.headers.get("svix-timestamp") ?? "",

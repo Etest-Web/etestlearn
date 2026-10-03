@@ -16,6 +16,7 @@ import {
   type Id,
   type WriteCtx,
 } from "./helpers/auth";
+import { logAudit } from "./helpers/audit";
 
 /**
  * A field's placement, or `null` to keep it off the certificate. A nullable
@@ -129,6 +130,14 @@ export const createTemplate = mutation({
       await deactivateOthers(ctx, id);
     }
 
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "certificate_template.create",
+      targetType: "certificateTemplate",
+      targetId: id,
+      details: { name, activated: args.activate === true },
+    });
+
     return id;
   },
 });
@@ -150,23 +159,39 @@ async function deactivateOthers(ctx: WriteCtx, keepId: Id<"certificateTemplates"
 export const activateTemplate = mutation({
   args: { templateId: v.id("certificateTemplates") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
 
     const template = await ctx.db.get(args.templateId);
     if (!template) throw new Error("Template not found");
 
     await deactivateOthers(ctx, args.templateId);
     await ctx.db.patch(args.templateId, { active: true });
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "certificate_template.activate",
+      targetType: "certificateTemplate",
+      targetId: args.templateId,
+      details: { name: template.name },
+    });
   },
 });
 
 export const deactivateTemplate = mutation({
   args: { templateId: v.id("certificateTemplates") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
     const template = await ctx.db.get(args.templateId);
     if (!template) throw new Error("Template not found");
     await ctx.db.patch(args.templateId, { active: false });
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "certificate_template.deactivate",
+      targetType: "certificateTemplate",
+      targetId: args.templateId,
+      details: { name: template.name },
+    });
   },
 });
 
@@ -181,7 +206,7 @@ export const updateTemplateLayout = mutation({
     layout: layoutValidator,
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
 
     const template = await ctx.db.get(args.templateId);
     if (!template) throw new Error("Template not found");
@@ -193,13 +218,24 @@ export const updateTemplateLayout = mutation({
     }
 
     await ctx.db.patch(args.templateId, { layout: args.layout });
+
+    // Layout changes steer where learner names land on every future
+    // certificate, so a template quietly repointed at a different recipient
+    // line is exactly the kind of tampering the log exists to catch.
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "certificate_template.layout_update",
+      targetType: "certificateTemplate",
+      targetId: args.templateId,
+      details: { name: template.name },
+    });
   },
 });
 
 export const deleteTemplate = mutation({
   args: { templateId: v.id("certificateTemplates") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
 
     const template = await ctx.db.get(args.templateId);
     if (!template) throw new Error("Template not found");
@@ -207,6 +243,15 @@ export const deleteTemplate = mutation({
     await ctx.db.delete(args.templateId);
     // Orphaned PDFs would otherwise sit in storage forever.
     await ctx.storage.delete(template.pdfStorageId);
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "certificate_template.delete",
+      targetType: "certificateTemplate",
+      targetId: args.templateId,
+      // The row is gone, so the name lives on only here — keep it in details.
+      details: { name: template.name },
+    });
   },
 });
 

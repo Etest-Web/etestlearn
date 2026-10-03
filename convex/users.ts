@@ -1,5 +1,6 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { logAudit } from "./helpers/audit";
 
 /**
  * Constant-time string compare. A plain `!==` on a shared secret leaks its
@@ -73,6 +74,16 @@ export const deleteFromClerk = internalMutation({
 });
 
 /**
+ * Upper bound on users accepted per `syncFromClerk` call.
+ *
+ * The mutation below is public, so without a cap one call with a valid token
+ * could upsert an unbounded number of rows — enough to churn the whole
+ * `users` table from a single request. Honest backfills chunk; a caller
+ * wanting more than this should paginate rather than smuggle it through.
+ */
+const MAX_SYNC_BATCH = 500;
+
+/**
  * Shared secret for the one-off backfill in scripts/sync-clerk-users.mjs.
  *
  * This mutation stays `mutation` rather than `internalMutation` because the
@@ -80,10 +91,16 @@ export const deleteFromClerk = internalMutation({
  * call internal functions. That makes it publicly reachable, so it is gated on
  * a bearer token: previously it had no guard at all, which let anyone with the
  * deployment URL (it ships in NEXT_PUBLIC_CONVEX_URL) insert or overwrite user
- * rows — including the email and name of existing admins.
+ * rows — including the email and name of existing admins. The batch is also
+ * capped server-side (MAX_SYNC_BATCH), so a single leaked token cannot
+ * rewrite the whole table in one tight loop (chunk instead).
  *
  * Roles are never taken from the payload: existing rows keep theirs, and new
  * rows are always created as "student".
+ *
+ * Not audited: `auditLogs.actorId` is required, and this path has no Convex
+ * identity (it authenticates on a shared secret, not a user) — a fabricated
+ * actor would be worse than no row. The Clerk webhook syncs are the same case.
  */
 export const syncFromClerk = mutation({
   args: {
@@ -111,6 +128,13 @@ export const syncFromClerk = mutation({
       !timingSafeEqualString(args.token, syncToken)
     ) {
       throw new Error("Not authorized");
+    }
+
+    // Checked after the token so probing for the limit also requires the
+    // secret. Rejection happens before any write, so an oversized call is
+    // fully atomic — nothing is half-synced.
+    if (args.users.length > MAX_SYNC_BATCH) {
+      throw new Error(`Batch exceeds the limit of ${MAX_SYNC_BATCH} users`);
     }
 
     let created = 0;
@@ -243,7 +267,24 @@ export const setUserRole = mutation({
       throw new Error("You cannot change your own admin role");
     }
 
+    // `db.patch` on a missing id is a silent no-op, so without this a typo'd
+    // user id would report success while changing nothing — and the audit row
+    // would claim a role change that never happened.
+    const target = await ctx.db.get(args.userId);
+    if (!target) {
+      throw new Error("User not found");
+    }
+    const oldRole = target.role;
+
     await ctx.db.patch(args.userId, { role: args.role });
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "user.set_role",
+      targetType: "user",
+      targetId: args.userId,
+      details: { oldRole, newRole: args.role },
+    });
   },
 });
 

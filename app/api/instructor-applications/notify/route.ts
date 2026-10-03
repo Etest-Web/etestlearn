@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { escapeHtml, isSmtpConfigured, sendMail } from "@/lib/mail";
+import { consumeDurableRateLimit } from "@/lib/durable-rate-limit";
 
 type InstructorApplicationPayload = {
   fullName: string;
@@ -11,15 +12,19 @@ type InstructorApplicationPayload = {
 };
 
 /**
- * Fixed-window rate limiter.
- *
- * In-memory and therefore per-instance: on serverless each cold start gets a
- * fresh map, so this is a floor that stops casual abuse and accidental client
- * retry loops, not a hard guarantee. A durable store (Upstash/Convex) is the
- * real answer if this endpoint ever carries a quota you care about.
+ * Fixed-window rate limiter: 5 per hour per client key.
  */
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 5;
+
+/**
+ * In-memory limiter — the cheap first line of defense, checked before the
+ * durable one. It is per-instance (each serverless cold start gets a fresh
+ * map), so on its own it is bypassable by an attacker who forces new
+ * instances. It stays because it still stops casual retry loops and single-
+ * instance floods without a network round trip; the authoritative check is
+ * the durable Convex limiter consulted right after it.
+ */
 const hits = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimited(key: string): boolean {
@@ -33,6 +38,21 @@ function rateLimited(key: string): boolean {
 
   entry.count += 1;
   return entry.count > MAX_PER_WINDOW;
+}
+
+/** Namespaces this endpoint's buckets in the shared `rateLimits` table. */
+const DURABLE_KEY_PREFIX = "instructorApplicationNotify:";
+
+function tooManyRequests(retryAfterSeconds: number): NextResponse {
+  return NextResponse.json(
+    { error: "Too many applications. Please try again later." },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))),
+      },
+    },
+  );
 }
 
 /**
@@ -80,13 +100,39 @@ export async function POST(request: Request) {
     "unknown";
 
   if (rateLimited(ip)) {
-    return NextResponse.json(
-      { error: "Too many applications. Please try again later." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(Math.ceil(WINDOW_MS / 1000)) },
-      }
+    return tooManyRequests(WINDOW_MS / 1000);
+  }
+
+  // Durable limiter — the authoritative check. The in-memory map above resets
+  // on every cold start, so the Convex-backed counter (a row in `rateLimits`,
+  // bumped inside a serializable mutation) is what actually holds the 5/hour
+  // quota across instances.
+  //
+  // Fail closed: if the limiter cannot be consulted (missing env, Convex
+  // unreachable) we return 503 rather than falling back to the per-instance
+  // map — otherwise simply overloading the limiter would downgrade it back to
+  // the bypassable one. 503 means "endpoint temporarily unavailable", not
+  // "unlimited".
+  let durable: { allowed: boolean; retryAfterMs: number };
+  try {
+    durable = await consumeDurableRateLimit(
+      DURABLE_KEY_PREFIX + ip,
+      MAX_PER_WINDOW,
+      WINDOW_MS,
     );
+  } catch (error) {
+    console.error("Durable rate limiter unavailable for notify route:", error);
+    return NextResponse.json(
+      {
+        error:
+          "Rate limiting is temporarily unavailable. Please try again shortly.",
+      },
+      { status: 503 },
+    );
+  }
+
+  if (!durable.allowed) {
+    return tooManyRequests(durable.retryAfterMs / 1000);
   }
 
   let body: unknown;

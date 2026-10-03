@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { logAudit, type AuditEntry } from "./helpers/audit";
 
 // ─── Submit an instructor application ───────────────────────────────
 export const submitApplication = mutation({
@@ -149,12 +150,33 @@ export const reviewApplication = mutation({
       updatedAt: Date.now(),
     });
 
+    const details: NonNullable<AuditEntry["details"]> = {
+      decision: args.decision,
+    };
+    if (args.reviewNote !== undefined) details.note = args.reviewNote;
+
     // If approved, promote the user to instructor
     if (args.decision === "approved") {
+      // Read the old role before the patch so the log records what the
+      // applicant actually was — an approval that silently raised an admin
+      // (or a stranger) would otherwise be indistinguishable from a normal
+      // student promotion.
+      const applicant = await ctx.db.get(application.userId);
       await ctx.db.patch(application.userId, {
         role: "instructor",
       });
+      details.promotedUserId = application.userId;
+      details.oldRole = applicant?.role ?? null;
+      details.newRole = "instructor";
     }
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "instructor_application.review",
+      targetType: "instructorApplication",
+      targetId: args.applicationId,
+      details,
+    });
 
     return { success: true };
   },

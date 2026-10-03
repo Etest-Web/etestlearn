@@ -11,6 +11,7 @@ import {
   type WriteCtx,
 } from "./helpers/auth";
 import { evaluateForLearner } from "./helpers/completion";
+import { logAudit } from "./helpers/audit";
 
 /** Fresh entropy for a serial. crypto.randomUUID is available in the runtime. */
 function entropy(): string {
@@ -320,18 +321,25 @@ export const getCertificateForVerification = query({
   handler: async (ctx, args) => {
     const ref = args.ref.trim();
 
-    const bySerial = await ctx.db
+    // Serial-only, deliberately. The serial (GL-YYYY-XXXXXXXX) is the one
+    // public identifier for a certificate; the old fallback that also
+    // accepted a raw Convex document id meant two incompatible reference
+    // formats for the same record, so what resolved depended on which page
+    // built the link — and it let anyone holding an internal id harvested
+    // from an authenticated response (getMyCertificate, dashboard URLs) query
+    // this unauthenticated endpoint with it. One format, one lookup path.
+    //
+    // Known gap (frontend not editable from here): the dashboard detail page
+    // still falls back to `/verify/${certificateId}` when a certificate has
+    // no serial, so such a certificate now shows "not found". Every row
+    // should have a serial — issuance always allocates one and
+    // `backfillCertificateDetails` repairs older rows — but the backfill is
+    // not scheduled anywhere yet; running it is the follow-up, not a reason
+    // to keep id lookups on a public endpoint.
+    const cert = await ctx.db
       .query("certificates")
       .withIndex("by_serial", (q) => q.eq("serial", ref))
       .unique();
-
-    // Certificates issued before serials existed can still be verified by id,
-    // so an old link keeps working.
-    const cert =
-      bySerial ??
-      (ctx.db.normalizeId("certificates", ref)
-        ? await ctx.db.get(ctx.db.normalizeId("certificates", ref)!)
-        : null);
 
     if (!cert) {
       return null;
@@ -392,10 +400,26 @@ export const issueCertificateForLearner = mutation({
       throw new Error("That learner is not enrolled in this course");
     }
 
-    return await issueForUser(ctx, learner, args.courseId, {
+    const certificateId = await issueForUser(ctx, learner, args.courseId, {
       issuedBy: actor,
       override: true,
     });
+
+    // Manual awards are the one issuance path worth auditing: they bypass the
+    // completion bar, so a staff member's discretion — not the learner's work —
+    // is what put the certificate in existence, and the log is the only record
+    // of who did it. The learner's own issueCertificate call is deliberately
+    // left out: it is gated by the completion rules rather than by anyone's
+    // judgment, and logging it would bury the interesting rows in routine ones.
+    await logAudit(ctx, {
+      actorId: actor._id,
+      action: "certificate.issue_override",
+      targetType: "certificate",
+      targetId: certificateId,
+      details: { learnerUserId: args.userId, courseId: args.courseId },
+    });
+
+    return certificateId;
   },
 });
 
@@ -485,10 +509,25 @@ export const revokeCertificate = mutation({
       throw new Error("Not authorized to revoke this certificate");
     }
 
+    const reason = args.reason?.trim() || undefined;
+
     await ctx.db.patch(args.certificateId, {
       revokedAt: Date.now(),
       revokedBy: actor._id,
-      revocationReason: args.reason?.trim() || undefined,
+      revocationReason: reason,
+    });
+
+    // Revoking a credential is exactly the kind of privileged, discretionary
+    // act an audit trail exists for: the row survives, but only this log says
+    // who withdrew it and why. Written in the same transaction, so there is no
+    // window where a certificate is revoked without a trace. The serial goes
+    // in details because that is the identifier an investigator actually has.
+    await logAudit(ctx, {
+      actorId: actor._id,
+      action: "certificate.revoke",
+      targetType: "certificate",
+      targetId: args.certificateId,
+      details: { serial: cert.serial ?? null, reason: reason ?? null },
     });
   },
 });
@@ -510,6 +549,17 @@ export const reinstateCertificate = mutation({
       revokedAt: undefined,
       revokedBy: undefined,
       revocationReason: undefined,
+    });
+
+    // Reinstatement is audited for the same reason revocation is: without it
+    // a revoked-looking certificate quietly becoming valid again would leave
+    // no explanation in the trail.
+    await logAudit(ctx, {
+      actorId: actor._id,
+      action: "certificate.reinstate",
+      targetType: "certificate",
+      targetId: args.certificateId,
+      details: { serial: cert.serial ?? null },
     });
   },
 });

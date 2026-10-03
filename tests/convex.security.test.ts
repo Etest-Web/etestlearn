@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import type { GenericSchema, SchemaDefinition, DataModelFromSchemaDefinition, GenericMutationCtx } from "convex/server";
 
@@ -13,6 +14,10 @@ const testSchema = schema as unknown as SchemaDefinition<GenericSchema, boolean>
 // Extract the DataModel type from the original schema for proper type inference in run() callbacks
 type TestDataModel = DataModelFromSchemaDefinition<typeof schema>;
 type TestCtx = GenericMutationCtx<TestDataModel>;
+
+/** Identity scoped to an existing test world — each test owns one `t`. */
+const as = (t: TestConvex<typeof testSchema>, subject: string) =>
+  t.withIdentity({ subject, tokenIdentifier: subject });
 
 async function seedWorld(t: any) {
   const now = Date.now();
@@ -271,5 +276,268 @@ describe("lesson progress", () => {
     });
     expect(enrollment.progressPercent).toBe(100);
     expect(enrollment.completedLessonIds).toHaveLength(4);
+  });
+});
+
+describe("course slug integrity", () => {
+  test("createCourse normalizes the slug and refuses one another course owns", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    const instructor = as(t, "clerk_instructor");
+
+    // The UI slugifies titles, but the slug field is free text — whatever a
+    // client posts is normalized again server-side before it is stored.
+    const courseId = await instructor.mutation(api.courses.createCourse, {
+      title: "Intro to Web Development",
+      slug: "  Intro: Web Dev!!  ",
+      description: "Learn the web",
+    });
+
+    const created = await t.run((ctx: TestCtx) =>
+      ctx.db.get(courseId as Id<"courses">),
+    );
+    expect(created?.slug).toBe("intro-web-dev");
+
+    // Case and punctuation differences must not produce a second course on the
+    // same route: getCourseBySlug reads with .unique(), so one duplicate would
+    // make both courses' pages throw.
+    await expect(
+      instructor.mutation(api.courses.createCourse, {
+        title: "Intro to Web Development II",
+        slug: "INTRO-WEB-DEV",
+        description: "Sequel",
+      }),
+    ).rejects.toThrow(/already taken/);
+
+    // A seeded course's slug is no more available than a created one.
+    await expect(
+      instructor.mutation(api.courses.createCourse, {
+        title: "Paid Course Copy",
+        slug: "paid course",
+        description: "Duplicate route",
+      }),
+    ).rejects.toThrow(/already taken/);
+
+    // Rejected attempts must not leave a row behind.
+    const courses = await t.run((ctx: TestCtx) => ctx.db.query("courses").collect());
+    expect(courses).toHaveLength(3); // two seeded + the one accepted create
+  });
+
+  test("updateCourse cannot take another course's slug, but keeping its own is fine", async () => {
+    const t = convexTest(testSchema, modules);
+    const { freeCourseId } = await seedWorld(t);
+    const instructor = as(t, "clerk_instructor");
+
+    await expect(
+      instructor.mutation(api.courses.updateCourse, {
+        courseId: freeCourseId,
+        slug: "paid-course",
+      }),
+    ).rejects.toThrow(/already taken/);
+
+    // Re-saving an unchanged slug must not collide with itself — the check
+    // excludes the course being edited.
+    await instructor.mutation(api.courses.updateCourse, {
+      courseId: freeCourseId,
+      slug: "Free Course",
+    });
+
+    const course = await t.run((ctx: TestCtx) =>
+      ctx.db.get(freeCourseId as Id<"courses">),
+    );
+    expect(course?.slug).toBe("free-course");
+    expect(course?.title).toBe("Free Course"); // unrelated fields untouched
+  });
+});
+
+describe("quiz authoring validation", () => {
+  test("passingScore must stay within 0-100 on create and update", async () => {
+    const t = convexTest(testSchema, modules);
+    const { freeCourseId } = await seedWorld(t);
+    const instructor = as(t, "clerk_instructor");
+
+    const lessonId = await instructor.mutation(api.courses.createLesson, {
+      courseId: freeCourseId,
+      title: "Quiz lesson",
+      contentType: "quiz",
+      order: 0,
+    });
+
+    // Above 100 no score can ever reach the bar, locking learners out of a
+    // certificate they earned; below 0 every submission passes for free.
+    await expect(
+      instructor.mutation(api.quizzes.createQuiz, {
+        lessonId,
+        title: "Impossible",
+        passingScore: 101,
+      }),
+    ).rejects.toThrow(/between 0 and 100/);
+
+    await expect(
+      instructor.mutation(api.quizzes.createQuiz, {
+        lessonId,
+        title: "Free pass",
+        passingScore: -1,
+      }),
+    ).rejects.toThrow(/between 0 and 100/);
+
+    const quizId = await instructor.mutation(api.quizzes.createQuiz, {
+      lessonId,
+      title: "Valid",
+      passingScore: 50,
+    });
+
+    await expect(
+      instructor.mutation(api.quizzes.updateQuiz, { quizId, passingScore: 150 }),
+    ).rejects.toThrow(/between 0 and 100/);
+
+    // The lower boundary is inclusive, and a rejected update must not patch.
+    await instructor.mutation(api.quizzes.updateQuiz, { quizId, passingScore: 0 });
+
+    const quiz = await t.run((ctx: TestCtx) => ctx.db.get(quizId as Id<"quizzes">));
+    expect(quiz?.passingScore).toBe(0);
+  });
+
+  test("questions with a broken answer key are rejected before anything is written", async () => {
+    const t = convexTest(testSchema, modules);
+    const { freeCourseId } = await seedWorld(t);
+    const instructor = as(t, "clerk_instructor");
+
+    const lessonId = await instructor.mutation(api.courses.createLesson, {
+      courseId: freeCourseId,
+      title: "Quiz lesson",
+      contentType: "quiz",
+      order: 0,
+    });
+    const quizId = await instructor.mutation(api.quizzes.createQuiz, {
+      lessonId,
+      title: "Quiz",
+      passingScore: 50,
+    });
+
+    const countQuestions = () =>
+      t.run((ctx: TestCtx) => ctx.db.query("quizQuestions").collect());
+    expect(await countQuestions()).toHaveLength(0);
+
+    await expect(
+      instructor.mutation(api.quizzes.addQuizQuestion, {
+        quizId,
+        prompt: "Pick one",
+        options: [{ text: "Only option", isCorrect: true }],
+      }),
+    ).rejects.toThrow(/at least two options/);
+
+    // With no correct option the question can never be answered, so nobody in
+    // the course can reach the passing score.
+    await expect(
+      instructor.mutation(api.quizzes.addQuizQuestion, {
+        quizId,
+        prompt: "Pick one",
+        options: [
+          { text: "A", isCorrect: false },
+          { text: "B", isCorrect: false },
+        ],
+      }),
+    ).rejects.toThrow(/marked correct/);
+
+    await expect(
+      instructor.mutation(api.quizzes.addQuizQuestion, {
+        quizId,
+        prompt: "Pick one",
+        options: [
+          { text: "   ", isCorrect: true },
+          { text: "B", isCorrect: false },
+        ],
+      }),
+    ).rejects.toThrow(/cannot be empty/);
+
+    // Two spellings of one answer would grade by row order, not by choice.
+    await expect(
+      instructor.mutation(api.quizzes.addQuizQuestion, {
+        quizId,
+        prompt: "Pick one",
+        options: [
+          { text: "Yes", isCorrect: true },
+          { text: "  YES ", isCorrect: false },
+        ],
+      }),
+    ).rejects.toThrow(/distinct/);
+
+    expect(await countQuestions()).toHaveLength(0);
+
+    // A well-formed key still goes through.
+    await instructor.mutation(api.quizzes.addQuizQuestion, {
+      quizId,
+      prompt: "Pick one",
+      options: [
+        { text: "A", isCorrect: true },
+        { text: "B", isCorrect: false },
+      ],
+    });
+    expect(await countQuestions()).toHaveLength(1);
+  });
+});
+
+describe("quiz submission rate limiting", () => {
+  test("caps accepted submissions at 10 per user per minute across quizzes", async () => {
+    const t = convexTest(testSchema, modules);
+    const { freeCourseId } = await seedWorld(t);
+    const instructor = as(t, "clerk_instructor");
+
+    // The per-quiz cooldown only throttles repeats against one quiz, so the
+    // global budget has to be exercised across distinct quizzes — that
+    // fan-out is exactly what the limit exists to stop.
+    const lessonIds = [];
+    for (let i = 0; i < 12; i++) {
+      const lessonId = await instructor.mutation(api.courses.createLesson, {
+        courseId: freeCourseId,
+        title: `Quiz ${i + 1}`,
+        contentType: "quiz",
+        order: i,
+      });
+      await instructor.mutation(api.quizzes.createQuiz, {
+        lessonId,
+        title: `Quiz ${i + 1}`,
+        passingScore: 50,
+      });
+      lessonIds.push(lessonId);
+    }
+
+    for (const lessonId of lessonIds.slice(0, 10)) {
+      await instructor.mutation(api.quizzes.submitQuizAttempt, {
+        lessonId,
+        answers: [],
+      });
+    }
+
+    // The 11th submission inside the same minute is refused...
+    await expect(
+      instructor.mutation(api.quizzes.submitQuizAttempt, {
+        lessonId: lessonIds[10],
+        answers: [],
+      }),
+    ).rejects.toThrow(/Too many requests/);
+
+    // ...and so is any other quiz from the same caller while the window lasts,
+    // proving the bucket is global rather than per quiz.
+    await expect(
+      instructor.mutation(api.quizzes.submitQuizAttempt, {
+        lessonId: lessonIds[11],
+        answers: [],
+      }),
+    ).rejects.toThrow(/Too many requests/);
+
+    const attempts = await t.run((ctx: TestCtx) => ctx.db.query("quizAttempts").collect());
+    expect(attempts).toHaveLength(10);
+
+    // Keyed by user: a blocked caller must not be able to starve anyone else.
+    await as(t, "clerk_admin").mutation(api.quizzes.submitQuizAttempt, {
+      lessonId: lessonIds[11],
+      answers: [],
+    });
+    const afterOtherUser = await t.run((ctx: TestCtx) =>
+      ctx.db.query("quizAttempts").collect(),
+    );
+    expect(afterOtherUser).toHaveLength(11);
   });
 });

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as auditLogs from "../auditLogs.js";
 import type * as certificateArtifacts from "../certificateArtifacts.js";
 import type * as certificateTemplateActions from "../certificateTemplateActions.js";
 import type * as certificateTemplates from "../certificateTemplates.js";
@@ -16,13 +17,16 @@ import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
 import type * as files from "../files.js";
+import type * as helpers_audit from "../helpers/audit.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_completion from "../helpers/completion.js";
+import type * as helpers_rateLimit from "../helpers/rateLimit.js";
 import type * as http from "../http.js";
 import type * as instructorApplications from "../instructorApplications.js";
 import type * as payments from "../payments.js";
 import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
+import type * as rateLimit from "../rateLimit.js";
 import type * as users from "../users.js";
 
 import type {
@@ -32,6 +36,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auditLogs: typeof auditLogs;
   certificateArtifacts: typeof certificateArtifacts;
   certificateTemplateActions: typeof certificateTemplateActions;
   certificateTemplates: typeof certificateTemplates;
@@ -40,13 +45,16 @@ declare const fullApi: ApiFromModules<{
   discussions: typeof discussions;
   enrollments: typeof enrollments;
   files: typeof files;
+  "helpers/audit": typeof helpers_audit;
   "helpers/auth": typeof helpers_auth;
   "helpers/completion": typeof helpers_completion;
+  "helpers/rateLimit": typeof helpers_rateLimit;
   http: typeof http;
   instructorApplications: typeof instructorApplications;
   payments: typeof payments;
   paystack: typeof paystack;
   quizzes: typeof quizzes;
+  rateLimit: typeof rateLimit;
   users: typeof users;
 }>;
 

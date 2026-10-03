@@ -2,6 +2,23 @@ import { query, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { gradeQuiz } from "../lib/quiz";
+import { requireRateLimit } from "./helpers/rateLimit";
+
+/**
+ * Convex has no range validator — `v.number()` exposes only `.optional()`,
+ * never `.min()`/`.max()` — so the 0–100 contract for `passingScore` has to
+ * be enforced here, before the value is stored. The bounds are not cosmetic:
+ * a negative score makes `percent >= passingScore` true for every attempt,
+ * so anyone could earn a certificate without answering anything, while a
+ * score above 100 makes passing impossible and locks learners out of theirs.
+ * NaN is rejected explicitly because it fails every comparison and would
+ * silently mean "never passes".
+ */
+function assertPassingScoreInRange(passingScore: number): void {
+  if (!Number.isFinite(passingScore) || passingScore < 0 || passingScore > 100) {
+    throw new Error("passingScore must be a number between 0 and 100");
+  }
+}
 
 export const getQuizForLesson = query({
   args: { lessonId: v.id("lessons") },
@@ -184,6 +201,20 @@ export const submitQuizAttempt = mutation({
       throw new Error("Please wait 30 seconds before trying again");
     }
 
+    // Global cap: 10 accepted submissions per user per minute, on top of the
+    // per-quiz cooldown above. The cooldown only throttles repeats against one
+    // quiz, so a caller can otherwise fan out over every lesson and keep the
+    // grading path — plus the certificate issuance it can trigger — running
+    // back to back without pause. Keyed by user id so one caller can never
+    // exhaust another caller's bucket.
+    //
+    // Placed after the enrollment and cooldown guards on purpose: Convex
+    // mutations are transactions, so any later throw rolls back everything
+    // including this increment. Rejected attempts can therefore never burn
+    // budget, and every counted slot is an attempt that actually reached
+    // grading — which is exactly the work this limit exists to bound.
+    await requireRateLimit(ctx, `submitQuizAttempt:${user._id}`, 10, 60_000);
+
     const questions = await ctx.db
       .query("quizQuestions")
       .withIndex("by_quiz_order", (q) => q.eq("quizId", quiz._id))
@@ -276,6 +307,8 @@ export const createQuiz = mutation({
       throw new Error("Quiz already exists for this lesson");
     }
 
+    assertPassingScoreInRange(args.passingScore);
+
     const quizId = await ctx.db.insert("quizzes", {
       lessonId: args.lessonId,
       title: args.title,
@@ -319,7 +352,12 @@ export const updateQuiz = mutation({
 
     const updates: any = {};
     if (args.title !== undefined) updates.title = args.title;
-    if (args.passingScore !== undefined) updates.passingScore = args.passingScore;
+    if (args.passingScore !== undefined) {
+      // Same 0–100 rule as creation: tightening the bar must not be able to
+      // push it out of range either.
+      assertPassingScoreInRange(args.passingScore);
+      updates.passingScore = args.passingScore;
+    }
 
     await ctx.db.patch(args.quizId, updates);
   },
@@ -358,6 +396,28 @@ export const addQuizQuestion = mutation({
     const course = await ctx.db.get(lesson.courseId);
     if (!course || (course.instructorId !== user._id && user.role !== "admin")) {
       throw new Error("Not authorized to modify this quiz");
+    }
+
+    // Validate the whole answer key before the first insert. The instructor UI
+    // checks these too, but it is client-side code anyone can bypass by calling
+    // this mutation directly, and a broken key is a real attack on learners:
+    // with zero correct options a question can never be answered, which blocks
+    // everyone in that course from the passing score — and therefore from their
+    // certificate. Empty or repeated texts make the key ambiguous, so two
+    // identical choices grade differently depending on which row the grader
+    // reads first.
+    if (args.options.length < 2) {
+      throw new Error("A question needs at least two options");
+    }
+    const texts = args.options.map((option) => option.text.trim());
+    if (texts.some((text) => text.length === 0)) {
+      throw new Error("Option text cannot be empty");
+    }
+    if (new Set(texts.map((text) => text.toLowerCase())).size !== texts.length) {
+      throw new Error("Options must be distinct");
+    }
+    if (!args.options.some((option) => option.isCorrect)) {
+      throw new Error("At least one option must be marked correct");
     }
 
     const existingQuestions = await ctx.db

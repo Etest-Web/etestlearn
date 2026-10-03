@@ -306,8 +306,7 @@ async function calculateCurrentStreak(ctx: ReadCtx, userId: Id<"users">): Promis
     .query("learningActivities")
     .withIndex("by_user_created", (q) => q.eq("userId", userId))
     .order("desc")
-    .take(500) // Reasonable limit
-    .collect();
+    .take(500); // Reasonable limit - returns array directly
 
   if (activities.length === 0) return 0;
 

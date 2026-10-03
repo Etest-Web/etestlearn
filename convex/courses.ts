@@ -1,7 +1,20 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { slugify } from "../lib/slug";
-import { type Id, type WriteCtx } from "./helpers/auth";
+import {
+  unpublishBlockedMessage,
+  unpublishNotGatedMessage,
+  unpublishPolicy,
+} from "../lib/publishing";
+import { logAudit, type AuditEntry } from "./helpers/audit";
+import {
+  canManageCourse,
+  isStaff,
+  requireUser,
+  type Id,
+  type ReadCtx,
+  type WriteCtx,
+} from "./helpers/auth";
 
 function buildSearchText(title: string, description: string, category?: string) {
   return [title, description, category].filter(Boolean).join(" ").trim();
@@ -190,6 +203,14 @@ export const createCourse = mutation({
   },
 });
 
+/**
+ * Edits course metadata. Deliberately has **no** `published` argument.
+ *
+ * Visibility is an operation, not a field: it goes through `publishCourse` /
+ * `unpublishCourse` / `requestUnpublish` below, which is what lets those rules
+ * be enforced. Leaving `published` here as a plain optional boolean would hand
+ * every future caller a one-argument path around the unpublish gate.
+ */
 export const updateCourse = mutation({
   args: {
     courseId: v.id("courses"),
@@ -198,7 +219,6 @@ export const updateCourse = mutation({
     description: v.optional(v.string()),
     category: v.optional(v.string()),
     level: v.optional(v.string()),
-    published: v.optional(v.boolean()),
     thumbnailUrl: v.optional(v.string()),
     price: v.optional(v.number()),
     currency: v.optional(v.string()),
@@ -239,7 +259,6 @@ export const updateCourse = mutation({
     if (args.description !== undefined) updates.description = args.description;
     if (args.category !== undefined) updates.category = args.category;
     if (args.level !== undefined) updates.level = args.level;
-    if (args.published !== undefined) updates.published = args.published;
     if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
     if (args.price !== undefined) updates.price = args.price;
     if (args.currency !== undefined) updates.currency = args.currency;
@@ -444,5 +463,403 @@ export const getCourseAnalytics = query({
       certificateCount: certificates.filter((c) => c.revokedAt === undefined).length,
       revokedCertificateCount: certificates.filter((c) => c.revokedAt !== undefined).length,
     };
+  },
+});
+
+// ─── Publishing ─────────────────────────────────────────────────────────────
+//
+// An instructor may list a paid course and pull an unsold or free one at will.
+// What they may not do is quietly vanish a course that people have paid for,
+// which is why unpublishing a sold course is an admin decision made through a
+// request. The rule itself lives in `lib/publishing.ts`; this section is only
+// the enforcement and the request workflow around it.
+
+/** Completed purchases on a course. Pending checkouts do not count. */
+async function countPaidSales(
+  ctx: ReadCtx,
+  courseId: Id<"courses">,
+): Promise<number> {
+  const paid = await ctx.db
+    .query("purchases")
+    .withIndex("by_course_status", (q) =>
+      q.eq("courseId", courseId).eq("status", "paid"),
+    )
+    .collect();
+  return paid.length;
+}
+
+/** The same question asked with `.first()` — stops at the first paid row. */
+async function hasPaidSales(
+  ctx: ReadCtx,
+  courseId: Id<"courses">,
+): Promise<boolean> {
+  const paid = await ctx.db
+    .query("purchases")
+    .withIndex("by_course_status", (q) =>
+      q.eq("courseId", courseId).eq("status", "paid"),
+    )
+    .first();
+  return paid !== null;
+}
+
+/** The course's live unpublish request, if any. */
+async function getPendingRequest(
+  ctx: ReadCtx,
+  courseId: Id<"courses">,
+) {
+  const requests = await ctx.db
+    .query("courseUnpublishRequests")
+    .withIndex("by_course", (q) => q.eq("courseId", courseId))
+    .collect();
+  return (
+    requests
+      .filter((r) => r.status === "pending")
+      .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
+  );
+}
+
+/**
+ * Everything the instructor UI needs to render the right publishing controls,
+ * so the browser never has to re-derive the policy and risk disagreeing with
+ * the server about who is allowed to do what.
+ */
+export const getCoursePublishingState = query({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized to manage this course");
+    }
+
+    const paidSales = await countPaidSales(ctx, course._id);
+    const pending = await getPendingRequest(ctx, course._id);
+
+    return {
+      published: course.published,
+      paidSales,
+      policy: unpublishPolicy({ price: course.price, paidSales }),
+      isAdmin: user.role === "admin",
+      pendingRequest: pending
+        ? {
+            _id: pending._id,
+            reason: pending.reason ?? null,
+            createdAt: pending.createdAt,
+          }
+        : null,
+    };
+  },
+});
+
+/**
+ * Puts a course on sale. Never gated — publishing is what instructors need to
+ * be able to do without asking anyone, and it cannot retroactively take
+ * anything away from a buyer.
+ *
+ * Republishing while an unpublish request is pending resolves that request:
+ * the ask was "take this down" and the answer is now "it is up", so leaving it
+ * in the admin queue would only produce a review of a decision already made.
+ */
+export const publishCourse = mutation({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized to publish this course");
+    }
+
+    if (!course.published) {
+      await ctx.db.patch(course._id, {
+        published: true,
+        updatedAt: Date.now(),
+      });
+    }
+
+    const pending = await getPendingRequest(ctx, course._id);
+    if (pending) {
+      await ctx.db.patch(pending._id, {
+        status: "rejected",
+        reviewNote: "Resolved automatically — the course was republished.",
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Takes a course off sale.
+ *
+ * Refused for the owning instructor when `lib/publishing.ts` classifies the
+ * course as `needs_approval` — that path is `requestUnpublish` instead. An
+ * admin may always unpublish directly: pulling down a fraudulent or
+ * rights-violating course should never wait on a request queue.
+ */
+export const unpublishCourse = mutation({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized to unpublish this course");
+    }
+
+    const isAdmin = user.role === "admin";
+    if (!isAdmin && (await hasPaidSales(ctx, course._id))) {
+      throw new Error(unpublishBlockedMessage(await countPaidSales(ctx, course._id)));
+    }
+
+    if (course.published) {
+      await ctx.db.patch(course._id, {
+        published: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Only the gated path is an audited action: unpublishing a free course is
+    // ordinary self-service, and auditing every draft toggle would bury the
+    // rows that matter.
+    if (isAdmin && (await hasPaidSales(ctx, course._id))) {
+      const paidSales = await countPaidSales(ctx, course._id);
+      await logAudit(ctx, {
+        actorId: user._id,
+        action: "course.unpublish",
+        targetType: "course",
+        targetId: course._id,
+        details: {
+          paidSales,
+          price: course.price ?? 0,
+          direct: true,
+        },
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Asks an admin to unpublish a course that has already sold. Refuses the
+ * request outright when the course is not actually gated, so the instructor
+ * gets told to just press the button instead of waiting on a pointless review.
+ */
+export const requestUnpublish = mutation({
+  args: {
+    courseId: v.id("courses"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized to request unpublishing this course");
+    }
+
+    if (!course.published) {
+      throw new Error("This course is already unpublished");
+    }
+
+    const paidSales = await countPaidSales(ctx, course._id);
+    if (unpublishPolicy({ price: course.price, paidSales }) !== "needs_approval") {
+      throw new Error(unpublishNotGatedMessage());
+    }
+
+    if (await getPendingRequest(ctx, course._id)) {
+      throw new Error("You already have a pending request for this course");
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("courseUnpublishRequests", {
+      courseId: course._id,
+      requestedBy: user._id,
+      reason: args.reason?.trim() || undefined,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/** Lets the instructor take a pending request back down. */
+export const withdrawUnpublishRequest = mutation({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized for this course");
+    }
+
+    const pending = await getPendingRequest(ctx, course._id);
+    if (!pending) {
+      throw new Error("There is no pending request for this course");
+    }
+
+    await ctx.db.patch(pending._id, {
+      status: "rejected",
+      reviewNote: "Withdrawn by the instructor.",
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Admin review queue. Admin only, and joined rather than returned raw so the
+ * reviewer can judge the request (what the course is, who asked, how many
+ * people are affected) without a second round trip per row.
+ */
+export const listUnpublishRequests = query({
+  args: {
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (user.role !== "admin") {
+      throw new Error("Not authorized — admin access required");
+    }
+
+    // Bounded so a long history cannot turn one admin page load into an
+    // unbounded read; the queue is a work list, not an export.
+    const MAX_REQUESTS = 100;
+    const rows = await (args.status
+      ? ctx.db
+          .query("courseUnpublishRequests")
+          .withIndex("by_status", (q) => q.eq("status", args.status!))
+      : ctx.db.query("courseUnpublishRequests"))
+      .take(MAX_REQUESTS);
+
+    return await Promise.all(
+      rows
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (row) => {
+          // A course or user row can be missing (deleted account, bad data);
+          // surface that rather than throwing and blanking the whole queue.
+          const [course, requester, paidSales] = await Promise.all([
+            ctx.db.get(row.courseId),
+            ctx.db.get(row.requestedBy),
+            countPaidSales(ctx, row.courseId),
+          ]);
+
+          return {
+            _id: row._id,
+            status: row.status,
+            reason: row.reason ?? null,
+            reviewNote: row.reviewNote ?? null,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            paidSales,
+            course: course
+              ? {
+                  _id: course._id,
+                  title: course.title,
+                  slug: course.slug,
+                  published: course.published,
+                  price: course.price ?? 0,
+                  currency: course.currency ?? "NGN",
+                }
+              : null,
+            requester: requester
+              ? {
+                  _id: requester._id,
+                  name: requester.name ?? null,
+                  email: requester.email ?? null,
+                }
+              : null,
+          };
+        }),
+    );
+  },
+});
+
+/**
+ * Admin decision on an unpublish request. Approving is what actually takes the
+ * course down — the instructor's request never touched `published`, so there is
+ * no window where a sold course is silently off sale.
+ */
+export const reviewUnpublishRequest = mutation({
+  args: {
+    requestId: v.id("courseUnpublishRequests"),
+    decision: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireUser(ctx);
+    if (admin.role !== "admin") {
+      throw new Error("Not authorized — admin access required");
+    }
+
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.status !== "pending") {
+      throw new Error("This request has already been reviewed");
+    }
+
+    const now = Date.now();
+
+    if (args.decision === "approved") {
+      const course = await ctx.db.get(request.courseId);
+      if (!course) throw new Error("Course not found");
+      if (course.published) {
+        await ctx.db.patch(course._id, {
+          published: false,
+          updatedAt: now,
+        });
+      }
+    }
+
+    await ctx.db.patch(request._id, {
+      status: args.decision,
+      reviewedBy: admin._id,
+      reviewNote: args.reviewNote?.trim() || undefined,
+      updatedAt: now,
+    });
+
+    // One row records the whole exchange — who asked, on what, and what the
+    // admin decided — so a rejected request still leaves evidence that the
+    // instructor escalated rather than quietly pulling the course.
+    const course = await ctx.db.get(request.courseId);
+    const details: NonNullable<AuditEntry["details"]> = {
+      decision: args.decision,
+      courseId: request.courseId,
+      requestedBy: request.requestedBy,
+      paidSales: await countPaidSales(ctx, request.courseId),
+    };
+    if (course) details.courseTitle = course.title;
+    if (args.reviewNote !== undefined) details.note = args.reviewNote;
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "course_unpublish_request.review",
+      targetType: "courseUnpublishRequest",
+      targetId: request._id,
+      details,
+    });
+
+    return { success: true };
   },
 });

@@ -18,7 +18,9 @@ import {
     Settings,
     UserCircle2,
     Users,
+    EyeOff,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 
@@ -59,13 +61,35 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
         <SidebarProvider>
             <Sidebar className="border-r bg-sidebar" collapsible="icon">
-                <SidebarHeader className="py-6 px-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#945DA3] text-white shadow-md">
+                {/* The 48px collapsed rail (data-collapsible=icon) has no room for
+                    the wordmark, so the padding tightens and the compact brand
+                    mark takes over. On mobile the sheet renders no
+                    `data-collapsible` at all, so the wordmark always shows there. */}
+                <SidebarHeader className="py-5 px-4 group-data-[collapsible=icon]:px-2">
+                    <Link
+                        href="/dashboard"
+                        aria-label="Glypha Learn — dashboard home"
+                        className="flex items-center justify-center rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                    >
+                        {/* The mark ships as flat #945DA3, which drops to 2.6:1 on
+                            the sidebar's dark surface (it gets 3.2:1 on the
+                            navbar's darker one). `brightness` lifts it without
+                            swapping in a second asset — there is no dark
+                            variant in public/. */}
+                        <Image
+                            src="/Logo.svg"
+                            alt="Glypha Learn"
+                            width={112}
+                            height={56}
+                            className="h-auto w-28 shrink-0 dark:brightness-[1.35] group-data-[collapsible=icon]:hidden"
+                        />
+                        {/* Same purple graduation-cap mark used on the verify
+                            page and 404 — it is the compact brand glyph in this
+                            codebase, so it keeps the collapsed rail legible. */}
+                        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground shadow-md group-data-[collapsible=icon]:flex">
                             <GraduationCap size={16} />
-                        </div>
-                        <span className="text-xl font-bold tracking-tight text-sidebar-foreground">Glypha Learn</span>
-                    </div>
+                        </span>
+                    </Link>
                 </SidebarHeader>
 
                 <SidebarContent className="px-3 gap-6">
@@ -239,6 +263,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         >
                             <FileStack size={20} />
                             Templates
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/unpublish-requests"
+                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                        >
+                            <EyeOff size={20} />
+                            Unpublish Requests
                         </Link>
                     )}
                     <SidebarGroup className="flex items-center gap-2 px-3">

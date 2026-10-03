@@ -11,11 +11,10 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { Badge } from "@/components/ui";
-import { Switch } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
@@ -30,6 +29,20 @@ export default function CourseEditPage() {
   const updateCourse = useMutation(api.courses.updateCourse);
   const createLesson = useMutation(api.courses.createLesson);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+
+  // Publishing is a separate operation from editing metadata (see
+  // `lib/publishing.ts`), so the server decides which controls exist rather
+  // than this page guessing from the price field.
+  const publishing = useQuery(api.courses.getCoursePublishingState, {
+    courseId: courseId as Id<"courses">,
+  });
+  const publishCourse = useMutation(api.courses.publishCourse);
+  const unpublishCourse = useMutation(api.courses.unpublishCourse);
+  const requestUnpublish = useMutation(api.courses.requestUnpublish);
+  const withdrawUnpublishRequest = useMutation(api.courses.withdrawUnpublishRequest);
+  const [isPublishingActionPending, setIsPublishingActionPending] = useState(false);
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [unpublishReason, setUnpublishReason] = useState("");
   const pendingStorageId = useRef<Id<"_storage"> | null>(null);
   const [resolvedStorageId, setResolvedStorageId] = useState<Id<"_storage"> | null>(null);
   const resolvedFileUrl = useQuery(
@@ -68,7 +81,6 @@ export default function CourseEditPage() {
     description: "",
     category: "",
     level: "",
-    published: false,
     thumbnailUrl: "",
     priceNaira: "",
   });
@@ -81,7 +93,6 @@ export default function CourseEditPage() {
         description: courseData.course.description,
         category: courseData.course.category || "",
         level: courseData.course.level || "",
-        published: courseData.course.published,
         thumbnailUrl: courseData.course.thumbnailUrl || "",
         priceNaira: courseData.course.price ? String(courseData.course.price / 100) : "",
       });
@@ -114,7 +125,6 @@ export default function CourseEditPage() {
         description: formData.description,
         category: formData.category || undefined,
         level: formData.level || undefined,
-        published: formData.published,
         thumbnailUrl: formData.thumbnailUrl || undefined,
         price,
         ...(price > 0 ? { currency: "NGN" } : {}),
@@ -127,6 +137,69 @@ export default function CourseEditPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Publishing actions share one handler because they differ only in which
+  // mutation runs and what the toast says — and they must never be reachable
+  // from the details form, where a stale price could publish or unpublish the
+  // wrong thing.
+  const runPublishingAction = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+    errorMessage: string,
+  ) => {
+    setIsPublishingActionPending(true);
+    try {
+      await action();
+      toast.success(successMessage);
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : errorMessage,
+      );
+    } finally {
+      setIsPublishingActionPending(false);
+    }
+  };
+
+  const handlePublish = () =>
+    runPublishingAction(
+      () => publishCourse({ courseId: courseId as Id<"courses"> }),
+      "Course published — it is now listed and on sale.",
+      "Failed to publish course.",
+    );
+
+  const handleUnpublish = () =>
+    runPublishingAction(
+      () => unpublishCourse({ courseId: courseId as Id<"courses"> }),
+      "Course unpublished. Learners who already bought it keep their access.",
+      "Failed to unpublish course.",
+    );
+
+  const handleRequestUnpublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsPublishingActionPending(true);
+    try {
+      await requestUnpublish({
+        courseId: courseId as Id<"courses">,
+        reason: unpublishReason.trim() || undefined,
+      });
+      setIsRequestDialogOpen(false);
+      setUnpublishReason("");
+      toast.success("Request submitted. An admin will review it shortly.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to submit the request.",
+      );
+    } finally {
+      setIsPublishingActionPending(false);
+    }
+  };
+
+  const handleWithdrawRequest = () =>
+    runPublishingAction(
+      () => withdrawUnpublishRequest({ courseId: courseId as Id<"courses"> }),
+      "Request withdrawn.",
+      "Failed to withdraw the request.",
+    );
 
   const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -242,6 +315,12 @@ export default function CourseEditPage() {
           <Badge variant={courseData.course.published ? "default" : "secondary"}>
             {courseData.course.published ? "Published" : "Draft"}
           </Badge>
+          {publishing?.pendingRequest && (
+            <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
+              <Clock className="mr-1 h-3 w-3" />
+              Unpublish requested
+            </Badge>
+          )}
           {courseData.course.slug && (
             <Button variant="outline" size="sm" onClick={() => window.open(`/courses/${courseData.course.slug}`, "_blank")}>
               <ExternalLink className="mr-2 h-4 w-4" />
@@ -273,23 +352,32 @@ export default function CourseEditPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-6">
+          <div className="flex flex-col gap-6">
+            {publishing === undefined ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-16 w-full" />
+                </CardContent>
+              </Card>
+            ) : (
+              <PublishingPanel
+                state={publishing}
+                pending={isPublishingActionPending}
+                isRequestDialogOpen={isRequestDialogOpen}
+                setIsRequestDialogOpen={setIsRequestDialogOpen}
+                unpublishReason={unpublishReason}
+                setUnpublishReason={setUnpublishReason}
+                onPublish={handlePublish}
+                onUnpublish={handleUnpublish}
+                onRequestSubmit={handleRequestUnpublish}
+                onWithdrawRequest={handleWithdrawRequest}
+              />
+            )}
           <form onSubmit={handleSubmit}>
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Course Details</CardTitle>
-                    <CardDescription>Update the metadata for this course.</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="published">Published</Label>
-                    <Switch
-                      id="published"
-                      checked={formData.published}
-                      onCheckedChange={(checked: boolean) => setFormData((prev) => ({ ...prev, published: checked }))}
-                    />
-                  </div>
-                </div>
+                <CardTitle>Course Details</CardTitle>
+                <CardDescription>Update the metadata for this course.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -422,6 +510,12 @@ export default function CourseEditPage() {
                   <p className="text-xs text-muted-foreground">
                     Leave empty (or 0) for a free course. Paid courses are collected via Paystack.
                   </p>
+                  {publishing?.policy === "needs_approval" && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      {publishing.paidSales} learner{publishing.paidSales === 1 ? "" : "s"} already paid
+                      for this course. From now on, taking it off sale needs admin approval.
+                    </p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2 border-t pt-4">
@@ -432,6 +526,7 @@ export default function CourseEditPage() {
               </CardFooter>
             </Card>
           </form>
+          </div>
         </TabsContent>
         <TabsContent value="content" className="pt-6">
           <Card>
@@ -568,5 +663,222 @@ export default function CourseEditPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/**
+ * The publishing controls, split out because they are the one part of this
+ * page whose shape is decided by the server: whether unpublishing is a button
+ * or a request is `policy`, not something this file can work out from the
+ * price input (which may not even be saved yet).
+ */
+function PublishingPanel({
+  state,
+  pending,
+  isRequestDialogOpen,
+  setIsRequestDialogOpen,
+  unpublishReason,
+  setUnpublishReason,
+  onPublish,
+  onUnpublish,
+  onRequestSubmit,
+  onWithdrawRequest,
+}: {
+  state: {
+    published: boolean;
+    paidSales: number;
+    policy: "free" | "paid_unsold" | "needs_approval";
+    isAdmin: boolean;
+    pendingRequest: { _id: string; reason: string | null; createdAt: number } | null;
+  };
+  pending: boolean;
+  isRequestDialogOpen: boolean;
+  setIsRequestDialogOpen: (open: boolean) => void;
+  unpublishReason: string;
+  setUnpublishReason: (reason: string) => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onRequestSubmit: (e: React.FormEvent) => void;
+  onWithdrawRequest: () => void;
+}) {
+  const isGated = state.policy === "needs_approval";
+  const requestPending = state.pendingRequest !== null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle>Visibility</CardTitle>
+            <CardDescription>
+              {state.published
+                ? "This course is listed and on sale."
+                : "This course is a draft and is not listed."}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {state.published ? (
+              <>
+                {/* An admin answering a support ticket must not have to impersonate
+                    the request flow, so the direct action stays available to them. */}
+                {isGated && state.isAdmin ? (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={onUnpublish}
+                    disabled={pending || requestPending}
+                  >
+                    {pending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <EyeOff className="mr-2 h-4 w-4" />
+                    )}
+                    Unpublish now
+                  </Button>
+                ) : isGated ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsRequestDialogOpen(true)}
+                    disabled={pending || requestPending}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Request unpublish
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onUnpublish}
+                    disabled={pending}
+                  >
+                    {pending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <EyeOff className="mr-2 h-4 w-4" />
+                    )}
+                    Unpublish
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button size="sm" onClick={onPublish} disabled={pending}>
+                {pending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Globe className="mr-2 h-4 w-4" />
+                )}
+                Publish course
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {(isGated || requestPending) && (
+        <CardContent className="space-y-3">
+          {requestPending ? (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="flex items-start gap-3">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                    Unpublish request awaiting admin review
+                  </p>
+                  <p className="text-sm text-amber-900/80 dark:text-amber-300/80">
+                    {state.paidSales} learner{state.paidSales === 1 ? "" : "s"} already paid for
+                    this course, so taking it off sale needs an admin. The course stays live and
+                    on sale until they decide.
+                  </p>
+                  {state.pendingRequest?.reason && (
+                    <p className="text-sm italic text-amber-900/80 dark:text-amber-300/80">
+                      &ldquo;{state.pendingRequest.reason}&rdquo;
+                    </p>
+                  )}
+                  <p className="text-xs text-amber-900/70 dark:text-amber-300/70">
+                    Submitted{" "}
+                    {new Date(state.pendingRequest!.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                  {!state.isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onWithdrawRequest}
+                      disabled={pending}
+                    >
+                      {pending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Undo2 className="mr-2 h-4 w-4" />
+                      )}
+                      Withdraw request
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-muted/40 p-4">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {state.paidSales} learner{state.paidSales === 1 ? " has" : "s have"} already paid
+                  for this course. You can keep selling it or change anything else about it, but
+                  taking it off sale now goes to an admin first. Learners who bought it keep access
+                  either way.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+        <DialogContent>
+          <form onSubmit={onRequestSubmit}>
+            <DialogHeader>
+              <DialogTitle>Request unpublish</DialogTitle>
+              <DialogDescription>
+                An admin will review this. Tell them why — for example, a content error, a
+                correction that needs re-recording, or a request from learners. The course stays on
+                sale until they respond.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="unpublishReason">Reason</Label>
+              <Textarea
+                id="unpublishReason"
+                rows={4}
+                className="mt-2"
+                value={unpublishReason}
+                onChange={(e) => setUnpublishReason(e.target.value)}
+                placeholder="Optional, but it speeds up the review."
+                maxLength={500}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {unpublishReason.length}/500
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsRequestDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit request
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

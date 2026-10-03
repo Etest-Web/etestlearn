@@ -42,7 +42,7 @@ export function HeroPoster() {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden">
       <section className="relative w-full">
         {/* Fixed TextLoop Background Wrapper */}
-        <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden blur">
           {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
               would hand the parent ~15px of over-wide canvas to clip. */}
           <div className="w-full">

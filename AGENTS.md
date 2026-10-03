@@ -109,8 +109,10 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    - `logAudit` call sites — privileged actions only; learner self-service issuance and webhook
      syncs are deliberately unlogged because `auditLogs.actorId` is required: `users.setUserRole`,
      `instructorApplications.reviewApplication`, `certificates.revokeCertificate` /
-     `reinstateCertificate` / `issueCertificateForLearner` (the override path), and all five
-     `certificateTemplates` admin mutations.
+     `reinstateCertificate` / `issueCertificateForLearner` (the override path), all five
+     `certificateTemplates` admin mutations, `courses.unpublishCourse` (only when the course is
+     paid *and* sold — unpublishing a free course is ordinary self-service and logging every draft
+     toggle would bury the rows that matter), and `courses.reviewUnpublishRequest`.
    - Read back via `auditLogs.listAuditLogs` (admin-only query).
 7. **Certificates:** single completion rule in `lib/certificates.ts`
    (`evaluateCertificateCompletion`), consumed by `convex/certificates.ts`
@@ -140,6 +142,22 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    - That is why `'strict-dynamic'` is absent: it would make CSP3 browsers ignore `'self'` and
      that host entry, blocking clerk-js and taking sign-in down. Verify with
      `curl -s -D- -o/dev/null <url>` plus a scan of the rendered HTML before considering it.
+9. **Publishing is an operation, not a field.** `courses.updateCourse` deliberately has **no**
+   `published` argument; visibility goes through `courses.publishCourse` /
+   `courses.unpublishCourse` / `courses.requestUnpublish`. Do not add the field back — it would
+   hand every future caller a one-argument path around the unpublish gate.
+
+   The rule itself is in `lib/publishing.ts` (`unpublishPolicy`), the same single-source shape as
+   `lib/certificates.ts`. An instructor may always publish. Unpublishing is free when the course is
+   free or paid-but-unsold; once a course has at least one **completed** (`paid`) purchase it needs
+   admin approval, because pulling a paid listing is the scam (`purchases` has a
+   `by_course_status` index for exactly this check; pending checkouts don't count because the
+   webhook still grants the enrollment). Workflow: instructor submits →
+   `courseUnpublishRequests` row (status `pending`, course stays live) → admin decides via
+   `courses.reviewUnpublishRequest`, and only an approval writes `published: false`. An admin may
+   also unpublish directly — pulling down a fraudulent course shouldn't wait on a queue — and
+   republishing resolves any pending request. Buyers lose nothing either way: access is keyed on the
+   enrollment, not on `published`. Queues are read at `app/dashboard/admin/unpublish-requests`.
 
 ---
 

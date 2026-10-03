@@ -61,7 +61,9 @@ export default function AdminUsersPage() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Manage platform users and their roles. Instructor applications live in{" "}
-          <a href="/dashboard/admin/applications" className="text-[#945DA3] hover:underline">Applications</a>.
+          <a href="/dashboard/admin/applications" className="text-[#945DA3] hover:underline">Applications</a>,
+          and instructors asking to take a paid course off sale queue in{" "}
+          <a href="/dashboard/admin/unpublish-requests" className="text-[#945DA3] hover:underline">Unpublish Requests</a>.
         </p>
       </div>
 

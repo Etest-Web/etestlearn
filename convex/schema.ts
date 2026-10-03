@@ -39,6 +39,27 @@ export default defineSchema({
       filterFields: ["published"],
     }),
 
+  // An instructor cannot pull a course somebody has already paid for off sale
+  // on their own — buyers would lose the listing they paid into. They ask here
+  // instead and an admin decides. Free and paid-but-unsold courses never need a
+  // request; `lib/publishing.ts` owns that rule.
+  courseUnpublishRequests: defineTable({
+    courseId: v.id("courses"),
+    requestedBy: v.id("users"),
+    reason: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_status", ["status"])
+    .index("by_course", ["courseId"])
+    .index("by_createdAt", ["createdAt"]),
+
   lessons: defineTable({
     courseId: v.id("courses"),
     title: v.string(),
@@ -170,7 +191,10 @@ export default defineSchema({
   }).index("by_reference", ["paystackReference"])
     .index("by_user", ["userId"])
     .index("by_user_course", ["userId", "courseId"])
-    .index("by_course", ["courseId"]),
+    .index("by_course", ["courseId"])
+    // Serves the unpublish gate: "does this course already have a buyer?" is a
+    // single range read that stops at the first paid row.
+    .index("by_course_status", ["courseId", "status"]),
 
   discussionThreads: defineTable({
     courseId: v.id("courses"),

@@ -120,6 +120,43 @@ async function issueForUser(
     templateId: templateId ?? undefined,
   });
 
+  // Log certificate earned activity
+  await ctx.db.insert("learningActivities", {
+    userId: user._id,
+    type: "certificate_earned",
+    courseId,
+    certificateId,
+    metadata: {
+      serial,
+      courseTitle: course.title,
+    },
+    createdAt: issuedAt,
+  });
+
+  // Increment certificate goals
+  await ctx.runMutation(internal.goals.incrementGoalProgress, {
+    userId: user._id,
+    type: "earn_certificates",
+    amount: 1,
+    date: issuedAt,
+  });
+
+  // Also increment course completion goal (earning a certificate means completing a course)
+  await ctx.runMutation(internal.goals.incrementGoalProgress, {
+    userId: user._id,
+    type: "complete_courses",
+    amount: 1,
+    date: issuedAt,
+  });
+
+  // Increment study streak for certificate achievement
+  await ctx.runMutation(internal.goals.incrementGoalProgress, {
+    userId: user._id,
+    type: "study_streak_days",
+    amount: 1,
+    date: issuedAt,
+  });
+
   // PDF render + email are best-effort side effects: the certificate is valid
   // without them, so they are scheduled rather than run inline. Mutations
   // cannot call runAction (only queries and actions can), so this goes through

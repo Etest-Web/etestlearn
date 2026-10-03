@@ -62,7 +62,7 @@ export function HeroPoster() {
               ribbon
               ribbonColor="#d046f6"
               ribbonWidth={86}
-              className="hidden sm:flex"
+              className="hidden sm:block"
               pauseOnHover={false}
             />
           </div>

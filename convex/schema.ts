@@ -260,5 +260,56 @@ export default defineSchema({
   }).index("by_createdAt", ["createdAt"])
     .index("by_actor", ["actorId"])
     .index("by_action", ["action"]),
+
+  // User learning goals for achievement tracking.
+  // Supports multiple goal types with progress tracking towards targets.
+  userGoals: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("complete_courses"),
+      v.literal("complete_lessons"),
+      v.literal("watch_hours"),
+      v.literal("earn_certificates"),
+      v.literal("pass_quizzes"),
+      v.literal("study_streak_days"),
+    ),
+    target: v.number(), // Target value (e.g., 5 courses, 50 lessons, 100 hours)
+    current: v.number(), // Current progress
+    period: v.union(
+      v.literal("weekly"),
+      v.literal("monthly"),
+      v.literal("yearly"),
+      v.literal("all_time"),
+    ),
+    startDate: v.number(), // Unix timestamp
+    endDate: v.optional(v.number()), // Unix timestamp, optional for all_time
+    isActive: v.boolean(),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_user_type_period", ["userId", "type", "period"]),
+
+  // Learning activity log for streak calculation and detailed analytics
+  learningActivities: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("lesson_completed"),
+      v.literal("quiz_passed"),
+      v.literal("quiz_attempted"),
+      v.literal("certificate_earned"),
+      v.literal("course_enrolled"),
+      v.literal("course_completed"),
+    ),
+    courseId: v.optional(v.id("courses")),
+    lessonId: v.optional(v.id("lessons")),
+    quizId: v.optional(v.id("quizzes")),
+    certificateId: v.optional(v.id("certificates")),
+    metadata: v.optional(v.any()), // Additional data (e.g., duration minutes, score)
+    createdAt: v.number(),
+  }).index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_type", ["userId", "type"])
+    .index("by_user_course", ["userId", "courseId"]),
 });
 

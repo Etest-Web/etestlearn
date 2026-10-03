@@ -17,6 +17,7 @@ import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
 import type * as files from "../files.js";
+import type * as goals from "../goals.js";
 import type * as helpers_audit from "../helpers/audit.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_completion from "../helpers/completion.js";
@@ -27,6 +28,7 @@ import type * as payments from "../payments.js";
 import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
 import type * as rateLimit from "../rateLimit.js";
+import type * as statistics from "../statistics.js";
 import type * as users from "../users.js";
 
 import type {
@@ -45,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   discussions: typeof discussions;
   enrollments: typeof enrollments;
   files: typeof files;
+  goals: typeof goals;
   "helpers/audit": typeof helpers_audit;
   "helpers/auth": typeof helpers_auth;
   "helpers/completion": typeof helpers_completion;
@@ -55,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   paystack: typeof paystack;
   quizzes: typeof quizzes;
   rateLimit: typeof rateLimit;
+  statistics: typeof statistics;
   users: typeof users;
 }>;
 

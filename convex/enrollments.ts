@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { computeProgress } from "../lib/progress";
@@ -61,6 +61,22 @@ export const enrollInCourse = mutation({
       updatedAt: now,
     });
 
+    // Log enrollment activity
+    await ctx.db.insert("learningActivities", {
+      userId: user._id,
+      type: "course_enrolled",
+      courseId: args.courseId,
+      createdAt: now,
+    });
+
+    // Increment course enrollment goals
+    await ctx.runMutation(internal.goals.incrementGoalProgress, {
+      userId: user._id,
+      type: "complete_courses",
+      amount: 1,
+      date: now,
+    });
+
     return id;
   },
 });
@@ -93,6 +109,7 @@ export const completeLesson = mutation({
   args: {
     courseId: v.id("courses"),
     lessonId: v.id("lessons"),
+    durationMinutes: v.optional(v.number()), // Time spent on lesson
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -113,10 +130,10 @@ export const completeLesson = mutation({
     if (!enrollment) throw new Error("Not enrolled in this course");
 
     const completed = new Set(enrollment.completedLessonIds ?? []);
-    if (completed.has(args.lessonId)) {
-      return enrollment.progressPercent;
+    const isNewCompletion = !completed.has(args.lessonId);
+    if (isNewCompletion) {
+      completed.add(args.lessonId);
     }
-    completed.add(args.lessonId);
 
     const lessons = await ctx.db
       .query("lessons")
@@ -125,11 +142,57 @@ export const completeLesson = mutation({
 
     const progressPercent = computeProgress(completed.size, lessons.length);
 
+    const now = Date.now();
     await ctx.db.patch(enrollment._id, {
       completedLessonIds: [...completed],
       progressPercent,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
+
+    if (isNewCompletion) {
+      // Get lesson details for logging
+      const lesson = await ctx.db.get(args.lessonId);
+
+      // Log lesson completion activity
+      await ctx.db.insert("learningActivities", {
+        userId: user._id,
+        type: "lesson_completed",
+        courseId: args.courseId,
+        lessonId: args.lessonId,
+        metadata: {
+          durationMinutes: args.durationMinutes ?? lesson?.durationMinutes ?? 0,
+          lessonTitle: lesson?.title,
+        },
+        createdAt: now,
+      });
+
+      // Increment lesson completion goals
+      await ctx.runMutation(internal.goals.incrementGoalProgress, {
+        userId: user._id,
+        type: "complete_lessons",
+        amount: 1,
+        date: now,
+      });
+
+      // Increment watch hours goals if duration provided
+      const durationMinutes = args.durationMinutes ?? lesson?.durationMinutes ?? 0;
+      if (durationMinutes > 0) {
+        await ctx.runMutation(internal.goals.incrementGoalProgress, {
+          userId: user._id,
+          type: "watch_hours",
+          amount: durationMinutes, // Goals module converts to hours
+          date: now,
+        });
+      }
+
+      // Check for study streak (daily activity)
+      await ctx.runMutation(internal.goals.incrementGoalProgress, {
+        userId: user._id,
+        type: "study_streak_days",
+        amount: 1,
+        date: now,
+      });
+    }
 
     // Issues the certificate automatically if this was the last outstanding
     // requirement. No-ops until the learner actually qualifies.

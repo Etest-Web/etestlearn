@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { gradeQuiz } from "../lib/quiz";
@@ -258,6 +258,39 @@ export const submitQuizAttempt = mutation({
       maxScore,
       passed,
       createdAt: now,
+    });
+
+    // Log quiz attempt activity
+    await ctx.db.insert("learningActivities", {
+      userId: user._id,
+      type: passed ? "quiz_passed" : "quiz_attempted",
+      courseId: course._id,
+      lessonId: lesson._id,
+      quizId: quiz._id,
+      metadata: {
+        score,
+        maxScore,
+        percent,
+        passed,
+        quizTitle: quiz.title,
+      },
+      createdAt: now,
+    });
+
+    // Increment quiz goals
+    await ctx.runMutation(internal.goals.incrementGoalProgress, {
+      userId: user._id,
+      type: passed ? "pass_quizzes" : "complete_lessons", // quiz attempt counts as lesson engagement
+      amount: 1,
+      date: now,
+    });
+
+    // Also increment study streak for quiz activity
+    await ctx.runMutation(internal.goals.incrementGoalProgress, {
+      userId: user._id,
+      type: "study_streak_days",
+      amount: 1,
+      date: now,
     });
 
     // Passing a quiz can be the last thing standing between the learner and

@@ -29,7 +29,12 @@ function PageHeader({
   actions,
   children,
   ...props
-}: React.ComponentProps<"header"> & {
+}: /* `title` is omitted from the native `<header>` props on purpose: the DOM
+   attribute is `title?: string`, and intersecting that with `ReactNode` gives
+   `title: ReactNode & string`, which rejects the JSX most callers want to pass
+   (an icon beside the text, a highlighted word). Every other prop passes
+   through. */
+  Omit<React.ComponentProps<"header">, "title"> & {
   eyebrow?: React.ReactNode
   eyebrowTone?: "muted" | "brand" | "success" | "warning" | "destructive"
   title: React.ReactNode
@@ -54,7 +59,7 @@ function PageHeader({
               "eyebrow",
               eyebrowTone === "brand" && "text-brand",
               eyebrowTone === "success" && "text-success",
-              eyebrowTone === "warning" && "text-warning-foreground",
+              eyebrowTone === "warning" && "text-warning",
               eyebrowTone === "destructive" && "text-destructive"
             )}
           >

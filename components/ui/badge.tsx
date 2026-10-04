@@ -22,7 +22,7 @@ const badgeVariants = cva(
         // at 8–10% is invisible on white, which is why tint-only badges so
         // often read as floating text rather than as a chip.
         success: "border-success/30 bg-success/10 text-success",
-        warning: "border-warning/40 bg-warning/12 text-warning-foreground",
+        warning: "border-warning/40 bg-warning/12 text-warning",
         info: "border-info/30 bg-info/10 text-info",
       },
     },

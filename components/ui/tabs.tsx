@@ -106,7 +106,7 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
         // filled background is right, because the group already reads as one
         // control and the fill is what shows which alternative is live.
         "group-data-[variant=segmented]/tabs-list:rounded-sm group-data-[variant=segmented]/tabs-list:px-3.5 group-data-[variant=segmented]/tabs-list:py-1.5 group-data-[variant=segmented]/tabs-list:text-sm",
-        "group-data-[variant=segmented]/tabs-list:data-active:bg-card group-data-[variant=segmented]/tabs-list:data-active:text-foreground group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:shadow-elevation-raised",
+        "group-data-[variant=segmented]/tabs-list:data-active:bg-card group-data-[variant=segmented]/tabs-list:data-active:text-foreground group-data-[variant=segmented]/tabs-list:data-active:font-semibold group-data-[variant=segmented]/tabs-list:data-active:shadow-raised",
         "group-data-[variant=segmented]/tabs-list:data-vertical/tabs:w-full",
 
         className

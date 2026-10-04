@@ -30,6 +30,17 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  /* `--success` / `--warning` / `--info` are defined in `:root` but were never
+     mapped here, so `text-success`, `bg-warning/10` and friends generated no
+     CSS at all — every status colour silently fell back to the inherited text
+     colour. A component can carry a `success` variant that resolves to nothing
+     and still typecheck, so this is worth stating explicitly. */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -81,14 +92,22 @@
 
   /* ── Elevation ──────────────────────────────────────────────────────────
      Two steps only. An editorial surface is separated by a rule, not by a
-     shadow, so `--elevation-raised` is barely there and `--elevation-overlay`
-     exists solely for layers that float above the page (dialog, sheet,
-     popover) where a shadow is the only thing communicating that. */
-  --elevation-raised: 0 1px 2px -1px oklch(14.5% 0.012 318.82 / 0.07);
-  --elevation-overlay: 0 12px 32px -8px oklch(14.5% 0.012 318.82 / 0.16);
+     shadow, so the raised step is barely there and the overlay step exists
+     solely for layers that float above the page (dialog, sheet, popover) where
+     a shadow is the only thing communicating that.
+
+     These MUST live in the `--shadow-*` namespace. Declaring them as
+     `--elevation-*` typechecks fine and emits no utility whatsoever, because
+     Tailwind derives `shadow-*` from `--shadow-*` and nothing else. */
+  --shadow-raised: var(--elevation-raised);
+  --shadow-overlay: var(--elevation-overlay);
 }
 
 :root {
+  /* Raw elevation values. Consumed through the `--shadow-*` namespace in
+     `@theme inline` above — read that comment before renaming anything. */
+  --elevation-raised: 0 1px 2px -1px oklch(14.5% 0.012 318.82 / 0.07);
+  --elevation-overlay: 0 12px 32px -8px oklch(14.5% 0.012 318.82 / 0.16);
   /* ── Palette derived from public/Logo.svg ─────────────────────────────
      purple #945DA3  →  oklch(56.556% 0.121 318.82)   brand / primary
       · --brand is the mark itself: fills, buttons, rules, highlights
@@ -187,6 +206,17 @@
   --accent: oklch(30% 0.03 318.82);
   --accent-foreground: oklch(98.5% 0.006 318.82);
   --destructive: oklch(70.4% 0.191 22.216);
+  /* The status colours step up for dark the same way --brand does. They had no
+     dark values at all, which meant a mapped `text-warning` would have rendered
+     its light-mode amber unchanged against a near-black surface — legible in
+     neither direction. Each is tuned to keep ≥4.5:1 as *text* on --card, since
+     the tints these back are only ever ~10-12% alpha. */
+  --success: oklch(76% 0.15 145.2);
+  --success-foreground: oklch(16% 0.03 145.2);
+  --warning: oklch(83% 0.13 82.5);
+  --warning-foreground: oklch(18% 0.04 82.5);
+  --info: oklch(75% 0.11 250);
+  --info-foreground: oklch(16% 0.03 250);
   --border: oklch(100% 0 0 / 10%);
   --input: oklch(100% 0 0 / 15%);
   --ring: oklch(72% 0.102 318.82);

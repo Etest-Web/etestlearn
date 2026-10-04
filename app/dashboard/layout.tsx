@@ -89,10 +89,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     // Navigation state is read here because the sidebar renders on every
     // dashboard route, so it is the one place that can mark the current item.
-    // `usePathname` only tells us the section, hence the prefix match.
+    // `usePathname` only tells us the section, hence the prefix match — except
+    // for "/dashboard" itself: every route starts with "/dashboard/", so a
+    // prefix match would keep the Dashboard entry lit on every page. Its
+    // highlight is exact-match only; sub-sections keep the prefix match so
+    // their sub-pages stay marked.
     const pathname = usePathname();
     const isCurrent = (href: string) =>
-        pathname === href || pathname.startsWith(`${href}/`);
+        href === "/dashboard"
+            ? pathname === href
+            : pathname === href || pathname.startsWith(`${href}/`);
 
     return (
         <SidebarProvider>
@@ -166,7 +172,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                                 <item.icon
                                                     className={
                                                         active
-                                                            ? "text-[#945DA3]"
+                                                            ? "text-brand"
                                                             : undefined
                                                     }
                                                 />
@@ -180,7 +186,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                                         // screen reader announces
                                                         // "3 unread" too.
                                                         aria-label={`${badge} unread`}
-                                                        className="ml-auto bg-[#945DA3] text-white"
+                                                        className="ml-auto bg-brand text-brand-foreground"
                                                     >
                                                         {badge > 99
                                                             ? "99+"
@@ -199,7 +205,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2 px-3">
                             Friends
                             {pendingFriendRequests ? (
-                                <span className="ml-2 font-semibold text-[#945DA3]">
+                                <span className="ml-2 font-semibold text-brand">
                                     {pendingFriendRequests} pending
                                 </span>
                             ) : null}
@@ -238,7 +244,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="text-sm font-semibold text-foreground hover:text-[#945DA3] transition-colors truncate">
+                                                    <span className="text-sm font-semibold text-foreground hover:text-brand transition-colors truncate">
                                                         {friend.name}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground capitalize">
@@ -259,7 +265,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                         No friends yet.{" "}
                                         <Link
                                             href="/dashboard/friends?tab=discover"
-                                            className="font-semibold text-[#945DA3] hover:underline"
+                                            className="font-semibold text-brand hover:underline"
                                         >
                                             Find learners
                                         </Link>
@@ -371,7 +377,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 name="q"
                                 type="search"
                                 placeholder="Search your course...."
-                                className="pl-11 h-12 rounded-full border-0 bg-card shadow-sm ring-1 ring-border text-[15px] focus-visible:ring-[#945DA3]/20"
+                                className="pl-11 h-12 rounded-full border-0 bg-card shadow-sm ring-1 ring-border text-[15px] focus-visible:ring-brand/20"
                             />
                         </form>
                         {/* Below md the search form above is hidden, so the
@@ -410,7 +416,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 {unread?.messages ? (
                                     <span
                                         aria-hidden
-                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#945DA3] text-white text-[10px] font-bold grid place-items-center"
+                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-brand text-white text-[10px] font-bold grid place-items-center"
                                     >
                                         {unread.messages > 99
                                             ? "99+"

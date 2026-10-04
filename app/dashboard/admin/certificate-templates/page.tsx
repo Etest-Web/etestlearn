@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { FileUp, Loader2, ShieldAlert, Trash2 } from "lucide-react";
+import { FileUp, Loader2, FileStack, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui";
 import { Button } from "@/components/ui";
@@ -14,6 +14,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
+  PageHeader,
 } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
@@ -76,17 +78,20 @@ export default function CertificateTemplatesPage() {
     return (
       <div className="max-w-5xl mx-auto w-full space-y-6">
         <Skeleton className="h-9 w-56" />
-        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-72 w-full" />
       </div>
     );
   }
 
   if (currentUser?.role !== "admin") {
     return (
-      <div className="max-w-md mx-auto mt-16 text-center space-y-3">
-        <ShieldAlert className="h-12 w-12 text-red-400 mx-auto" />
-        <h1 className="text-xl font-bold">Access denied</h1>
-        <p className="text-sm text-muted-foreground">Admins only.</p>
+      <div className="mx-auto mt-16 w-full max-w-md">
+        <EmptyState
+          icon={FileStack}
+          title="Access denied"
+          description="This console is for administrators. Your account does not have access to it."
+          tone="warning"
+        />
       </div>
     );
   }
@@ -185,15 +190,11 @@ export default function CertificateTemplatesPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Certificate templates</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Upload a designed PDF background. Every new certificate is stamped onto
-          it with the learner&apos;s name, course, date, and certificate ID.
-          Only page 1 is used.
-        </p>
-      </div>
+    <div className="max-w-5xl mx-auto w-full space-y-8">
+      <PageHeader
+        title="Certificate templates"
+        description="Upload a designed PDF background. Every new certificate is stamped onto it with the learner&apos;s name, course, date, and certificate ID. Only page 1 is used."
+      />
 
       <Card>
         <CardHeader>
@@ -203,9 +204,9 @@ export default function CertificateTemplatesPage() {
             deactivates the previous template.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="template-name" className="text-xs">
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="template-name" className="eyebrow">
               Template name
             </Label>
             <Input
@@ -216,8 +217,10 @@ export default function CertificateTemplatesPage() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <label className="inline-flex cursor-pointer items-center rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent">
-              <FileUp className="mr-2 h-4 w-4" />
+            {/* Styled to the `outline` button so the file picker and the real
+                buttons on this page read as the same control. */}
+            <label className="inline-flex h-9.5 cursor-pointer items-center gap-1.5 rounded-md border border-rule-strong px-3.5 text-sm font-medium transition-colors hover:bg-surface-sunken has-[:disabled]:pointer-events-none has-[:disabled]:opacity-45">
+              <FileUp className="h-4 w-4" />
               {uploading ? "Uploading…" : "Choose PDF"}
               <input
                 type="file"
@@ -238,7 +241,9 @@ export default function CertificateTemplatesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Templates ({(templates ?? []).length})</CardTitle>
+          <CardTitle>
+            Templates (<span className="tabular">{(templates ?? []).length}</span>)
+          </CardTitle>
           <CardDescription>
             The active template is used for all newly issued certificates.
             Existing certificates keep the template they were issued with.
@@ -246,12 +251,14 @@ export default function CertificateTemplatesPage() {
         </CardHeader>
         <CardContent>
           {(templates ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No templates uploaded. Certificates will use the built-in plain
-              layout until you add one.
-            </p>
+            <EmptyState
+              icon={FileStack}
+              title="No templates uploaded"
+              description="Certificates will use the built-in plain layout until you add one."
+              tone="brand"
+            />
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-rule border-y border-rule">
               {(templates ?? []).map((template) => (
                 <li
                   key={template._id}
@@ -261,10 +268,10 @@ export default function CertificateTemplatesPage() {
                     <p className="flex items-center gap-2 truncate text-sm font-medium">
                       {template.name}
                       {template.active && (
-                        <Badge className="text-[10px]">active</Badge>
+                        <Badge variant="default">active</Badge>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="tabular text-xs text-muted-foreground">
                       {Math.round(template.pageWidth)} ×{" "}
                       {Math.round(template.pageHeight)} pt
                     </p>
@@ -311,7 +318,8 @@ export default function CertificateTemplatesPage() {
                     )}
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon-sm"
+                      aria-label={`Delete template ${template.name}`}
                       onClick={() =>
                         run(
                           () => remove({ templateId: template._id }),
@@ -341,11 +349,11 @@ export default function CertificateTemplatesPage() {
               prints its own title.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
               {FIELDS.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <Label htmlFor={`anchor-${field.key}`} className="text-xs">
+                <div key={field.key} className="space-y-1.5">
+                  <Label htmlFor={`anchor-${field.key}`} className="eyebrow">
                     {field.label}
                   </Label>
                   <Input
@@ -362,6 +370,7 @@ export default function CertificateTemplatesPage() {
                         return next;
                       })
                     }
+                    className="tabular"
                   />
                 </div>
               ))}
@@ -380,7 +389,7 @@ export default function CertificateTemplatesPage() {
               <object
                 data={previewUrl}
                 type="application/pdf"
-                className="h-[480px] w-full rounded-lg border"
+                className="h-[480px] w-full border border-rule"
               >
                 <a href={previewUrl} target="_blank" rel="noopener noreferrer">
                   Open preview

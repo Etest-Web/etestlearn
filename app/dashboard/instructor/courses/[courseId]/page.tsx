@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { Badge } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock } from "lucide-react";
+import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
@@ -269,14 +270,14 @@ export default function CourseEditPage() {
     return (
       <div className="flex flex-col gap-6 w-full pb-20">
         <div className="flex flex-wrap items-center gap-4">
-          <Skeleton className="h-10 w-10" />
+          <Skeleton className="size-9.5" />
           <Skeleton className="h-8 w-48" />
         </div>
-        <div className="flex w-full mt-4">
+        <div className="flex w-full">
           <Skeleton className="h-10 w-24 mr-2" />
           <Skeleton className="h-10 w-24" />
         </div>
-        <Card className="mt-2">
+        <Card>
           <CardHeader>
             <Skeleton className="h-6 w-32 mb-2" />
             <Skeleton className="h-4 w-64" />
@@ -295,61 +296,65 @@ export default function CourseEditPage() {
 
   if (courseData === null) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <h2 className="text-xl font-semibold">Course not found</h2>
-        <Button onClick={() => router.push("/dashboard/instructor")}>Back to Courses</Button>
+      <div className="w-full pb-20">
+        <EmptyState
+          icon={SearchX}
+          title="Course not found"
+          description="This course does not exist, or it is not one of yours to edit."
+          action={
+            <Button onClick={() => router.push("/dashboard/instructor")}>Back to Courses</Button>
+          }
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
-      <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/instructor")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold tracking-tight">Edit Course</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={courseData.course.published ? "default" : "secondary"}>
-            {courseData.course.published ? "Published" : "Draft"}
-          </Badge>
-          {publishing?.pendingRequest && (
-            <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
-              <Clock className="mr-1 h-3 w-3" />
-              Unpublish requested
+      {/* Back sits above the header rather than inside its action slot, so it
+          keeps its place at the leading edge of the page. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Back to my courses"
+        className="-ml-2 self-start"
+        onClick={() => router.push("/dashboard/instructor")}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+
+      <PageHeader
+        title="Edit Course"
+        description={courseData.course.title}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={courseData.course.published ? "default" : "secondary"}>
+              {courseData.course.published ? "Published" : "Draft"}
             </Badge>
-          )}
-          {courseData.course.slug && (
-            <Button variant="outline" size="sm" onClick={() => window.open(`/courses/${courseData.course.slug}`, "_blank")}>
-              <ExternalLink className="mr-2 h-4 w-4" />
-              View public page
-            </Button>
-          )}
-        </div>
-      </div>
+            {publishing?.pendingRequest && (
+              <Badge variant="outline">
+                <Clock className="h-3 w-3" />
+                Unpublish requested
+              </Badge>
+            )}
+            {courseData.course.slug && (
+              <Button variant="outline" size="sm" onClick={() => window.open(`/courses/${courseData.course.slug}`, "_blank")}>
+                <ExternalLink className="h-4 w-4" />
+                View public page
+              </Button>
+            )}
+          </div>
+        }
+      />
       
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 touch-target">
-          <TabsTrigger
-            value="details"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
-          >
-            Details
-          </TabsTrigger>
-          <TabsTrigger
-            value="content"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
-          >
-            Curriculum
-          </TabsTrigger>
-          <TabsTrigger
-            value="certificates"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
-          >
-            Certificates
-          </TabsTrigger>
+        {/* Section switching, so the `rule` variant: a hairline under the strip
+            with a brand bar on the selected tab. Selection reads as position
+            and weight. */}
+        <TabsList variant="rule" className="touch-target">
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="content">Curriculum</TabsTrigger>
+          <TabsTrigger value="certificates">Certificates</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-6">
           <div className="flex flex-col gap-6">
@@ -379,9 +384,9 @@ export default function CourseEditPage() {
                 <CardTitle>Course Details</CardTitle>
                 <CardDescription>Update the metadata for this course.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="title">Course Title</Label>
                     <Input
                       id="title"
@@ -391,7 +396,7 @@ export default function CourseEditPage() {
                       required
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="slug">URL Slug</Label>
                     <Input
                       id="slug"
@@ -403,7 +408,7 @@ export default function CourseEditPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
@@ -414,7 +419,7 @@ export default function CourseEditPage() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="thumbnailUrl">Thumbnail Image</Label>
                   <div className="flex gap-4 items-start">
                     <div className="flex-1 space-y-2">
@@ -460,7 +465,7 @@ export default function CourseEditPage() {
                       </div>
                     </div>
                     {formData.thumbnailUrl && (
-                      <div className="w-32 h-20 bg-muted rounded-lg overflow-hidden border border-border shadow-sm shrink-0">
+                      <div className="w-32 h-20 shrink-0 overflow-hidden border border-rule bg-surface-sunken">
                         <img 
                           src={formData.thumbnailUrl} 
                           alt="Thumbnail preview" 
@@ -469,12 +474,12 @@ export default function CourseEditPage() {
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-1 text-xs leading-[1.5] text-muted-foreground">
                     Upload an image or provide a valid image URL to represent this course.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="category">Category</Label>
                     <Input
                       id="category"
@@ -484,7 +489,7 @@ export default function CourseEditPage() {
                       placeholder="e.g. Programming"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="level">Level</Label>
                     <Input
                       id="level"
@@ -495,7 +500,7 @@ export default function CourseEditPage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2 max-w-xs">
+                <div className="max-w-xs space-y-1.5">
                   <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>
                   <Input
                     id="priceNaira"
@@ -506,19 +511,23 @@ export default function CourseEditPage() {
                     value={formData.priceNaira}
                     onChange={handleChange}
                     placeholder="0"
+                    className="tabular"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs leading-[1.5] text-muted-foreground">
                     Leave empty (or 0) for a free course. Paid courses are collected via Paystack.
                   </p>
                   {publishing?.policy === "needs_approval" && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      {publishing.paidSales} learner{publishing.paidSales === 1 ? "" : "s"} already paid
+                    /* No `warning` colour token is registered, so the stock amber
+                       stays here; the sentence carries the meaning, not the hue. */
+                    <p className="text-xs leading-[1.5] text-amber-700 dark:text-amber-400">
+                      <span className="tabular">{publishing.paidSales}</span>{" "}
+                      learner{publishing.paidSales === 1 ? "" : "s"} already paid
                       for this course. From now on, taking it off sale needs admin approval.
                     </p>
                   )}
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end gap-2 border-t pt-4">
+              <CardFooter className="flex justify-end gap-2">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Save Changes
@@ -552,7 +561,7 @@ export default function CourseEditPage() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label htmlFor="lesson-title">Lesson Title</Label>
                           <Input
                             id="lesson-title"
@@ -561,7 +570,7 @@ export default function CourseEditPage() {
                             required
                           />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label htmlFor="lesson-type">Content Type</Label>
                           <Select
                             value={newLessonData.contentType}
@@ -609,40 +618,42 @@ export default function CourseEditPage() {
             </CardHeader>
             <CardContent>
               {courseData.lessons.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-8 text-center border rounded-lg border-dashed">
-                  <LayoutList className="h-8 w-8 text-muted-foreground mb-4" />
-                  <p className="text-sm font-medium">No lessons yet</p>
-                  <p className="text-xs text-muted-foreground mb-4">Add your first lesson to start building the curriculum.</p>
-                  <Button variant="outline" onClick={() => setIsLessonDialogOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Lesson
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={LayoutList}
+                  title="No lessons yet"
+                  description="Add your first lesson to start building the curriculum."
+                  action={
+                    <Button variant="outline" onClick={() => setIsLessonDialogOpen(true)}>
+                      <PlusCircle className="h-4 w-4" />
+                      Add Lesson
+                    </Button>
+                  }
+                />
               ) : (
-                <div className="space-y-2">
+                /* Lessons are a numbered list, so they read as rows separated by
+                   hairlines rather than as a stack of floating cards. */
+                <ol className="list-none divide-y divide-rule border-y border-rule">
                   {courseData.lessons
                     .sort((a, b) => a.order - b.order)
                     .map((lesson, index) => (
-                      <div
+                      <li
                         key={lesson._id}
-                        className="flex items-center justify-between gap-3 p-3 bg-muted/50 border rounded-lg hover:bg-muted transition-colors group"
+                        className="group flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-surface-sunken"
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <button aria-label={`Reorder ${lesson.title}`} className="shrink-0 cursor-grab text-muted-foreground hover:text-foreground">
+                          <button aria-label={`Reorder ${lesson.title}`} className="shrink-0 cursor-grab text-muted-foreground transition-colors hover:text-foreground">
                             <AlignJustify className="h-4 w-4" />
                           </button>
-                          <span className="w-6 shrink-0 text-sm font-medium text-muted-foreground">
+                          <span className="tabular w-6 shrink-0 text-sm text-muted-foreground">
                             {index + 1}.
                           </span>
                           <div className="flex min-w-0 items-center gap-2">
-                            <span className="shrink-0">{getIconForType(lesson.contentType)}</span>
-                            <span className="truncate font-medium text-sm">{lesson.title}</span>
+                            <span className="shrink-0 text-muted-foreground">{getIconForType(lesson.contentType)}</span>
+                            <span className="truncate text-sm font-medium">{lesson.title}</span>
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <Badge variant="outline" className="capitalize text-xs font-normal">
-                            {lesson.contentType}
-                          </Badge>
+                          <Badge variant="secondary">{lesson.contentType}</Badge>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -651,9 +662,9 @@ export default function CourseEditPage() {
                             Edit
                           </Button>
                         </div>
-                      </div>
+                      </li>
                     ))}
-                </div>
+                </ol>
               )}
             </CardContent>
           </Card>
@@ -729,9 +740,9 @@ function PublishingPanel({
                     disabled={pending || requestPending}
                   >
                     {pending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <EyeOff className="mr-2 h-4 w-4" />
+                      <EyeOff className="h-4 w-4" />
                     )}
                     Unpublish now
                   </Button>
@@ -742,7 +753,7 @@ function PublishingPanel({
                     onClick={() => setIsRequestDialogOpen(true)}
                     disabled={pending || requestPending}
                   >
-                    <Send className="mr-2 h-4 w-4" />
+                    <Send className="h-4 w-4" />
                     Request unpublish
                   </Button>
                 ) : (
@@ -753,9 +764,9 @@ function PublishingPanel({
                     disabled={pending}
                   >
                     {pending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <EyeOff className="mr-2 h-4 w-4" />
+                      <EyeOff className="h-4 w-4" />
                     )}
                     Unpublish
                   </Button>
@@ -764,9 +775,9 @@ function PublishingPanel({
             ) : (
               <Button size="sm" onClick={onPublish} disabled={pending}>
                 {pending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Globe className="mr-2 h-4 w-4" />
+                  <Globe className="h-4 w-4" />
                 )}
                 Publish course
               </Button>
@@ -778,20 +789,24 @@ function PublishingPanel({
       {(isGated || requestPending) && (
         <CardContent className="space-y-3">
           {requestPending ? (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <>
+              {/* No `warning` colour token is registered, so the amber plate stays — it is a
+                  caution, not a status, and the wording carries the meaning. */}
+              <div className="border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
               <div className="flex items-start gap-3">
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
                     Unpublish request awaiting admin review
                   </p>
-                  <p className="text-sm text-amber-900/80 dark:text-amber-300/80">
-                    {state.paidSales} learner{state.paidSales === 1 ? "" : "s"} already paid for
+                  <p className="text-sm leading-[1.6] text-amber-900/80 dark:text-amber-300/80">
+                    <span className="tabular">{state.paidSales}</span>{" "}
+                    learner{state.paidSales === 1 ? "" : "s"} already paid for
                     this course, so taking it off sale needs an admin. The course stays live and
                     on sale until they decide.
                   </p>
                   {state.pendingRequest?.reason && (
-                    <p className="text-sm italic text-amber-900/80 dark:text-amber-300/80">
+                    <p className="text-sm italic leading-[1.6] text-amber-900/80 dark:text-amber-300/80">
                       &ldquo;{state.pendingRequest.reason}&rdquo;
                     </p>
                   )}
@@ -811,9 +826,9 @@ function PublishingPanel({
                       disabled={pending}
                     >
                       {pending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Undo2 className="mr-2 h-4 w-4" />
+                        <Undo2 className="h-4 w-4" />
                       )}
                       Withdraw request
                     </Button>
@@ -821,12 +836,14 @@ function PublishingPanel({
                 </div>
               </div>
             </div>
+            </>
           ) : (
-            <div className="rounded-lg border border-border bg-muted/40 p-4">
+            <div className="border border-rule bg-surface-sunken p-4">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {state.paidSales} learner{state.paidSales === 1 ? " has" : "s have"} already paid
+                <p className="text-sm leading-[1.6] text-muted-foreground">
+                  <span className="tabular">{state.paidSales}</span>{" "}
+                  learner{state.paidSales === 1 ? " has" : "s have"} already paid
                   for this course. You can keep selling it or change anything else about it, but
                   taking it off sale now goes to an admin first. Learners who bought it keep access
                   either way.
@@ -848,18 +865,17 @@ function PublishingPanel({
                 sale until they respond.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="space-y-1.5">
               <Label htmlFor="unpublishReason">Reason</Label>
               <Textarea
                 id="unpublishReason"
                 rows={4}
-                className="mt-2"
                 value={unpublishReason}
                 onChange={(e) => setUnpublishReason(e.target.value)}
                 placeholder="Optional, but it speeds up the review."
                 maxLength={500}
               />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="tabular mt-1 text-xs text-muted-foreground">
                 {unpublishReason.length}/500
               </p>
             </div>

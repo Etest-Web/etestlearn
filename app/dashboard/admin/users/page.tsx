@@ -2,21 +2,29 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, EmptyState, PageHeader } from "@/components/ui";
 import { Badge } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShieldAlert, Users as UsersIcon } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
-function roleBadgeClass(role: string) {
+/** The three Badge variants this page draws from; see the note above. */
+type RoleBadgeVariant = "default" | "secondary" | "outline";
+
+/**
+ * Role reads as a word inside the pill, so the variant only has to separate the
+ * three at a glance. Admin takes the brand plate because it is the privileged
+ * one; instructor and student are distinguished by fill vs. hairline.
+ */
+function roleBadgeVariant(role: string): RoleBadgeVariant {
   switch (role) {
     case "admin":
-      return "bg-primary/10 text-[#6C3C78] border-primary/25 dark:bg-primary/15 dark:text-[#C090CE] dark:border-primary/30";
+      return "default";
     case "instructor":
-      return "bg-brand/20 text-brand-ink border-brand/50 dark:bg-brand/15 dark:text-brand dark:border-brand/30";
+      return "secondary";
     default:
-      return "bg-secondary text-secondary-foreground border-border";
+      return "outline";
   }
 }
 
@@ -27,19 +35,22 @@ export default function AdminUsersPage() {
 
   if (currentUser === undefined || (users === undefined && currentUser?.role === "admin")) {
     return (
-      <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="max-w-5xl mx-auto w-full space-y-6">
         <Skeleton className="h-9 w-56" />
-        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-72 w-full" />
       </div>
     );
   }
 
   if (currentUser?.role !== "admin") {
     return (
-      <div className="max-w-md mx-auto mt-16 text-center space-y-3">
-        <ShieldAlert className="h-12 w-12 text-red-400 mx-auto" />
-        <h1 className="text-xl font-bold">Access denied</h1>
-        <p className="text-sm text-muted-foreground">Admins only.</p>
+      <div className="mx-auto mt-16 w-full max-w-md">
+        <EmptyState
+          icon={ShieldAlert}
+          title="Access denied"
+          description="This console is for administrators. Your account does not have access to it."
+          tone="warning"
+        />
       </div>
     );
   }
@@ -54,46 +65,54 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <UsersIcon className="h-6 w-6" /> Admin Console
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage platform users and their roles. Instructor applications live in{" "}
-          <a href="/dashboard/admin/applications" className="text-[#945DA3] hover:underline">Applications</a>,
-          and instructors asking to take a paid course off sale queue in{" "}
-          <a href="/dashboard/admin/unpublish-requests" className="text-[#945DA3] hover:underline">Unpublish Requests</a>.
-        </p>
-      </div>
+    <div className="max-w-5xl mx-auto w-full space-y-8">
+      <PageHeader
+        title="Admin Console"
+        description={
+          <>
+            Manage platform users and their roles. Instructor applications live in{" "}
+            <a href="/dashboard/admin/applications" className="link-quiet text-primary">Applications</a>,
+            and instructors asking to take a paid course off sale queue in{" "}
+            <a href="/dashboard/admin/unpublish-requests" className="link-quiet text-primary">Unpublish Requests</a>.
+          </>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All users ({users?.length ?? 0})</CardTitle>
+      <Card className="gap-0 p-0">
+        <CardHeader className="border-b border-rule p-5">
+          <CardTitle>
+            All users (<span className="tabular">{users?.length ?? 0}</span>)
+          </CardTitle>
           <CardDescription>Changing a role takes effect immediately.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-sm">
+              <caption className="sr-only">
+                Every user on the platform, with their role and a control to change it.
+              </caption>
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
-                  <th className="py-3 pr-4">User</th>
-                  <th className="py-3 pr-4">Email</th>
-                  <th className="py-3 pr-4">Role</th>
-                  <th className="py-3">Change role</th>
+                {/* A recessed head rather than a heavy border: the column labels
+                    sit on a sunken plane so the rules below do the dividing. */}
+                <tr className="border-b border-rule bg-surface-sunken">
+                  <th scope="col" className="eyebrow px-3 py-2.5 pl-5 text-left">User</th>
+                  <th scope="col" className="eyebrow px-3 py-2.5 text-left">Email</th>
+                  <th scope="col" className="eyebrow px-3 py-2.5 text-left">Role</th>
+                  <th scope="col" className="eyebrow px-3 py-2.5 pr-5 text-left">Change role</th>
                 </tr>
               </thead>
               <tbody>
                 {(users ?? []).map((u) => (
-                  <tr key={u._id} className="border-b last:border-0">
-                    <td className="py-3 pr-4 font-medium">{u.name ?? "Unnamed user"}</td>
-                    <td className="py-3 pr-4 text-muted-foreground break-all">{u.email ?? "—"}</td>
-                    <td className="py-3 pr-4">
-                      <Badge variant="outline" className={roleBadgeClass(u.role)}>
-                        {u.role}
-                      </Badge>
+                  <tr
+                    key={u._id}
+                    className="border-b border-rule transition-colors last:border-0 hover:bg-surface-sunken/60"
+                  >
+                    <td className="px-3 py-2.5 pl-5 font-medium">{u.name ?? "Unnamed user"}</td>
+                    <td className="px-3 py-2.5 break-all text-muted-foreground">{u.email ?? "—"}</td>
+                    <td className="px-3 py-2.5">
+                      <Badge variant={roleBadgeVariant(u.role)}>{u.role}</Badge>
                     </td>
-                    <td className="py-3">
+                    <td className="px-3 py-2.5 pr-5">
                       {u._id === currentUser._id ? (
                         <span className="text-xs text-muted-foreground">(you)</span>
                       ) : (
@@ -103,7 +122,7 @@ export default function AdminUsersPage() {
                             if (role) handleRoleChange(u._id, role);
                           }}
                         >
-                          <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs">
+                          <SelectTrigger className="h-8 w-full text-xs sm:w-[140px]">
                             <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>

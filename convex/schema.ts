@@ -448,5 +448,69 @@ export default defineSchema({
 
   // ═══════════════════════════════════════════════════════════════════════
   // END task block
+  // BEGIN group block — course-scoped study groups
+  //
+  // Groups hang off a course, so admission reuses the existing course-access
+  // branch (admin → course instructor → enrolled). Both students and
+  // instructors may create groups; only the course instructor (or an admin) may
+  // archive one, which is why `isArchived` exists instead of a hard delete —
+  // members' posts must not vanish with the group.
+  //
+  // Join requests are a separate table from membership so that "pending for me"
+  // and "this user's groups" are both single index reads, and so that declining
+  // leaves an auditable trail rather than a no-op insert/delete pair.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  studyGroups: defineTable({
+    courseId: v.id("courses"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    createdBy: v.id("users"),
+    // Public groups are joinable by any enrolled student; private groups
+    // require a request to be approved.
+    isPrivate: v.boolean(),
+    isArchived: v.optional(v.boolean()),
+    createdAt: v.number(),
+  })
+    .index("by_course", ["courseId"]),
+
+  studyGroupMembers: defineTable({
+    groupId: v.id("studyGroups"),
+    userId: v.id("users"),
+    // A moderator is a member promoted by the course instructor; they can pin
+    // and delete messages in their own group but cannot archive the group.
+    role: v.union(v.literal("member"), v.literal("moderator")),
+    joinedAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_user", ["userId"]),
+
+  studyGroupJoinRequests: defineTable({
+    groupId: v.id("studyGroups"),
+    userId: v.id("users"),
+    message: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("declined"),
+    ),
+    createdAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+    reviewedBy: v.optional(v.id("users")),
+  })
+    .index("by_group", ["groupId"])
+    // Serves the moderator's approval queue.
+    .index("by_group_status", ["groupId", "status"])
+    .index("by_user", ["userId"]),
+
+  studyGroupMessages: defineTable({
+    groupId: v.id("studyGroups"),
+    userId: v.id("users"),
+    body: v.string(),
+    createdAt: v.number(),
+  }).index("by_group_created", ["groupId", "createdAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // END group block
 });
 

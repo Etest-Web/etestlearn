@@ -311,5 +311,76 @@ export default defineSchema({
   }).index("by_user_created", ["userId", "createdAt"])
     .index("by_user_type", ["userId", "type"])
     .index("by_user_course", ["userId", "courseId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BEGIN inbox block — direct messages + notifications
+  //
+  // DM threads store their two participants denormalized as userA/userB in
+  // sorted Id order rather than an array, because Convex indexes cannot
+  // filter on array membership. Listing "my threads newest first" is then two
+  // range scans (by_user_a / by_user_b) merged in memory, instead of a full
+  // table scan with an `includes()` predicate.
+  //
+  // Unread state is a per-(user, thread) read marker rather than a flag on
+  // each message: one row per thread instead of one write per message read,
+  // and an unread badge is a single count over by_user instead of a scan of
+  // every message in every thread.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  dmThreads: defineTable({
+    userA: v.id("users"), // sorted ascending; always the smaller Id
+    userB: v.id("users"), // always the larger Id
+    lastMessageAt: v.optional(v.number()), // undefined until the first send
+    lastMessagePreview: v.optional(v.string()), // truncated for the list view
+    createdAt: v.number(),
+  })
+    .index("by_user_a", ["userA", "lastMessageAt"])
+    .index("by_user_b", ["userB", "lastMessageAt"]),
+
+  dmMessages: defineTable({
+    threadId: v.id("dmThreads"),
+    senderId: v.id("users"),
+    body: v.string(),
+    // Only the recipient's copy is meaningful; the sender has implicitly read
+    // what they just wrote.
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_thread_created", ["threadId", "createdAt"]),
+
+  // High-water mark per user per thread. Anything created after it is unread.
+  dmReadMarkers: defineTable({
+    userId: v.id("users"),
+    threadId: v.id("dmThreads"),
+    lastReadAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // In-app event feed. Rows are written by other modules' mutations (or by an
+  // internal helper) rather than by the client, so `type` is a closed union the
+  // UI can switch on exhaustively.
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("certificate_earned"),
+      v.literal("course_completed"),
+      v.literal("quiz_graded"),
+      v.literal("streak_milestone"),
+      v.literal("discussion_reply"),
+      v.literal("task_assigned"),
+      v.literal("task_graded"),
+      v.literal("group_invite"),
+      v.literal("friend_request"),
+    ),
+    title: v.string(),
+    body: v.optional(v.string()),
+    href: v.optional(v.string()), // in-app deep link, never an external URL
+    actorId: v.optional(v.id("users")),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_unread", ["userId", "readAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // END inbox block
 });
 

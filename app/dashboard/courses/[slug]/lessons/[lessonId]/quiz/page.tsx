@@ -11,7 +11,10 @@ import {
   CardContent,
   Button,
   Checkbox,
+  EmptyState,
+  PageHeader,
 } from "@/components/ui";
+import { HelpCircle } from "lucide-react";
 
 export default function LessonQuizPage() {
   const params = useParams<{ slug: string; lessonId: string }>();
@@ -41,9 +44,11 @@ export default function LessonQuizPage() {
   if (quizData === null) {
     return (
       <div className="mx-auto max-w-3xl py-8">
-        <p className="text-sm text-muted-foreground">
-          No quiz is configured for this lesson yet.
-        </p>
+        <EmptyState
+          icon={HelpCircle}
+          title="No quiz for this lesson"
+          description="No quiz is configured for this lesson yet."
+        />
       </div>
     );
   }
@@ -70,26 +75,24 @@ export default function LessonQuizPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          Lesson quiz
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">{quiz.title}</h1>
-        <p className="text-sm text-muted-foreground">
-          Answer the questions below. You need at least {quiz.passingScore}% to
-          pass.
-        </p>
-      </header>
+      {/* "Lesson quiz" was already a small uppercase label above the title, so
+          it is a real eyebrow here rather than a filler one. */}
+      <PageHeader
+        eyebrow="Lesson quiz"
+        title={quiz.title}
+        description={`Answer the questions below. You need at least ${quiz.passingScore}% to pass.`}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Questions</CardTitle>
+          <CardTitle>Questions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {questions.map(({ question, options }: any, index: number) => (
             <div key={question._id} className="space-y-2">
               <p className="text-sm font-medium">
-                {index + 1}. {question.prompt}
+                <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
+                {question.prompt}
               </p>
               <div className="space-y-1">
                 {options.map((opt: any) => {
@@ -100,7 +103,7 @@ export default function LessonQuizPage() {
                   return (
                     <label
                       key={opt._id}
-                      className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
+                      className="flex items-center gap-2 rounded-sm border border-rule px-3 py-1.5 text-sm"
                     >
                       <Checkbox
                         checked={checked}
@@ -126,10 +129,18 @@ export default function LessonQuizPage() {
           </div>
 
           {result && (
-            <div className="mt-4 rounded-md border px-3 py-2 text-sm">
+            // Tinted by outcome, but the sentence below is what actually says
+            // whether the attempt passed — never colour alone.
+            <div
+              className={`mt-4 rounded-sm border px-3 py-2 text-sm ${
+                result.passed
+                  ? "border-emerald-200 bg-emerald-500/5"
+                  : "border-destructive/30 bg-destructive/5"
+              }`}
+            >
               <p>
                 Score:{" "}
-                <span className="font-medium">
+                <span className="tabular font-medium">
                   {result.score} / {result.maxScore} (
                   {Math.round(result.percent)}%)
                 </span>
@@ -146,4 +157,3 @@ export default function LessonQuizPage() {
     </div>
   );
 }
-

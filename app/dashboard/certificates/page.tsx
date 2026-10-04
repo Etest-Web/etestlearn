@@ -4,7 +4,14 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { Award } from "lucide-react";
-import { Card, CardContent, Skeleton } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  CardContent,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+} from "@/components/ui";
 import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
 
 export default function CertificatesPage() {
@@ -16,30 +23,29 @@ export default function CertificatesPage() {
     return (
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-sm" />
+        <Skeleton className="h-40 w-full rounded-sm" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <section className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Certificates</h1>
-        <p className="text-sm text-muted-foreground">
-          {certificates.length > 0
+      <PageHeader
+        title="Certificates"
+        description={
+          certificates.length > 0
             ? "Download, share, or open the public verification page for any of your certificates."
-            : "Courses you complete appear here with a shareable verification link."}
-        </p>
-      </section>
+            : "Courses you complete appear here with a shareable verification link."
+        }
+      />
 
       {certificates.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-sm text-muted-foreground">
-            You don&apos;t have any certificates yet. Finish every lesson and pass
-            every quiz in a course to earn one automatically.
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Award}
+          title="No certificates yet"
+          description="Finish every lesson and pass every quiz in a course to earn one automatically."
+        />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
           {certificates.map((cert) => {
@@ -48,20 +54,25 @@ export default function CertificatesPage() {
               <li key={cert._id}>
                 <Link
                   href={`/dashboard/certificates/${cert._id}`}
-                  className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="block h-full rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  <Card className="h-full transition-colors hover:border-primary/40">
-                    <CardContent className="space-y-3 p-5">
+                  {/* The card *is* the link target, so it takes the interactive
+                      variant: the hairline and the focus ring come with it. */}
+                  <Card variant="interactive" size="sm" className="h-full">
+                    <CardContent className="space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <Award
                           aria-hidden
                           className={`mt-0.5 h-5 w-5 shrink-0 ${
-                            revoked ? "text-muted-foreground" : "text-[#945DA3]"
+                            revoked ? "text-muted-foreground" : "text-brand"
                           }`}
                         />
-                        <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider">
+                        {/* The state is a word, not just a colour. `destructive`
+                            is a registered colour token; the live state takes the
+                            neutral outline, which is what it had before. */}
+                        <Badge variant={revoked ? "destructive" : "outline"}>
                           {revoked ? "Revoked" : "Active"}
-                        </span>
+                        </Badge>
                       </div>
                       <div className="space-y-1">
                         <p className="font-medium leading-snug">{cert.courseTitle}</p>

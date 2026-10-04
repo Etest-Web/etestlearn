@@ -28,6 +28,7 @@ import { ReactNode } from "react";
 
 import { friendsApi } from "@/lib/friends-api";
 import { inboxApi } from "@/lib/inbox-api";
+import { cn } from "@/lib/utils";
 
 import {
     Avatar,
@@ -72,6 +73,15 @@ const OVERVIEW_NAV = [
     { href: "/dashboard/friends", label: "Friends", icon: UserRound },
 ] as const;
 
+/**
+ * The sidebar's footer rows (Instructor Tools, Admin Console, Settings, …) are
+ * hand-rolled anchors rather than `SidebarMenuButton`s, so they get one shared
+ * treatment instead of six copies of it: quiet label, sidebar-accent lift on
+ * hover, brand bar reserved for the section nav above.
+ */
+const FOOTER_LINK =
+    "flex items-center gap-3 rounded-sm px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-ring";
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const { user } = useUser();
     const dbUser = useQuery(api.users.getCurrentUser);
@@ -102,7 +112,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     return (
         <SidebarProvider>
-            <Sidebar className="border-r bg-sidebar" collapsible="icon">
+            <Sidebar className="border-r border-rule bg-sidebar" collapsible="icon">
                 {/* The 48px collapsed rail (data-collapsible=icon) has no room for
                     the wordmark, so the padding tightens and the compact brand
                     mark takes over. On mobile the sheet renders no
@@ -111,13 +121,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     <Link
                         href="/dashboard"
                         aria-label="Glypha Learn — dashboard home"
-                        className="flex items-center justify-center rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                        className="flex items-center justify-center rounded-sm focus-ring"
                     >
-                        {/* The mark ships as flat #945DA3, which drops to 2.6:1 on
-                            the sidebar's dark surface (it gets 3.2:1 on the
-                            navbar's darker one). `brightness` lifts it without
-                            swapping in a second asset — there is no dark
-                            variant in public/. */}
+                        {/* The mark ships as the flat brand purple, which drops to
+                            2.6:1 on the sidebar's dark surface (it gets 3.2:1 on
+                            the navbar's darker one). `brightness` lifts it without
+                            swapping in a second asset — there is no dark variant
+                            in public/, so the raw hex cannot simply be re-tinted
+                            here. */}
                         <Image
                             src="/Logo.svg"
                             alt="Glypha Learn"
@@ -128,7 +139,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         {/* Same purple graduation-cap mark used on the verify
                             page and 404 — it is the compact brand glyph in this
                             codebase, so it keeps the collapsed rail legible. */}
-                        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground shadow-md group-data-[collapsible=icon]:flex">
+                        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-brand text-brand-foreground group-data-[collapsible=icon]:flex">
                             <GraduationCap size={16} />
                         </span>
                     </Link>
@@ -136,7 +147,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
                 <SidebarContent className="px-3 gap-6">
                     <SidebarGroup>
-                        <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2 px-3">
+                        <SidebarGroupLabel className="eyebrow mb-2 px-3">
                             Overview
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
@@ -153,11 +164,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                         <SidebarMenuItem key={item.href}>
                                             <SidebarMenuButton
                                                 isActive={active}
-                                                className={`px-4 py-5 rounded-xl [&>svg]:size-5 ${
+                                                className={cn(
+                                                    "relative rounded-sm px-4 py-5 [&>svg]:size-5",
+                                                    // The primitive marks the current
+                                                    // item with a filled plate; this
+                                                    // design marks it the way
+                                                    // `Tabs variant="rule"` does — a
+                                                    // brand bar at the inline-start
+                                                    // edge plus weight. Suppressing
+                                                    // the plate needs `!important`,
+                                                    // because both declarations carry
+                                                    // equal specificity and source
+                                                    // order would otherwise decide.
+                                                    "data-active:!bg-transparent",
                                                     active
-                                                        ? "bg-accent text-accent-foreground font-medium"
-                                                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                                }`}
+                                                        ? "font-semibold text-foreground after:absolute after:inset-y-2 after:left-0 after:w-0.5 after:bg-brand"
+                                                        : "text-muted-foreground",
+                                                )}
                                                 render={
                                                     <Link
                                                         href={item.href}
@@ -186,7 +209,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                                         // screen reader announces
                                                         // "3 unread" too.
                                                         aria-label={`${badge} unread`}
-                                                        className="ml-auto bg-brand text-brand-foreground"
+                                                        className="ml-auto bg-brand text-brand-foreground tabular"
                                                     >
                                                         {badge > 99
                                                             ? "99+"
@@ -202,10 +225,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     </SidebarGroup>
 
                     <SidebarGroup>
-                        <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2 px-3">
+                        <SidebarGroupLabel className="eyebrow mb-2 px-3">
                             Friends
                             {pendingFriendRequests ? (
-                                <span className="ml-2 font-semibold text-brand">
+                                /* A sentence, so it stays in the body face at a
+                                   readable size instead of inheriting the display
+                                   face the label is set in. */
+                                <span className="ml-2 font-sans text-[12px] font-semibold text-brand tabular">
                                     {pendingFriendRequests} pending
                                 </span>
                             ) : null}
@@ -223,11 +249,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                                 render={
                                                     <Link
                                                         href="/dashboard/friends"
-                                                        className="flex items-center gap-3 px-3 rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                                                        className="flex items-center gap-3 rounded-sm px-3 focus-ring"
                                                     />
                                                 }
                                             >
-                                                <Avatar className="w-10 h-10 border border-border shadow-sm">
+                                                <Avatar className="w-10 h-10 border border-rule">
                                                     {friend.imageUrl ? (
                                                         <AvatarImage
                                                             src={friend.imageUrl}
@@ -280,7 +306,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isInstructor && (
                         <Link
                             href="/dashboard/instructor"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                            className={FOOTER_LINK}
                         >
                             <UserCircle2 size={20} />
                             Instructor Tools
@@ -289,7 +315,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isAdmin && (
                         <Link
                             href="/dashboard/admin/users"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                            className={FOOTER_LINK}
                         >
                             <Users size={20} />
                             Admin Console
@@ -298,7 +324,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isAdmin && (
                         <Link
                             href="/dashboard/admin/certificates"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                            className={FOOTER_LINK}
                         >
                             <Award size={20} />
                             Certificates
@@ -307,7 +333,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isAdmin && (
                         <Link
                             href="/dashboard/admin/certificate-templates"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                            className={FOOTER_LINK}
                         >
                             <FileStack size={20} />
                             Templates
@@ -316,7 +342,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isAdmin && (
                         <Link
                             href="/dashboard/admin/unpublish-requests"
-                            className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                            className={FOOTER_LINK}
                         >
                             <EyeOff size={20} />
                             Unpublish Requests
@@ -328,7 +354,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 render={
                                     <Link
                                         href="/dashboard/settings"
-                                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors"
+                                        className={FOOTER_LINK}
                                     />
                                 }
                             >
@@ -346,7 +372,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             render={
                                 <button
                                     type="button"
-                                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#FF4949] hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                                    className={cn(FOOTER_LINK, "text-destructive hover:bg-destructive/10 hover:text-destructive")}
                                 />
                             }
                         >
@@ -377,7 +403,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 name="q"
                                 type="search"
                                 placeholder="Search your course...."
-                                className="pl-11 h-12 rounded-full border-0 bg-card shadow-sm ring-1 ring-border text-[15px] focus-visible:ring-brand/20"
+                                className="h-12 rounded-sm border-rule pl-11 text-[15px]"
                             />
                         </form>
                         {/* Below md the search form above is hidden, so the
@@ -401,7 +427,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="relative w-10 h-10 rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors"
+                                className="relative border border-rule"
                                 render={<Link href="/dashboard/inbox?tab=messages" />}
                                 aria-label={
                                     unread?.messages
@@ -416,7 +442,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 {unread?.messages ? (
                                     <span
                                         aria-hidden
-                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-brand text-white text-[10px] font-bold grid place-items-center"
+                                        className="tabular absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-sm bg-brand px-1 text-[10px] font-bold text-brand-foreground"
                                     >
                                         {unread.messages > 99
                                             ? "99+"
@@ -427,7 +453,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="relative w-10 h-10 rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors"
+                                className="relative border border-rule"
                                 render={
                                     <Link href="/dashboard/inbox?tab=notifications" />
                                 }
@@ -444,7 +470,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 {unread?.notifications ? (
                                     <span
                                         aria-hidden
-                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#FF4949] text-white text-[10px] font-bold grid place-items-center"
+                                        className="tabular absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-sm border border-destructive/30 bg-destructive/10 px-1 text-[10px] font-bold text-destructive"
                                     >
                                         {unread.notifications > 99
                                             ? "99+"
@@ -453,12 +479,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 ) : (
                                     <span
                                         aria-hidden
-                                        className="absolute top-2.5 right-3 w-1.5 h-1.5 bg-[#FF4949] rounded-full"
+                                        className="absolute right-3 top-2.5 size-1.5 rounded-full bg-destructive"
                                     />
                                 )}
                             </Button>
                         </div>
-                        <div className="flex items-center gap-3 pl-3 border-l border-border sm:pl-6">
+                        <div className="flex items-center gap-3 border-l border-rule pl-3 sm:pl-6">
                             <UserButton appearance={{ elements: { avatarBox: "w-10 h-10" } }} />
                             <span className="font-semibold text-foreground hidden sm:block">
                                 {user?.fullName || "Student"}

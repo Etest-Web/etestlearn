@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
-import { PlayCircle, Award, Clock, ArrowRight } from "lucide-react";
+import { PlayCircle, Award, ArrowRight, BookOpen } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function MyLessonsPage() {
   const { user } = useUser();
@@ -23,12 +28,12 @@ export default function MyLessonsPage() {
   if (enrollments === undefined || courses === undefined) {
     return (
       <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
-        <Skeleton className="h-20 w-full max-w-[200px] rounded-xl" />
-        <Skeleton className="h-12 w-full max-w-[300px] rounded-xl" />
+        <Skeleton className="h-20 w-full max-w-[200px] rounded-sm" />
+        <Skeleton className="h-12 w-full max-w-[300px] rounded-sm" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-72 rounded-[24px]" />
-          <Skeleton className="h-72 rounded-[24px]" />
-          <Skeleton className="h-72 rounded-[24px]" />
+          <Skeleton className="h-72 rounded-sm" />
+          <Skeleton className="h-72 rounded-sm" />
+          <Skeleton className="h-72 rounded-sm" />
         </div>
       </div>
     );
@@ -45,45 +50,33 @@ export default function MyLessonsPage() {
   const inProgressCourses = enrolledCourses.filter(
     (item) => item.enrollment.progressPercent < 100
   );
-  
+
   const completedCourses = enrolledCourses.filter(
     (item) => item.enrollment.progressPercent >= 100
   );
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full">
-      
-      {/* Header section */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">
-          My Lessons
-        </h1>
-        <p className="text-muted-foreground font-medium">
-          You are enrolled in {enrolledCourses.length} course{enrolledCourses.length === 1 ? "" : "s"}. Let's keep making progress, {user?.firstName}!
-        </p>
-      </div>
+
+      <PageHeader
+        title="My Lessons"
+        description={`You are enrolled in ${enrolledCourses.length} course${enrolledCourses.length === 1 ? "" : "s"}. Let's keep making progress, ${user?.firstName}!`}
+      />
 
       <Tabs defaultValue="all" className="w-full">
-        {/* Three triggers need ~444px. Let them scroll horizontally instead of
-            stretching the document; touch-target lifts them to 44px. */}
+        {/* All / In progress / Completed are peer views of one list, so the
+            segmented variant is right here rather than the rule bar. Three
+            triggers need ~444px: they scroll horizontally instead of widening the
+            document, and `touch-target` lifts them to 44px. */}
         <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
-          <TabsTrigger 
-            value="all" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-          >
+        <TabsList variant="segmented" className="w-max touch-target">
+          <TabsTrigger value="all" className="tabular">
             All Lessons ({enrolledCourses.length})
           </TabsTrigger>
-          <TabsTrigger 
-            value="in-progress" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-          >
+          <TabsTrigger value="in-progress" className="tabular">
             In Progress ({inProgressCourses.length})
           </TabsTrigger>
-          <TabsTrigger 
-            value="completed" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-          >
+          <TabsTrigger value="completed" className="tabular">
             Completed ({completedCourses.length})
           </TabsTrigger>
         </TabsList>
@@ -93,40 +86,37 @@ export default function MyLessonsPage() {
           <CourseGrid items={enrolledCourses} />
         </TabsContent>
         <TabsContent value="in-progress" className="mt-0 outline-none">
-          <CourseGrid items={inProgressCourses} emptyMessage="You don't have any lessons currently in progress." />
+          <CourseGrid items={inProgressCourses} emptyTitle="Nothing in progress" emptyMessage="You don't have any lessons currently in progress." />
         </TabsContent>
         <TabsContent value="completed" className="mt-0 outline-none">
-          <CourseGrid items={completedCourses} emptyMessage="You haven't completed any lessons yet. Keep at it!" />
+          <CourseGrid items={completedCourses} emptyTitle="Nothing completed yet" emptyMessage="You haven't completed any lessons yet. Keep at it!" />
         </TabsContent>
       </Tabs>
-      
+
     </div>
   );
 }
 
 // Reusable Grid Component
-function CourseGrid({ 
-  items, 
-  emptyMessage = "You haven't enrolled in any lessons yet. Visit the catalog to get started." 
-}: { 
+function CourseGrid({
+  items,
+  emptyTitle = "No Lessons Found",
+  emptyMessage = "You haven't enrolled in any lessons yet. Visit the catalog to get started."
+}: {
   items: Array<{ enrollment: any; course: any }>;
+  emptyTitle?: string;
   emptyMessage?: string;
 }) {
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 bg-card rounded-3xl border border-dashed border-border">
-        <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 text-muted-foreground">
-          <Clock size={32} />
-        </div>
-        <h3 className="text-lg font-bold text-foreground mb-2">No Lessons Found</h3>
-        <p className="text-muted-foreground max-w-sm text-center">{emptyMessage}</p>
-        <Link 
-          href="/courses" 
-          className="mt-6 px-6 py-3 bg-foreground text-background font-bold rounded-xl hover:bg-foreground/90 transition-colors"
-        >
-          Explore Catalog
-        </Link>
-      </div>
+      <EmptyState
+        icon={BookOpen}
+        title={emptyTitle}
+        description={emptyMessage}
+        action={
+          <Button render={<Link href="/courses" />}>Explore Catalog</Button>
+        }
+      />
     );
   }
 
@@ -134,75 +124,84 @@ function CourseGrid({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.map((item) => {
         const isCompleted = item.enrollment.progressPercent >= 100;
-        
+
         return (
-          <div 
-            key={item.course._id} 
-            className="flex flex-col bg-card rounded-[24px] border border-border shadow-sm overflow-hidden group hover:shadow-md transition-shadow"
-          >
+          /* The Card carries the surface: no radius, no shadow, and the rule on
+             its edge does the separating. `gap-0 p-0` lets the thumbnail sit
+             flush, which is why no image-radius override is needed. */
+          <Card key={item.course._id} className="group gap-0 overflow-hidden p-0">
             {/* Thumbnail */}
-            <div className="h-44 bg-muted relative overflow-hidden">
-              <img 
-                src={item.course.thumbnailUrl || "/hero-backdrop.jpg"} 
-                alt={item.course.title} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            <div className="h-44 bg-surface-sunken relative overflow-hidden">
+              <img
+                src={item.course.thumbnailUrl || "/hero-backdrop.jpg"}
+                alt={item.course.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
 
                {/* Category Badge overlay */}
                {item.course.category && (
-                 <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-lg text-foreground uppercase tracking-widest shadow-sm">
+                 <Badge
+                   variant="outline"
+                   className="absolute left-4 top-4 border-0 bg-background/90 backdrop-blur-sm"
+                 >
                   {item.course.category}
-                </div>
+                </Badge>
               )}
             </div>
 
             {/* Content Body */}
             <div className="p-6 flex flex-col flex-1">
-              <h3 className="font-bold text-xl text-foreground mb-4 line-clamp-2 leading-snug">
+              <h3 className="text-xl font-semibold text-foreground mb-4 line-clamp-2 leading-snug">
                 {item.course.title}
               </h3>
-              
+
               <div className="mt-auto flex flex-col gap-4">
                 {/* Progress Details */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className={isCompleted ? "text-emerald-500" : "text-[#945DA3]"}>
+                    <span className="eyebrow">Progress</span>
+                    <span
+                      className={
+                        isCompleted ? "tabular text-emerald-600" : "tabular text-brand"
+                      }
+                    >
                       {Math.round(item.enrollment.progressPercent)}%
                     </span>
                   </div>
-                  <Progress 
-                    value={item.enrollment.progressPercent} 
-                    className="h-2 bg-muted"
+                  <Progress
+                    value={item.enrollment.progressPercent}
+                    className="h-2"
                   />
                 </div>
 
                 {/* Status Bar / Action */}
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-                     {isCompleted ? (
-                       <span className="flex items-center gap-1 text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
-                         <Award size={14} />
-                         Completed
-                       </span>
-                     ) : (
-                       <span className="flex items-center gap-1 text-brand-ink bg-brand/20 px-2 py-1 rounded-md">
-                         <PlayCircle size={14} />
-                         In Progress
-                       </span>
-                     )}
-                   </div>
-                   <Link 
-                     href={`/dashboard/courses/${item.course.slug}`} 
-                     className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-[#945DA3] hover:border-[#945DA3] hover:text-white transition-colors"
+                <div className="flex items-center justify-between pt-4 border-t border-rule">
+                   {/* The word is in the badge, so the status never rides on
+                       colour alone. */}
+                   {isCompleted ? (
+                     <Badge variant="success" className="gap-1 text-emerald-600">
+                       <Award />
+                       Completed
+                     </Badge>
+                   ) : (
+                     <Badge className="gap-1">
+                       <PlayCircle />
+                       In Progress
+                     </Badge>
+                   )}
+                   <Button
+                     variant="outline"
+                     size="icon"
+                     render={<Link href={`/dashboard/courses/${item.course.slug}`} />}
+                     className="hover:border-brand hover:bg-brand hover:text-brand-foreground"
                    >
                      <ArrowRight size={18} />
-                   </Link>
+                   </Button>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>

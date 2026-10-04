@@ -320,7 +320,7 @@ function InboxPage() {
           <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
             <TabsTrigger
               value="messages"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[state=active]:bg-[#945DA3] data-[state=active]:text-white data-[active]:bg-[#945DA3] data-[active]:text-white"
+              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
             >
               <Mail size={16} />
               Messages
@@ -330,7 +330,7 @@ function InboxPage() {
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[state=active]:bg-[#945DA3] data-[state=active]:text-white data-[active]:bg-[#945DA3] data-[active]:text-white"
+              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
             >
               <Bell size={16} />
               Notifications
@@ -340,7 +340,7 @@ function InboxPage() {
             </TabsTrigger>
             <TabsTrigger
               value="replies"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[state=active]:bg-[#945DA3] data-[state=active]:text-white data-[active]:bg-[#945DA3] data-[active]:text-white"
+              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
             >
               <MessagesSquare size={16} />
               Course replies

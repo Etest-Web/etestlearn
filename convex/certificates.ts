@@ -1,7 +1,9 @@
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { makeFunctionReference } from "convex/server";
 import { generateCertificateSerial } from "../lib/certificates";
+import type { NotificationType } from "./inbox";
 import {
   canManageCourse,
   isStaff,
@@ -12,6 +14,29 @@ import {
 } from "./helpers/auth";
 import { evaluateForLearner } from "./helpers/completion";
 import { logAudit } from "./helpers/audit";
+
+/**
+ * `internal.inbox.internalNotification`, reached by wire name instead of through
+ * `internal` from `./_generated/api`.
+ *
+ * `convex/_generated/*` is produced by `npx convex dev` and does not list the
+ * `inbox` module yet, so importing it as `internal.inbox` does not compile until
+ * codegen runs again. The wire name is exactly what codegen will emit
+ * ("modulePath:exportName"), so this can become `internal.inbox.internalNotification`
+ * with no other change — same workaround as `lib/durable-rate-limit.ts`.
+ */
+const enqueueNotification = makeFunctionReference<
+  "mutation",
+  {
+    userId: Id<"users">;
+    type: NotificationType;
+    title: string;
+    body?: string;
+    href?: string;
+    actorId?: Id<"users">;
+  },
+  Id<"notifications">
+>("inbox:internalNotification");
 
 /** Fresh entropy for a serial. crypto.randomUUID is available in the runtime. */
 function entropy(): string {
@@ -232,7 +257,22 @@ export const issueIfEligible = internalMutation({
     );
     if (!completion.eligible) return null;
 
-    return await issueForUser(ctx, user, args.courseId);
+    const certificateId = await issueForUser(ctx, user, args.courseId);
+
+    // Only reachable on the path that actually issues — every early return above
+    // is either "not eligible" or "already issued" — so this cannot double-notify.
+    // A certificate arriving with no notification is a dead inbox, and this is
+    // the one funnel every issuance passes through.
+    const course = await ctx.db.get(args.courseId);
+    await ctx.runMutation(enqueueNotification, {
+      userId: args.userId,
+      type: "certificate_earned",
+      title: "Your certificate is ready",
+      body: course?.title,
+      href: "/dashboard/certificates",
+    });
+
+    return certificateId;
   },
 });
 

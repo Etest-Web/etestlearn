@@ -53,6 +53,20 @@ function TabsList({
   )
 }
 
+/**
+ * NOTE ON STYLING THE SELECTED TAB
+ *
+ * These primitives are Base UI, not Radix. Radix set `data-state="active"` on a
+ * selected trigger; Base UI sets a bare `data-active`. The two are not
+ * interchangeable, and the Radix spelling fails silently — `data-[state=active]:`
+ * is a valid Tailwind class that simply never matches, so a selected tab just
+ * renders with no active styling and nothing in the console complains.
+ *
+ * Use `data-active:` (or the equivalent `data-[active]:`) for a selected tab.
+ * If you are copying an active-tab class out of an older page in this repo,
+ * check which spelling it uses first: the My Lessons and instructor course
+ * pages carried the dead Radix form until this was fixed.
+ */
 function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   return (
     <TabsPrimitive.Tab

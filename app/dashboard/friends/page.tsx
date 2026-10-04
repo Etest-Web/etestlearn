@@ -182,13 +182,13 @@ function FriendsView() {
           <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
             <TabsTrigger
               value="friends"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
             >
               {`Friends${friends === undefined ? "" : ` (${friends.length})`}`}
             </TabsTrigger>
             <TabsTrigger
               value="requests"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
             >
               {`Requests${
                 requests === undefined ? "" : ` (${requests.incoming.length})`
@@ -196,7 +196,7 @@ function FriendsView() {
             </TabsTrigger>
             <TabsTrigger
               value="discover"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
             >
               Discover
             </TabsTrigger>

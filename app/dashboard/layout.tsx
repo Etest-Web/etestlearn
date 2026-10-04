@@ -17,14 +17,22 @@ import {
     Search,
     Settings,
     UserCircle2,
+    UserRound,
     Users,
     EyeOff,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 
+import { friendsApi } from "@/lib/friends-api";
+import { inboxApi } from "@/lib/inbox-api";
+
 import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage,
     Button,
     Input,
     ModeToggle,
@@ -37,6 +45,7 @@ import {
     SidebarHeader,
     SidebarInset,
     SidebarMenu,
+    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarProvider,
@@ -46,17 +55,44 @@ import {
     TooltipTrigger,
 } from "@/components/ui";
 
-const MOCK_FRIENDS = [
-    { name: "Bagas Mahpie", role: "Friend", img: "https://i.pravatar.cc/100?u=1" },
-    { name: "Sir Dandy", role: "Old Friend", img: "https://i.pravatar.cc/100?u=2" },
-    { name: "Jhon Tosan", role: "Friend", img: "https://i.pravatar.cc/100?u=3" },
-];
+/**
+ * The overview nav, declared once. This list used to be six hand-copied blocks
+ * with a "Coming soon" tooltip bolted onto whichever routes did not exist yet,
+ * which meant every new section needed the same edit in four places and the
+ * "coming soon" markers outlived the gaps they described. Adding a route is now
+ * one entry here.
+ */
+const OVERVIEW_NAV = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/inbox", label: "Inbox", icon: Inbox },
+    { href: "/dashboard/courses", label: "Lesson", icon: BookOpen },
+    { href: "/dashboard/certificates", label: "Certificates", icon: Award },
+    { href: "/dashboard/tasks", label: "Task", icon: ClipboardList },
+    { href: "/dashboard/groups", label: "Group", icon: Users },
+    { href: "/dashboard/friends", label: "Friends", icon: UserRound },
+] as const;
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const { user } = useUser();
     const dbUser = useQuery(api.users.getCurrentUser);
     const isInstructor = dbUser?.role === "instructor" || dbUser?.role === "admin";
     const isAdmin = dbUser?.role === "admin";
+
+    // Real friends now, replacing a hardcoded pravatar.cc placeholder list.
+    // The sidebar is chrome, so this is capped and cheap; the full list and
+    // every activity summary live on /dashboard/friends.
+    const friends = useQuery(friendsApi.listSidebarFriends, { limit: 6 });
+    const pendingFriendRequests = useQuery(friendsApi.getPendingRequestCount);
+    // Drives the header's Messages / Notifications badges. One query for both
+    // counts rather than two, so the header costs a single subscription.
+    const unread = useQuery(inboxApi.getUnreadCounts);
+
+    // Navigation state is read here because the sidebar renders on every
+    // dashboard route, so it is the one place that can mark the current item.
+    // `usePathname` only tells us the section, hence the prefix match.
+    const pathname = usePathname();
+    const isCurrent = (href: string) =>
+        pathname === href || pathname.startsWith(`${href}/`);
 
     return (
         <SidebarProvider>
@@ -99,95 +135,62 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu className="gap-2">
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        isActive
-                                        className="bg-accent text-accent-foreground font-medium rounded-xl px-4 py-5 [&>svg]:size-5"
-                                    >
-                                        <LayoutDashboard className="text-[#945DA3]" />
-                                        <Link href="/dashboard" className="text-[15px]">
-                                            Dashboard
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
+                                {OVERVIEW_NAV.map((item) => {
+                                    const active = isCurrent(item.href);
+                                    const badge =
+                                        item.href === "/dashboard/inbox"
+                                            ? (unread?.messages ?? 0) +
+                                              (unread?.notifications ?? 0)
+                                            : 0;
 
-                                <SidebarMenuItem>
-                                    <Tooltip>
-                                        <TooltipTrigger
-                                            render={
-                                                <SidebarMenuButton className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5 text-muted-foreground" />
-                                            }
-                                        >
-                                            <Inbox />
-                                            <span className="text-[15px] font-medium">Inbox</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                            side="right"
-                                            className="bg-foreground text-background font-medium"
-                                        >
-                                            Coming soon
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5 text-muted-foreground">
-                                        <BookOpen />
-                                        <Link href="/dashboard/courses" className="text-[15px] font-medium">
-                                            Lesson
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton
-                                        className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5"
-                                        render={<Link href="/dashboard/certificates" />}
-                                    >
-                                        <Award className="text-[#945DA3]" />
-                                        <span className="text-[15px] font-medium">
-                                            Certificates
-                                        </span>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <Tooltip>
-                                        <TooltipTrigger
-                                            render={
-                                                <SidebarMenuButton className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5 text-muted-foreground" />
-                                            }
-                                        >
-                                            <ClipboardList />
-                                            <span className="text-[15px] font-medium">Task</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                            side="right"
-                                            className="bg-foreground text-background font-medium"
-                                        >
-                                            Coming soon
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </SidebarMenuItem>
-
-                                <SidebarMenuItem>
-                                    <Tooltip>
-                                        <TooltipTrigger
-                                            render={
-                                                <SidebarMenuButton className="px-4 py-5 hover:bg-accent hover:text-accent-foreground rounded-xl [&>svg]:size-5 text-muted-foreground" />
-                                            }
-                                        >
-                                            <Users />
-                                            <span className="text-[15px] font-medium">Group</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                            side="right"
-                                            className="bg-foreground text-background font-medium"
-                                        >
-                                            Coming soon
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </SidebarMenuItem>
+                                    return (
+                                        <SidebarMenuItem key={item.href}>
+                                            <SidebarMenuButton
+                                                isActive={active}
+                                                className={`px-4 py-5 rounded-xl [&>svg]:size-5 ${
+                                                    active
+                                                        ? "bg-accent text-accent-foreground font-medium"
+                                                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                                }`}
+                                                render={
+                                                    <Link
+                                                        href={item.href}
+                                                        aria-current={
+                                                            active
+                                                                ? "page"
+                                                                : undefined
+                                                        }
+                                                    />
+                                                }
+                                            >
+                                                <item.icon
+                                                    className={
+                                                        active
+                                                            ? "text-[#945DA3]"
+                                                            : undefined
+                                                    }
+                                                />
+                                                <span className="text-[15px] font-medium">
+                                                    {item.label}
+                                                </span>
+                                                {badge > 0 && (
+                                                    <SidebarMenuBadge
+                                                        // Not colour-only: the
+                                                        // count is text, so a
+                                                        // screen reader announces
+                                                        // "3 unread" too.
+                                                        aria-label={`${badge} unread`}
+                                                        className="ml-auto bg-[#945DA3] text-white"
+                                                    >
+                                                        {badge > 99
+                                                            ? "99+"
+                                                            : badge}
+                                                    </SidebarMenuBadge>
+                                                )}
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    );
+                                })}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -195,34 +198,73 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2 px-3">
                             Friends
+                            {pendingFriendRequests ? (
+                                <span className="ml-2 font-semibold text-[#945DA3]">
+                                    {pendingFriendRequests} pending
+                                </span>
+                            ) : null}
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu className="gap-4 mt-2">
-                                {MOCK_FRIENDS.map((f, i) => (
-                                    <Tooltip key={i}>
-                                        <TooltipTrigger>
-                                            <div className="flex items-center gap-3 px-3 cursor-pointer group">
-                                                <img
-                                                    src={f.img}
-                                                    alt={f.name}
-                                                    className="w-10 h-10 rounded-full border border-border shadow-sm"
-                                                />
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-semibold text-foreground hover:text-[#945DA3] transition-colors">
-                                                        {f.name}
+                                {/* Empty until the learner actually befriends
+                                    someone. An empty list would collapse the
+                                    whole group, so the label alone is the
+                                    affordance until there is a row to show. */}
+                                {friends && friends.length > 0 ? (
+                                    friends.map((friend) => (
+                                        <Tooltip key={friend._id}>
+                                            <TooltipTrigger
+                                                render={
+                                                    <Link
+                                                        href="/dashboard/friends"
+                                                        className="flex items-center gap-3 px-3 rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                                                    />
+                                                }
+                                            >
+                                                <Avatar className="w-10 h-10 border border-border shadow-sm">
+                                                    {friend.imageUrl ? (
+                                                        <AvatarImage
+                                                            src={friend.imageUrl}
+                                                            alt=""
+                                                        />
+                                                    ) : null}
+                                                    <AvatarFallback
+                                                        aria-hidden
+                                                        className="bg-brand/15 text-brand-ink"
+                                                    >
+                                                        {friend.name
+                                                            .slice(0, 2)
+                                                            .toUpperCase()}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-sm font-semibold text-foreground hover:text-[#945DA3] transition-colors truncate">
+                                                        {friend.name}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground">{f.role}</span>
+                                                    <span className="text-xs text-muted-foreground capitalize">
+                                                        {friend.role}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                            side="right"
-                                            className="bg-foreground text-background font-medium"
+                                            </TooltipTrigger>
+                                            <TooltipContent
+                                                side="right"
+                                                className="bg-foreground text-background font-medium"
+                                            >
+                                                View friends
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ))
+                                ) : (
+                                    <li className="px-3 text-sm text-muted-foreground">
+                                        No friends yet.{" "}
+                                        <Link
+                                            href="/dashboard/friends?tab=discover"
+                                            className="font-semibold text-[#945DA3] hover:underline"
                                         >
-                                            Coming soon
-                                        </TooltipContent>
-                                    </Tooltip>
-                                ))}
+                                            Find learners
+                                        </Link>
+                                    </li>
+                                )}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -347,13 +389,68 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
                     <div className="flex shrink-0 items-center gap-3 sm:gap-4 lg:gap-6">
                         <div className="flex items-center gap-2 sm:gap-3">
-                            <button aria-label="Messages" className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
-                                <Mail size={18} className="text-muted-foreground" />
-                            </button>
-                            <button aria-label="Notifications" className="relative w-10 h-10 flex items-center justify-center rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors">
-                                <Bell size={18} className="text-muted-foreground" />
-                                <span className="absolute top-2.5 right-3 w-1.5 h-1.5 bg-[#FF4949] rounded-full" />
-                            </button>
+                            {/* These were two inert <button>s with no handler.
+                                They now deep-link into the matching inbox tab
+                                and carry live counts. */}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="relative w-10 h-10 rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors"
+                                render={<Link href="/dashboard/inbox?tab=messages" />}
+                                aria-label={
+                                    unread?.messages
+                                        ? `Messages, ${unread.messages} unread`
+                                        : "Messages"
+                                }
+                            >
+                                <Mail
+                                    size={18}
+                                    className="text-muted-foreground"
+                                />
+                                {unread?.messages ? (
+                                    <span
+                                        aria-hidden
+                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#945DA3] text-white text-[10px] font-bold grid place-items-center"
+                                    >
+                                        {unread.messages > 99
+                                            ? "99+"
+                                            : unread.messages}
+                                    </span>
+                                ) : null}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="relative w-10 h-10 rounded-full bg-card hover:bg-accent shadow-sm border border-border transition-colors"
+                                render={
+                                    <Link href="/dashboard/inbox?tab=notifications" />
+                                }
+                                aria-label={
+                                    unread?.notifications
+                                        ? `Notifications, ${unread.notifications} unread`
+                                        : "Notifications"
+                                }
+                            >
+                                <Bell
+                                    size={18}
+                                    className="text-muted-foreground"
+                                />
+                                {unread?.notifications ? (
+                                    <span
+                                        aria-hidden
+                                        className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#FF4949] text-white text-[10px] font-bold grid place-items-center"
+                                    >
+                                        {unread.notifications > 99
+                                            ? "99+"
+                                            : unread.notifications}
+                                    </span>
+                                ) : (
+                                    <span
+                                        aria-hidden
+                                        className="absolute top-2.5 right-3 w-1.5 h-1.5 bg-[#FF4949] rounded-full"
+                                    />
+                                )}
+                            </Button>
                         </div>
                         <div className="flex items-center gap-3 pl-3 border-l border-border sm:pl-6">
                             <UserButton appearance={{ elements: { avatarBox: "w-10 h-10" } }} />

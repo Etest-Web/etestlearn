@@ -1063,10 +1063,9 @@ export const markAllNotificationsRead = mutation({
  * });
  * ```
  *
- * No producer calls it yet: every module that would want one
- * (`enrollments.completeLesson`, `certificates.issueIfEligible`, …) belongs to
- * work happening alongside this one, and editing those would collide with it.
- * The helper is here, ready for whoever wires the first producer.
+ * The producer is `certificates.issueIfEligible`, which every issuance funnels
+ * through — it notifies only on the branch that actually issues, so the
+ * idempotency check upstream already prevents duplicate notifications.
  */
 export const internalNotification = internalMutation({
   args: {

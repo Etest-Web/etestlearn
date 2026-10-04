@@ -334,19 +334,19 @@ export default function CourseEditPage() {
         <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 touch-target">
           <TabsTrigger
             value="details"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
           >
             Details
           </TabsTrigger>
           <TabsTrigger
             value="content"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
           >
             Curriculum
           </TabsTrigger>
           <TabsTrigger
             value="certificates"
-            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-b-primary data-[state=active]:text-foreground data-[state=active]:shadow-none touch-target"
+            className="relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-active:border-b-primary data-active:text-foreground data-active:shadow-none touch-target"
           >
             Certificates
           </TabsTrigger>

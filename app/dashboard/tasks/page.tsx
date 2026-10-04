@@ -84,17 +84,18 @@ function TasksContent() {
           <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
             <TabsTrigger
               value="assignments"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[active]:bg-[#945DA3] data-[active]:text-white"
+              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
             >
               <NotebookPen className="h-4 w-4" aria-hidden />
               Assignments
             </TabsTrigger>
-            {/* `data-[active]` is Base UI's attribute — this is not Radix, so
-                `data-[state=active]` would match nothing. */}
+            {/* `data-active` is Base UI's attribute — this is not Radix, so
+                `data-[state=active]` would match nothing. See the note in
+                `components/ui/tabs.tsx`. */}
             {canGrade ? (
               <TabsTrigger
                 value="grading"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[active]:bg-[#945DA3] data-[active]:text-white"
+                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
               >
                 <ClipboardCheck className="h-4 w-4" aria-hidden />
                 Grading
@@ -103,7 +104,7 @@ function TasksContent() {
             ) : null}
             <TabsTrigger
               value="my-tasks"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-[active]:bg-[#945DA3] data-[active]:text-white"
+              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
             >
               <ListTodo className="h-4 w-4" aria-hidden />
               My Tasks

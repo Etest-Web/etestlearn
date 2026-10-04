@@ -132,14 +132,14 @@ export function GroupsScreen() {
             <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
               <TabsTrigger
                 value="mine"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
               >
                 My groups
                 {myGroups ? ` (${myGroups.length})` : ""}
               </TabsTrigger>
               <TabsTrigger
                 value="browse"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
               >
                 Browse
                 {courses ? ` (${courses.length})` : ""}

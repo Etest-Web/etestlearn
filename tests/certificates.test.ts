@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { api } from "../convex/_generated/api";
+import { inboxApi } from "../lib/inbox-api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import type {
@@ -233,6 +234,32 @@ describe("certificate issuance", () => {
     expect(second).toBe(first);
     const all = await t.run((ctx: TestCtx) => ctx.db.query("certificates").collect());
     expect(all).toHaveLength(1);
+  });
+
+  test("notifies the learner exactly once when a certificate is issued", async () => {
+    const t = convexTest(testSchema, modules);
+    const ids = await seedWorld(t);
+    const student = await completeAllLessons(t, ids.articleCourseId);
+
+    // One auto-issuance fires from completeLesson, which scheduled it.
+    const afterIssue = await student.query(inboxApi.listNotifications, {});
+    expect(afterIssue).toHaveLength(1);
+    expect(afterIssue[0].type).toBe("certificate_earned");
+    expect(afterIssue[0].href).toBe("/dashboard/certificates");
+    // The view normalises read state to a boolean rather than exposing `readAt`.
+    expect(afterIssue[0].isRead).toBe(false);
+
+    // Re-issuing is a no-op and must not produce a second notification: the
+    // idempotency check returns before the notify call is ever reached.
+    await student.mutation(api.certificates.issueCertificate, {
+      courseId: ids.articleCourseId,
+    });
+    await student.mutation(api.certificates.issueCertificate, {
+      courseId: ids.articleCourseId,
+    });
+
+    const afterRepeats = await student.query(inboxApi.listNotifications, {});
+    expect(afterRepeats).toHaveLength(1);
   });
 
   test("records the active template on the certificate", async () => {

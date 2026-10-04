@@ -70,19 +70,19 @@ export default function MyLessonsPage() {
         <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
           <TabsTrigger 
             value="all" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
           >
             All Lessons ({enrolledCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="in-progress" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
           >
             In Progress ({inProgressCourses.length})
           </TabsTrigger>
           <TabsTrigger 
             value="completed" 
-            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-[state=active]:bg-[#945DA3] data-[state=active]:text-white transition-all text-muted-foreground"
+            className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
           >
             Completed ({completedCourses.length})
           </TabsTrigger>

@@ -333,6 +333,7 @@ export const updateLesson = mutation({
     order: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
+    videoStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -361,6 +362,7 @@ export const updateLesson = mutation({
     if (args.order !== undefined) updates.order = args.order;
     if (args.durationMinutes !== undefined) updates.durationMinutes = args.durationMinutes;
     if (args.content !== undefined) updates.content = args.content;
+    if (args.videoStorageId !== undefined) updates.videoStorageId = args.videoStorageId;
 
     await ctx.db.patch(args.lessonId, updates);
   },
@@ -389,7 +391,36 @@ export const deleteLesson = mutation({
       throw new Error("Not authorized to delete lessons in this course");
     }
 
-    // TODO: cleanup related quizzes, attempts
+    // Cascade: quiz → questions → options; quiz attempts keyed by quizId.
+    const quiz = await ctx.db
+      .query("quizzes")
+      .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+      .unique();
+
+    if (quiz) {
+      const questions = await ctx.db
+        .query("quizQuestions")
+        .withIndex("by_quiz_order", (q) => q.eq("quizId", quiz._id))
+        .collect();
+
+      for (const question of questions) {
+        const options = await ctx.db
+          .query("quizOptions")
+          .withIndex("by_question", (q) => q.eq("questionId", question._id))
+          .collect();
+        for (const opt of options) await ctx.db.delete(opt._id);
+        await ctx.db.delete(question._id);
+      }
+
+      const attempts = await ctx.db
+        .query("quizAttempts")
+        .withIndex("by_quiz", (q) => q.eq("quizId", quiz._id))
+        .collect();
+      for (const attempt of attempts) await ctx.db.delete(attempt._id);
+
+      await ctx.db.delete(quiz._id);
+    }
+
     await ctx.db.delete(args.lessonId);
   },
 });

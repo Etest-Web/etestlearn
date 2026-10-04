@@ -1,12 +1,17 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireRateLimit } from "./helpers/rateLimit";
 
-export const generateUploadUrl = mutation(async (ctx) => {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Not authenticated");
-  }
-  return await ctx.storage.generateUploadUrl();
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    await requireRateLimit(ctx, `upload:${identity.subject}`, 20, 60_000);
+    return await ctx.storage.generateUploadUrl();
+  },
 });
 
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -17,7 +22,7 @@ const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 export const validateAndResolveUpload = query({
   args: {
     storageId: v.id("_storage"),
-    kind: v.union(v.literal("image")),
+    kind: v.union(v.literal("image"), v.literal("video")),
     maxBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -40,6 +45,10 @@ export const validateAndResolveUpload = query({
 
     if (args.kind === "image" && !meta.contentType?.startsWith("image/")) {
       throw new Error("Only image files are allowed");
+    }
+
+    if (args.kind === "video" && !meta.contentType?.startsWith("video/")) {
+      throw new Error("Only video files are allowed");
     }
 
     return await ctx.storage.getUrl(args.storageId);

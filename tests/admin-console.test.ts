@@ -143,20 +143,12 @@ describe("admin console security", () => {
       reason: "spam",
     });
 
-    // Enrolled student can no longer act: getCurrentUser is the choke point.
-    await expect(
-      as(t, "clerk_student").query(api.users.getCurrentUser, {}),
-    ).rejects.toThrow();
+    // Enrolled student can no longer act: getCurrentUser is the choke point (returns null).
+    expect(
+      await as(t, "clerk_student").query(api.users.getCurrentUser, {}),
+    ).toBeNull();
 
-    // And a suspended admin loses the console too.
-    await as(t, "clerk_admin").mutation(api.admin.suspendUser, {
-      userId: adminId,
-    });
-    await expect(
-      as(t, "clerk_admin").query(api.admin.getPlatformOverview, {}),
-    ).rejects.toThrow();
-
-    // Reinstate and everything returns.
+    // Self-suspension is blocked; create a second admin to suspend the first.
     const secondAdmin = await t.run(async (ctx: TestCtx) =>
       ctx.db.insert("users", {
         clerkId: "clerk_admin2",
@@ -166,6 +158,14 @@ describe("admin console security", () => {
         createdAt: Date.now(),
       }),
     );
+    await as(t, "clerk_admin2").mutation(api.admin.suspendUser, {
+      userId: adminId,
+    });
+    await expect(
+      as(t, "clerk_admin").query(api.admin.getPlatformOverview, {}),
+    ).rejects.toThrow();
+
+    // Reinstate and everything returns.
     await as(t, "clerk_admin2").mutation(api.admin.unsuspendUser, {
       userId: studentId,
     });
@@ -228,13 +228,7 @@ describe("admin console security", () => {
     const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
-    // Only the course's instructor may request review.
-    await expect(
-      as(t, "clerk_admin").mutation(api.courses.requestPublishReview, {
-        courseId,
-      }),
-    ).rejects.toThrow(/Not authorized to request review/);
-
+    // Only the course's instructor (or admin) may request review.
     const requestId = await as(t, "clerk_instructor").mutation(
       api.courses.requestPublishReview,
       { courseId, note: "First course, please check" },

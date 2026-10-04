@@ -29,10 +29,20 @@ export const listMessagesForThread = query({
 
     await verifyAccess(ctx, user, thread.courseId);
 
-    return await ctx.db
+    const messages = await ctx.db
       .query("discussionMessages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .collect();
+
+    return await Promise.all(
+      messages.map(async (m) => {
+        const author = await ctx.db.get(m.userId);
+        return {
+          ...m,
+          authorName: author?.name ?? author?.email ?? null,
+        };
+      }),
+    );
   },
 });
 

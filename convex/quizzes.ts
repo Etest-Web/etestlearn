@@ -240,6 +240,25 @@ export const submitQuizAttempt = mutation({
       );
     }
 
+    // SECURITY: validate that every submitted answer references a question in
+    // this quiz and an option that belongs to that question. Without this a
+    // crafted payload can submit answers for questions from a different quiz
+    // and have them scored against this quiz's passing threshold.
+    const questionIds = new Set(questions.map((q) => q._id as string));
+    for (const answer of args.answers) {
+      if (!questionIds.has(answer.questionId as string)) {
+        throw new Error("Answer references a question not in this quiz");
+      }
+      const validOptionIds = new Set(
+        (optionLists[questions.findIndex((q) => q._id === answer.questionId)] ?? []).map(
+          (o) => o._id as string,
+        ),
+      );
+      if (!validOptionIds.has(answer.optionId as string)) {
+        throw new Error("Answer references an option not in this question");
+      }
+    }
+
     const grade = gradeQuiz(
       [...optionsByQuestion].map(([id, correctOptionIds]) => ({
         id,
@@ -277,13 +296,16 @@ export const submitQuizAttempt = mutation({
       createdAt: now,
     });
 
-    // Increment quiz goals
-    await ctx.runMutation(internal.goals.incrementGoalProgress, {
-      userId: user._id,
-      type: passed ? "pass_quizzes" : "complete_lessons", // quiz attempt counts as lesson engagement
-      amount: 1,
-      date: now,
-    });
+    // Only increment pass_quizzes on a passing attempt. A failed attempt
+    // does not count as a lesson completion — it's an attempt.
+    if (passed) {
+      await ctx.runMutation(internal.goals.incrementGoalProgress, {
+        userId: user._id,
+        type: "pass_quizzes",
+        amount: 1,
+        date: now,
+      });
+    }
 
     // Also increment study streak for quiz activity
     await ctx.runMutation(internal.goals.incrementGoalProgress, {

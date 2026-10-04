@@ -25,7 +25,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX } from "lucide-react";
+import { useRef } from "react";
+import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -54,9 +55,58 @@ export default function LessonEditPage() {
   );
   const createQuiz = useMutation(api.quizzes.createQuiz);
   const deleteQuizQuestion = useMutation(api.quizzes.deleteQuizQuestion);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadedVideoStorageId, setUploadedVideoStorageId] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  
+  const validateUpload = useQuery(
+    api.files.validateAndResolveUpload,
+    uploadedVideoStorageId
+      ? { storageId: uploadedVideoStorageId as any, kind: "video", maxBytes: 500 * 1024 * 1024 }
+      : "skip",
+  );
+
+  useEffect(() => {
+    if (validateUpload) {
+      setFormData((prev) => ({ ...prev, content: validateUpload }));
+    }
+  }, [validateUpload]);
+
+  async function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please choose a video file");
+      return;
+    }
+    const MAX = 500 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error("Video must be under 500 MB");
+      return;
+    }
+    setIsUploadingVideo(true);
+    try {
+      const postUrl = await generateUploadUrl({});
+      const res = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = (await res.json()) as { storageId: string };
+      setUploadedVideoStorageId(storageId);
+      toast.success("Video uploaded — save to attach it to the lesson");
+    } catch {
+      toast.error("Video upload failed. Please try again.");
+    } finally {
+      setIsUploadingVideo(false);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+    }
+  }
   
   const [formData, setFormData] = useState({
     title: "",
@@ -93,6 +143,7 @@ export default function LessonEditPage() {
         contentType: formData.contentType,
         durationMinutes: formData.durationMinutes ? parseInt(formData.durationMinutes) : undefined,
         content: formData.content,
+        videoStorageId: uploadedVideoStorageId ? (uploadedVideoStorageId as Id<"_storage">) : undefined,
       });
       toast.success("Lesson updated successfully");
     } catch (error) {
@@ -281,16 +332,49 @@ export default function LessonEditPage() {
             </div>
 
             {formData.contentType === "video" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="content">Video URL</Label>
-                <Input
-                  id="content"
-                  name="content"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={formData.content}
-                  onChange={handleChange}
-                />
-                <p className="text-xs leading-[1.5] text-muted-foreground">Enter a link to YouTube, Vimeo, or a direct MP4 file.</p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="content">Video URL</Label>
+                  <Input
+                    id="content"
+                    name="content"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={formData.content}
+                    onChange={handleChange}
+                  />
+                  <p className="text-xs leading-[1.5] text-muted-foreground">
+                    Enter a YouTube, Vimeo, or MP4 link — or upload a file below.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Or upload a video file</Label>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleVideoUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploadingVideo}
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    {isUploadingVideo ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
+                    ) : (
+                      <><Upload className="h-4 w-4" /> Upload video</>
+                    )}
+                  </Button>
+                  {uploadedVideoStorageId && !isUploadingVideo && (
+                    <p className="text-xs text-emerald-600">
+                      ✓ Video uploaded — save the lesson to attach it.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">MP4, WebM, MOV · max 500 MB</p>
+                </div>
               </div>
             )}
 

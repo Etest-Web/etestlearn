@@ -31,8 +31,19 @@ export const createPendingPurchase = mutation({
       .unique();
     if (enrollment) throw new Error("You are already enrolled in this course");
 
+    // Return existing pending purchase rather than stacking multiple checkouts
+    // for the same user+course. Only one pending row per user+course at a time.
+    const existingPending = await ctx.db
+      .query("purchases")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", user._id).eq("courseId", args.courseId),
+      )
+      .filter((q) => q.eq(q.field("status"), "pending"))
+      .first();
+    if (existingPending) return { reference: existingPending.paystackReference };
+
     const now = Date.now();
-    const reference = `etest-${now}-${Math.random().toString(36).slice(2, 10)}`;
+    const reference = `etest-${now}-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 
     await ctx.db.insert("purchases", {
       userId: user._id,

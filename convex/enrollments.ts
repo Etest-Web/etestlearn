@@ -129,6 +129,14 @@ export const completeLesson = mutation({
       .unique();
     if (!enrollment) throw new Error("Not enrolled in this course");
 
+    // Verify the lesson actually belongs to the claimed course — a caller
+    // enrolled in course A must not mark lessons from course B as complete
+    // and inflate their progress.
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson || lesson.courseId !== args.courseId) {
+      throw new Error("Lesson does not belong to this course");
+    }
+
     const completed = new Set(enrollment.completedLessonIds ?? []);
     const isNewCompletion = !completed.has(args.lessonId);
     if (isNewCompletion) {
@@ -150,9 +158,6 @@ export const completeLesson = mutation({
     });
 
     if (isNewCompletion) {
-      // Get lesson details for logging
-      const lesson = await ctx.db.get(args.lessonId);
-
       // Log lesson completion activity
       await ctx.db.insert("learningActivities", {
         userId: user._id,

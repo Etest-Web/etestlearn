@@ -9,16 +9,22 @@ import {
     BookOpen,
     ClipboardList,
     FileStack,
+    Gauge,
     GraduationCap,
     Inbox,
     LayoutDashboard,
     LogOut,
     Mail,
+    Megaphone,
+    MessagesSquare,
+    ScrollText,
     Search,
     Settings,
+    Tags,
     UserCircle2,
     UserRound,
     Users,
+    Wallet,
     EyeOff,
 } from "lucide-react";
 import Image from "next/image";
@@ -314,11 +320,74 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     )}
                     {isAdmin && (
                         <Link
+                            href="/dashboard/admin"
+                            className={FOOTER_LINK}
+                        >
+                            <Gauge size={20} />
+                            Admin Overview
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
                             href="/dashboard/admin/users"
                             className={FOOTER_LINK}
                         >
                             <Users size={20} />
-                            Admin Console
+                            Admin Users
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/courses"
+                            className={FOOTER_LINK}
+                        >
+                            <BookOpen size={20} />
+                            Admin Courses
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/payments"
+                            className={FOOTER_LINK}
+                        >
+                            <Wallet size={20} />
+                            Payments
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/discussions"
+                            className={FOOTER_LINK}
+                        >
+                            <MessagesSquare size={20} />
+                            Moderation
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/announcements"
+                            className={FOOTER_LINK}
+                        >
+                            <Megaphone size={20} />
+                            Announcements
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/categories"
+                            className={FOOTER_LINK}
+                        >
+                            <Tags size={20} />
+                            Categories
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link
+                            href="/dashboard/admin/audit"
+                            className={FOOTER_LINK}
+                        >
+                            <ScrollText size={20} />
+                            Audit Log
                         </Link>
                     )}
                     {isAdmin && (

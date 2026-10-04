@@ -30,6 +30,9 @@ export default function CourseEditPage() {
   const updateCourse = useMutation(api.courses.updateCourse);
   const createLesson = useMutation(api.courses.createLesson);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  // Admin-curated categories as suggestions; the field stays free text so
+  // historical values and new ideas keep working (see convex/categories.ts).
+  const categoryOptions = useQuery(api.categories.list);
 
   // Publishing is a separate operation from editing metadata (see
   // `lib/publishing.ts`), so the server decides which controls exist rather
@@ -487,7 +490,13 @@ export default function CourseEditPage() {
                       value={formData.category}
                       onChange={handleChange}
                       placeholder="e.g. Programming"
+                      list="admin-categories"
                     />
+                    <datalist id="admin-categories">
+                      {(categoryOptions ?? []).map((option) => (
+                        <option key={option._id} value={option.name} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="level">Level</Label>

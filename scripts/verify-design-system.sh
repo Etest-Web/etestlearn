@@ -41,7 +41,18 @@ printf '\n───── residue ─────\n'
 # Hardcoded brand hex and the old 24px radius are the two tells that made the
 # codebase read as assembled rather than designed. Both should be gone from
 # app/ and components/ once the sweep is complete.
-residue=$(grep -rn '945DA3\|rounded-\[24px\]' app components --include='*.tsx' 2>/dev/null | wc -l)
+#
+# Two exclusions, because a gate that reports known-good lines gets ignored:
+#   · comment/prose lines, which legitimately *mention* these strings when
+#     explaining why they are gone (card.tsx documents the removed override);
+#   · the theme-color meta tag, which cannot take a CSS variable — a literal hex
+#     is the only thing that works there.
+usage_only() {
+  grep -vE '(^|[[:space:]])(//|\*|/\*)' "$1" |
+    grep -v 'name="theme-color"'
+}
+
+residue=$(usage_only "$(grep -rln '945DA3\|rounded-\[24px\]' app components --include='*.tsx' 2>/dev/null)" | wc -l)
 echo "hardcoded #945DA3 / rounded-[24px] remaining: $residue"
 
 # The Base UI tab trap: `data-[state=active]:` is Radix's attribute and silently
@@ -49,6 +60,11 @@ echo "hardcoded #945DA3 / rounded-[24px] remaining: $residue"
 # is a usage site that matters.
 radix=$(grep -rn 'data-\[state=active\]:' app components --include='*.tsx' 2>/dev/null | wc -l)
 echo "dead Radix data-[state=active:] selectors:  $radix"
+
+if [ "$residue" -ne 0 ]; then
+  echo
+  usage_only "$(grep -rln '945DA3\|rounded-\[24px\]' app components --include='*.tsx' 2>/dev/null)" | head -20
+fi
 
 if [ "$residue" -ne 0 ] || [ "$radix" -ne 0 ]; then
   fail=1

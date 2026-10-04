@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -15,6 +16,44 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { Megaphone, X } from "lucide-react";
+
+/**
+ * Newest active platform announcement, dismissible per announcement id.
+ * Dismissal lives in localStorage rather than the database: the banner is
+ * chrome, not state, and per-device dismissal is the behavior people expect.
+ */
+function AnnouncementBanner() {
+  const announcement = useQuery(api.announcements.getActiveAnnouncement);
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDismissedId(localStorage.getItem("dismissed-announcement"));
+  }, []);
+
+  if (!announcement || dismissedId === announcement._id) return null;
+
+  return (
+    <div className="relative flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{announcement.body}</p>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss announcement"
+        className="absolute right-2 top-2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        onClick={() => {
+          localStorage.setItem("dismissed-announcement", announcement._id);
+          setDismissedId(announcement._id);
+        }}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -64,6 +103,7 @@ export default function DashboardPage() {
     <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
       {/* LEFT COLUMN: Main Content */}
       <div className="flex min-w-0 flex-col gap-8">
+        <AnnouncementBanner />
         
         {/* Banner */}
         {/* The hero plate is the one saturated surface on the page, so it needs no

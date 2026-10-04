@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
+import type * as announcements from "../announcements.js";
 import type * as auditLogs from "../auditLogs.js";
+import type * as categories from "../categories.js";
 import type * as certificateArtifacts from "../certificateArtifacts.js";
 import type * as certificateTemplateActions from "../certificateTemplateActions.js";
 import type * as certificateTemplates from "../certificateTemplates.js";
@@ -42,7 +45,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
+  announcements: typeof announcements;
   auditLogs: typeof auditLogs;
+  categories: typeof categories;
   certificateArtifacts: typeof certificateArtifacts;
   certificateTemplateActions: typeof certificateTemplateActions;
   certificateTemplates: typeof certificateTemplates;

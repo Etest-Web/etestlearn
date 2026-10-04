@@ -212,10 +212,16 @@ export const getCurrentUser = query({
       return null;
     }
 
-    return await ctx.db
+    const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
+
+    // Mirrors helpers/auth.getCurrentUser: a suspended account reads as
+    // signed out everywhere, so this module's inline lookup cannot become
+    // the one path that lets a suspended user keep acting.
+    if (user?.suspendedAt !== undefined) return null;
+    return user;
   },
 });
 
@@ -304,6 +310,7 @@ export const updateProfile = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     if (!user) throw new Error("User record not found");
+    if (user.suspendedAt !== undefined) throw new Error("Account suspended");
 
     const updates: { name?: string; imageUrl?: string } = {};
     if (args.name !== undefined && args.name.trim().length > 0) {

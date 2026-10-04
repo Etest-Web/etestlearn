@@ -27,17 +27,26 @@ export type AnyCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
  *
  * Most modules previously inlined this lookup; certificates need it in a dozen
  * places (eligibility, issuance, revocation, PDF rendering), so it lives here.
- * Returns null when unauthenticated or when the Clerk webhook has not yet
- * created the Convex user.
+ * Returns null when unauthenticated, when the Clerk webhook has not yet
+ * created the Convex user, or when the account is suspended (`suspendedAt`
+ * set by `admin.suspendUser`). Suspended == unauthenticated is the single
+ * enforcement point: every caller that resolves identity through this helper
+ * — queries and mutations alike — treats a suspended account as signed out,
+ * so suspension needs no per-function checks and unsuspension is instant.
+ * The Clerk account itself is not disabled; that stays a manual step because
+ * it requires the Clerk Backend API and a support decision.
  */
 export async function getCurrentUser(ctx: AnyCtx): Promise<UserDoc | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 
-  return await ctx.db
+  const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
     .unique();
+
+  if (user?.suspendedAt !== undefined) return null;
+  return user;
 }
 
 /** Like {@link getCurrentUser} but throws instead of returning null. */

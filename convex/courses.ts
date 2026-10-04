@@ -8,6 +8,7 @@ import {
 } from "../lib/publishing";
 import { logAudit, type AuditEntry } from "./helpers/audit";
 import {
+  AnyCtx,
   canManageCourse,
   isStaff,
   requireUser,
@@ -69,11 +70,20 @@ async function requireAvailableSlug(
 export const listPublishedCourses = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const courses = await ctx.db
       .query("courses")
       .withIndex("by_published", (q) => q.eq("published", true))
       .collect();
-}
+
+    // Featured first, then newest — the admin featured picker curates what
+    // leads the catalog without anyone hand-editing insertion order.
+    return courses.sort((a, b) => {
+      const fa = a.featured ? 1 : 0;
+      const fb = b.featured ? 1 : 0;
+      if (fa !== fb) return fb - fa;
+      return b.createdAt - a.createdAt;
+    });
+  },
 });
 
 export const listInstructorCourses = query({
@@ -856,6 +866,254 @@ export const reviewUnpublishRequest = mutation({
       actorId: admin._id,
       action: "course_unpublish_request.review",
       targetType: "courseUnpublishRequest",
+      targetId: request._id,
+      details,
+    });
+
+    return { success: true };
+  },
+});
+
+// ─── Admin console ──────────────────────────────────────────────────────────
+//
+// Moderation surface for the admin console: the full course table, bulk
+// publish/unpublish, the featured picker, and the opt-in pre-publication
+// review queue. None of these change `publishCourse`'s no-gate contract —
+// review here is something an instructor asks for, not something imposed.
+
+async function requireCourseAdmin(ctx: AnyCtx) {
+  const user = await requireUser(ctx);
+  if (user.role !== "admin") {
+    throw new Error("Not authorized — admin access required");
+  }
+  return user;
+}
+
+/** Every course with its instructor name and paid-sales count, newest first. */
+export const adminListCourses = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireCourseAdmin(ctx);
+
+    const [courses, users] = await Promise.all([
+      ctx.db.query("courses").collect(),
+      ctx.db.query("users").collect(),
+    ]);
+    const nameOf = new Map(users.map((u) => [u._id, u.name ?? u.email ?? null]));
+
+    const rows = await Promise.all(
+      courses
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (course) => ({
+          _id: course._id,
+          title: course.title,
+          slug: course.slug,
+          category: course.category ?? null,
+          level: course.level ?? null,
+          price: course.price ?? 0,
+          published: course.published,
+          featured: course.featured ?? false,
+          instructor: nameOf.get(course.instructorId) ?? null,
+          paidSales: await countPaidSales(ctx, course._id),
+          updatedAt: course.updatedAt,
+        })),
+    );
+    return rows;
+  },
+});
+
+/**
+ * Bulk publish/unpublish from the console's course table. Publishing is
+ * ungated; unpublishing as an admin is always allowed (see unpublishCourse)
+ * and every applied change is audited — a bulk action that rewrote N listings
+ * with no trail would be worse than the gate it bypasses.
+ */
+export const bulkSetPublished = mutation({
+  args: {
+    courseIds: v.array(v.id("courses")),
+    published: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireCourseAdmin(ctx);
+    if (args.courseIds.length === 0) return { changed: 0 };
+    if (args.courseIds.length > 100) {
+      throw new Error("Bulk publish is limited to 100 courses per call");
+    }
+
+    let changed = 0;
+    for (const courseId of args.courseIds) {
+      const course = await ctx.db.get(courseId);
+      if (!course || course.published === args.published) continue;
+
+      await ctx.db.patch(courseId, {
+        published: args.published,
+        updatedAt: Date.now(),
+      });
+      changed++;
+
+      if (!args.published) {
+        await logAudit(ctx, {
+          actorId: admin._id,
+          action: "course.unpublish",
+          targetType: "course",
+          targetId: courseId,
+          details: {
+            paidSales: await countPaidSales(ctx, courseId),
+            price: course.price ?? 0,
+            direct: true,
+            bulk: true,
+          },
+        });
+      }
+    }
+    return { changed };
+  },
+});
+
+/** Featured flag for the public catalog's featured-first ordering. */
+export const setFeatured = mutation({
+  args: { courseId: v.id("courses"), featured: v.boolean() },
+  handler: async (ctx, args) => {
+    const admin = await requireCourseAdmin(ctx);
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+
+    await ctx.db.patch(args.courseId, { featured: args.featured });
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "course.featured",
+      targetType: "course",
+      targetId: args.courseId,
+      details: { featured: args.featured, title: course.title },
+    });
+  },
+});
+
+// ─── Opt-in pre-publication review queue ────────────────────────────────────
+
+/** An instructor asks for admin sign-off before their course goes live. */
+export const requestPublishReview = mutation({
+  args: {
+    courseId: v.id("courses"),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) throw new Error("Not authorized");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new Error("Course not found");
+    if (!(await canManageCourse(ctx, user, course))) {
+      throw new Error("Not authorized to request review for this course");
+    }
+    if (course.published) {
+      throw new Error("This course is already published");
+    }
+
+    const requests = await ctx.db
+      .query("courseReviewRequests")
+      .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
+      .collect();
+    if (requests.some((r) => r.status === "pending")) {
+      throw new Error("A review is already pending for this course");
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("courseReviewRequests", {
+      courseId: args.courseId,
+      requestedBy: user._id,
+      note: args.note?.trim() || undefined,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/** The console's review queue: pending requests with course context. */
+export const listPublishReviewRequests = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireCourseAdmin(ctx);
+
+    const requests = await ctx.db
+      .query("courseReviewRequests")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .order("desc")
+      .take(100);
+
+    return await Promise.all(
+      requests.map(async (request) => {
+        const [course, requester] = await Promise.all([
+          ctx.db.get(request.courseId),
+          ctx.db.get(request.requestedBy),
+        ]);
+        return {
+          _id: request._id,
+          courseId: request.courseId,
+          courseTitle: course?.title ?? null,
+          coursePublished: course?.published ?? false,
+          requesterName: requester?.name ?? requester?.email ?? null,
+          note: request.note ?? null,
+          createdAt: request.createdAt,
+        };
+      }),
+    );
+  },
+});
+
+/**
+ * Approve publishes the course immediately (the ask was "may I go live", so
+ * yes means yes); reject leaves it as a draft with a note back to the
+ * instructor. Audited either way, mirroring reviewUnpublishRequest.
+ */
+export const reviewPublishRequest = mutation({
+  args: {
+    requestId: v.id("courseReviewRequests"),
+    decision: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewNote: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const admin = await requireCourseAdmin(ctx);
+
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Review request not found");
+    if (request.status !== "pending") {
+      throw new Error("This request has already been reviewed");
+    }
+
+    const now = Date.now();
+    if (args.decision === "approved") {
+      const course = await ctx.db.get(request.courseId);
+      if (course && !course.published) {
+        await ctx.db.patch(course._id, {
+          published: true,
+          updatedAt: now,
+        });
+      }
+    }
+
+    await ctx.db.patch(args.requestId, {
+      status: args.decision,
+      reviewedBy: admin._id,
+      reviewNote: args.reviewNote?.trim() || undefined,
+      updatedAt: now,
+    });
+
+    const course = await ctx.db.get(request.courseId);
+    const details: NonNullable<AuditEntry["details"]> = {
+      decision: args.decision,
+      courseId: request.courseId,
+      requestedBy: request.requestedBy,
+    };
+    if (course) details.courseTitle = course.title;
+    if (args.reviewNote !== undefined) details.note = args.reviewNote;
+
+    await logAudit(ctx, {
+      actorId: admin._id,
+      action: "course_publish_request.review",
+      targetType: "courseReviewRequest",
       targetId: request._id,
       details,
     });

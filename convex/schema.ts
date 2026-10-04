@@ -12,6 +12,11 @@ export default defineSchema({
       v.literal("instructor"),
       v.literal("admin")
     ),
+    // Set when an admin suspends the account. `helpers/auth.getCurrentUser`
+    // treats a suspended user as unauthenticated, so every function that
+    // resolves identity through the shared helper refuses them platform-wide
+    // without any data being deleted — unsuspending restores everything.
+    suspendedAt: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_clerk_id", ["clerkId"]),
 
@@ -29,11 +34,16 @@ export default defineSchema({
     currency: v.optional(v.string()), // e.g. "NGN"
     // Denormalized "title description category" for full-text search.
     searchText: v.optional(v.string()),
+    // Admin-curated "featured" flag; featured courses sort first on the
+    // public catalog. Optional so every pre-existing course reads as false.
+    featured: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_slug", ["slug"])
     .index("by_instructor", ["instructorId"])
     .index("by_published", ["published"])
+    // Serves the admin featured picker and the catalog's featured-first sort.
+    .index("by_featured", ["featured"])
     .searchIndex("search", {
       searchField: "searchText",
       filterFields: ["published"],
@@ -188,6 +198,12 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // Refund annotation written by `payments.markRefunded`. Access is NOT
+    // revoked automatically: an admin reviews each case, and revocation is a
+    // separate decision (delete the enrollment) so a mistaken refund annotation
+    // never silently removes someone's course.
+    refundedAt: v.optional(v.number()),
+    refundReason: v.optional(v.string()),
   }).index("by_reference", ["paystackReference"])
     .index("by_user", ["userId"])
     .index("by_user_course", ["userId", "courseId"])
@@ -200,6 +216,9 @@ export default defineSchema({
     courseId: v.id("courses"),
     title: v.string(),
     createdBy: v.id("users"),
+    // Moderation lock: set by an admin, refuses new messages in
+    // `discussions.postMessage` while leaving history readable.
+    locked: v.optional(v.boolean()),
     createdAt: v.number(),
   }).index("by_course", ["courseId"]),
 
@@ -548,5 +567,48 @@ export default defineSchema({
 
   // ═══════════════════════════════════════════════════════════════════════
   // END friends block
+  // BEGIN admin console block
+  //
+  // Support surfaces the admin console added: platform announcements,
+  // a curated category list, and an opt-in pre-publication review queue.
+  // The review queue is deliberately opt-in: `courses.publishCourse` stays
+  // ungated (see the publishing block comment there and AGENTS.md rule 9) —
+  // an instructor who wants admin sign-off before going live asks for it
+  // here instead of the platform silently holding every listing hostage.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  announcements: defineTable({
+    title: v.string(),
+    body: v.string(),
+    active: v.optional(v.boolean()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_active", ["active"]),
+
+  categories: defineTable({
+    name: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_name", ["name"]),
+
+  courseReviewRequests: defineTable({
+    courseId: v.id("courses"),
+    requestedBy: v.id("users"),
+    note: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_status", ["status"])
+    .index("by_course", ["courseId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // END admin console block
 });
 

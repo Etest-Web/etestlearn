@@ -2,10 +2,18 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { Button } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
+import { SearchX } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -25,46 +33,47 @@ function CoursesWrapper() {
     (query ? (searchedCourses ?? []) : (allCourses ?? [])) ?? [];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-12 space-y-8">
-      <header className="space-y-3 text-center">
-        <Badge variant="outline" className="uppercase tracking-wide">
-          Courses
-        </Badge>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          {query ? `Search results for "${query}"` : "Explore world-class courses"}
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-          {query ? "" : "Browse published courses created by you and approved instructors."}
-        </p>
-      </header>
+    <main className="mx-auto max-w-6xl px-4 py-12 space-y-10">
+      <PageHeader
+        title={query ? `Search results for "${query}"` : "Explore world-class courses"}
+        description={
+          query
+            ? undefined
+            : "Browse published courses created by you and approved instructors."
+        }
+      />
 
       {filteredCourses.length === 0 ? (
-        <p className="text-center text-muted-foreground mt-12 py-12 border border-dashed rounded-xl border-border">
-          No courses found matching your search. Try different keywords!
-        </p>
+        <EmptyState
+          icon={SearchX}
+          title="No courses found"
+          description={
+            query
+              ? "Nothing in the catalog matches that search. Try different keywords."
+              : "There are no published courses to browse yet. Check back shortly."
+          }
+        />
       ) : (
         <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCourses.map((course) => (
-            <Card key={course._id} className="flex flex-col">
+            <Card key={course._id} variant="interactive">
               <CardHeader>
-                <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="w-full h-48 object-cover rounded-lg" />
-                <div className="flex flex-wrap gap-2 mb-2">
+                <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
+                <div className="flex flex-wrap gap-2">
                   {course.category && (
                     <Badge variant="secondary">{course.category}</Badge>
                   )}
                   {course.level && (
-                    <Badge variant="outline" className="text-xs">
-                      {course.level}
-                    </Badge>
+                    <Badge variant="outline">{course.level}</Badge>
                   )}
                 </div>
                 <CardTitle className="line-clamp-2">{course.title}</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground line-clamp-3">
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <p className="text-sm leading-body text-muted-foreground line-clamp-3">
                   {course.description}
                 </p>
-                <Button className="mt-auto" onClick={() => router.push(`/courses/${course.slug}`)}>
+                <Button className="mt-auto w-full" variant="outline" onClick={() => router.push(`/courses/${course.slug}`)}>
                   View course
                 </Button>
               </CardContent>
@@ -83,4 +92,3 @@ export default function CoursesPage() {
     </Suspense>
   );
 }
-

@@ -56,27 +56,30 @@ export default function PaymentCallbackPage() {
 
   return (
     <main className="mx-auto max-w-md px-4 py-24">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            {state === "verifying" && <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />}
-            {state === "success" && <CheckCircle2 className="h-12 w-12 text-green-500" />}
-            {(state === "failed" || state === "error") && <XCircle className="h-12 w-12 text-red-500" />}
+      {/* No PageHeader here: the whole page *is* one status, so the card is the
+          heading. `aria-live="polite"` because the state swaps in place after a
+          round trip and a screen reader otherwise never hears the outcome. */}
+      <Card aria-live="polite">
+        <CardHeader className="items-center text-center">
+          <div aria-hidden className="mb-1 flex justify-center">
+            {state === "verifying" && <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />}
+            {state === "success" && <CheckCircle2 className="h-10 w-10 text-success" />}
+            {(state === "failed" || state === "error") && <XCircle className="h-10 w-10 text-destructive" />}
           </div>
-          <CardTitle>
+          <CardTitle className="display-subheading text-2xl tracking-editorial text-center">
             {state === "verifying" && "Verifying your payment..."}
             {state === "success" && "Payment successful!"}
             {state === "failed" && "Payment not completed"}
             {state === "error" && "Something went wrong"}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-center">
             {state === "verifying" && "Confirming your transaction with Paystack. This only takes a moment."}
             {state === "success" && "You've been enrolled in the course. Happy learning!"}
             {state === "failed" && message}
             {state === "error" && message}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center gap-3">
+        <CardContent className="flex justify-center gap-2">
           {state === "success" && (
             <Button onClick={() => router.push("/dashboard/courses")}>Go to my courses</Button>
           )}

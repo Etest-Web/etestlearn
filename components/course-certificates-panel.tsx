@@ -13,6 +13,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
 } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
@@ -41,7 +42,7 @@ export function CertificatesPanel({
   const [busy, setBusy] = useState<string | null>(null);
 
   if (certificates === undefined) {
-    return <Skeleton className="h-48 w-full rounded-xl" />;
+    return <Skeleton className="h-48 w-full rounded-sm" />;
   }
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string) {
@@ -62,7 +63,9 @@ export function CertificatesPanel({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Issued certificates ({activeCount})</CardTitle>
+          <CardTitle>
+            Issued certificates (<span className="tabular">{activeCount}</span>)
+          </CardTitle>
           <CardDescription>
             Certificates are awarded automatically when a learner completes
             every lesson and passes every quiz. Revoking one keeps the record
@@ -71,11 +74,13 @@ export function CertificatesPanel({
         </CardHeader>
         <CardContent>
           {certificates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No certificates issued for this course yet.
-            </p>
+            <EmptyState
+              icon={Award}
+              title="No certificates issued yet"
+              description="Nobody has been awarded one for this course. The first one is issued automatically when a learner completes every lesson and passes every quiz."
+            />
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-rule">
               {certificates.map((cert) => {
                 const isRevoked = isCertificateRevoked(cert);
                 return (
@@ -87,14 +92,14 @@ export function CertificatesPanel({
                       <Award
                         aria-hidden
                         className={`mt-0.5 h-4 w-4 shrink-0 ${
-                          isRevoked ? "text-muted-foreground" : "text-[#945DA3]"
+                          isRevoked ? "text-muted-foreground" : "text-brand"
                         }`}
                       />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">
                           {cert.holderName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="tabular text-xs text-muted-foreground">
                           {formatCertificateDate(cert.issuedAt)}
                           {cert.serial ? ` · ${cert.serial}` : ""}
                         </p>
@@ -128,11 +133,11 @@ export function CertificatesPanel({
                     >
                       {isRevoked ? (
                         <>
-                          <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reinstate
+                          <RotateCcw className="size-3.5" /> Reinstate
                         </>
                       ) : (
                         <>
-                          <Ban className="mr-2 h-3.5 w-3.5" /> Revoke
+                          <Ban className="size-3.5" /> Revoke
                         </>
                       )}
                     </Button>
@@ -179,7 +184,7 @@ export function CertificatesPanel({
                 ).finally(() => setLearnerId(""))
               }
             >
-              <Send className="mr-2 h-3.5 w-3.5" />
+              <Send className="size-3.5" />
               {busy === "award" ? "Issuing…" : "Issue certificate"}
             </Button>
           </div>

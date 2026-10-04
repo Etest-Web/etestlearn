@@ -51,7 +51,7 @@ export function VideoPlayer({ src, title }: { src: string; title: string }) {
 
   if (embed) {
     return (
-      <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "16 / 9" }}>
+      <div className="relative w-full overflow-hidden rounded-sm bg-black" style={{ aspectRatio: "16 / 9" }}>
         <iframe
           src={embed}
           title={title}
@@ -67,7 +67,7 @@ export function VideoPlayer({ src, title }: { src: string; title: string }) {
     <video
       controls
       preload="metadata"
-      className="w-full rounded-xl bg-black"
+      className="w-full rounded-sm bg-black"
       style={{ aspectRatio: "16 / 9" }}
       src={src}
     >

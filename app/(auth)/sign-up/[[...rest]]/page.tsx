@@ -7,10 +7,13 @@ const SignupPage = () => {
        breathe on a phone instead of letting Clerk sit flush to the edges. */
     <main className="flex min-h-dvh items-center justify-center px-4 py-10">
       <div className="flex w-full flex-col items-center justify-center">
-        <h1 className="mb-2 text-center text-2xl font-bold text-balance sm:text-3xl">
+        {/* Display face on the h1 — the same voice every other page title
+           uses. PageHeader is not used here because it is left-aligned on
+           desktop, and an auth screen reads better centred. */}
+        <h1 className="display-heading mb-3 text-center text-3xl text-balance sm:text-5xl">
           Join Glypha Learning
         </h1>
-        <p className="mb-8 text-center text-base text-muted-foreground sm:text-lg">
+        <p className="mb-8 max-w-[46ch] text-center text-sm leading-body text-muted-foreground sm:text-base">
           Create your free account to start learning.
         </p>
         <SignUp />

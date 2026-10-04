@@ -36,11 +36,14 @@ export function Navbar() {
     : NAV_LINKS;
 
   return (
-    <header className="sticky top-0 z-60 border-b bg-background/80 backdrop-blur-md">
+    /* The rule under the bar is the same `--rule` hairline the dashboard
+       sidebar sits on, so the chrome reads as one surface across the two
+       shells. Kept as a translucent plate because the hero scrolls under it. */
+    <header className="sticky top-0 z-60 border-b border-rule bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-h-20 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2 group">
-          <div className="flex w-30 items-center justify-center rounded-lg transition-transform group-hover:scale-105">
+          <div className="flex w-30 items-center justify-center rounded-sm transition-transform group-hover:scale-105">
             <Image width={10} height={10} alt="Glypha" src={"/Logo.svg"} className="w-full" />
           </div>
           {/*<span className="text-sm font-bold tracking-tight sm:text-base">Glypha Learning</span>*/}
@@ -107,7 +110,7 @@ export function Navbar() {
                     render={
                       <Link
                         href={href}
-                        className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="flex items-center gap-3 rounded-sm px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       />
                     }
                   >
@@ -116,7 +119,7 @@ export function Navbar() {
                   </SheetClose>
                 ))}
               </nav>
-              <div className="mt-auto flex items-center justify-between gap-3 border-t px-4 py-4">
+              <div className="mt-auto flex items-center justify-between gap-3 border-t border-rule px-4 py-4">
                 <ModeToggle />
                 {isLoaded &&
                   (user ? (

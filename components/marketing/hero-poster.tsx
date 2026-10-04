@@ -21,12 +21,12 @@ function CertificateMock() {
         alt="Certificate preview"
         width={1600}
         height={1140}
-        className="tilt-card w-full h-auto shadow-lg dark:shadow-none"
+        className="tilt-card h-auto w-full shadow-elevation-raised"
         priority
       />
       <div
         aria-hidden="true"
-        className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-2xl border border-border/60 bg-muted/50"
+        className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-sm border border-rule bg-surface-sunken"
       />
     </div>
   );
@@ -102,8 +102,8 @@ export function HeroPoster() {
               <Link
                 href={primaryHref}
                 className={cn(
-                  "group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand px-7 text-sm font-semibold text-brand-foreground",
-                  "transition-transform duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.96]",
+                  "group inline-flex h-12 items-center justify-center gap-2 rounded-sm bg-brand px-7 text-sm font-semibold text-brand-foreground",
+                  "transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-brand/90 active:translate-y-0 active:scale-[0.96]",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                 )}
               >
@@ -113,7 +113,7 @@ export function HeroPoster() {
               {!user && (
                 <Link
                   href="/sign-in"
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-border bg-card px-7 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="inline-flex h-12 items-center justify-center rounded-sm border border-rule-strong bg-card px-7 text-sm font-medium transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   Sign in to continue
                 </Link>

@@ -24,8 +24,8 @@ export function SectionHeading({
       )}
     >
       <div className="flex items-center gap-3">
-        <span className="font-mono text-xs tabular-nums text-primary">{index}</span>
-        <span className="h-px w-10 bg-border" aria-hidden="true" />
+        <span className="tabular text-xs text-primary">{index}</span>
+        <span className="h-px w-10 bg-rule" aria-hidden="true" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           {kicker}
         </span>

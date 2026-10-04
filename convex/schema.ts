@@ -311,5 +311,73 @@ export default defineSchema({
   }).index("by_user_created", ["userId", "createdAt"])
     .index("by_user_type", ["userId", "type"])
     .index("by_user_course", ["userId", "courseId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BEGIN task block — graded assignments + personal study tasks
+  //
+  // Two distinct things share one "Task" page, so they get two tables rather
+  // than one table with a nullable owner: `assignments` is instructor-authored
+  // and course-scoped with graded submissions, `studyTasks` is a private
+  // self-authored checklist. Merging them would make every access check a
+  // three-way branch and would let a "no course" row leak across users.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  assignments: defineTable({
+    courseId: v.id("courses"),
+    lessonId: v.optional(v.id("lessons")),
+    title: v.string(),
+    instructions: v.optional(v.string()),
+    createdBy: v.id("users"),
+    dueAt: v.optional(v.number()),
+    maxPoints: v.optional(v.number()),
+    // draft → only the author sees it; open → students see and submit;
+    // closed → visible but no further submissions accepted.
+    status: v.union(v.literal("draft"), v.literal("open"), v.literal("closed")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_course", ["courseId"])
+    .index("by_course_status", ["courseId", "status"]),
+
+  assignmentSubmissions: defineTable({
+    assignmentId: v.id("assignments"),
+    userId: v.id("users"),
+    content: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("submitted"),
+      v.literal("graded"),
+    ),
+    submittedAt: v.optional(v.number()),
+    score: v.optional(v.number()),
+    feedback: v.optional(v.string()),
+    gradedBy: v.optional(v.id("users")),
+    gradedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_assignment", ["assignmentId"])
+    // Serves the grader's work queue: "open submissions for assignment X",
+    // newest first, without loading every graded row.
+    .index("by_assignment_submitted", ["assignmentId", "submittedAt"])
+    .index("by_user", ["userId"]),
+
+  studyTasks: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    notes: v.optional(v.string()),
+    courseId: v.optional(v.id("courses")),
+    dueAt: v.optional(v.number()),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    completedAt: v.optional(v.number()), // undefined means outstanding
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    // Serves both "my open tasks" and "what did I finish this month".
+    .index("by_user_completed", ["userId", "completedAt"])
+    .index("by_user_due", ["userId", "dueAt"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // END task block
 });
 

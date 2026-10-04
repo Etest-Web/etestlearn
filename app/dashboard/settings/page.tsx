@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
@@ -13,19 +13,13 @@ import { Loader2, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
+  const { user } = useUser();
   const currentUser = useQuery(api.users.getCurrentUser);
   const updateProfile = useMutation(api.users.updateProfile);
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
 
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const pendingStorageId = useRef<Id<"_storage"> | null>(null);
-  const [resolvedStorageId, setResolvedStorageId] = useState<Id<"_storage"> | null>(null);
-  const resolvedFileUrl = useQuery(
-    api.files.validateAndResolveUpload,
-    resolvedStorageId ? { storageId: resolvedStorageId, kind: "image" as const } : "skip",
-  );
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,20 +27,6 @@ export default function SettingsPage() {
       setName(currentUser.name ?? "");
     }
   }, [currentUser, name]);
-
-  // When an uploaded avatar URL resolves, persist it to the profile.
-  useEffect(() => {
-    if (
-      resolvedFileUrl &&
-      pendingStorageId.current &&
-      resolvedStorageId === pendingStorageId.current
-    ) {
-      updateProfile({ imageUrl: resolvedFileUrl })
-        .then(() => toast.success("Profile photo updated"))
-        .catch(() => toast.error("Failed to save profile photo"));
-      pendingStorageId.current = null;
-    }
-  }, [resolvedFileUrl, resolvedStorageId, updateProfile]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -71,15 +51,17 @@ export default function SettingsPage() {
     }
     setIsUploadingAvatar(true);
     try {
-      const postUrl = await generateUploadUrl();
-      const result = await fetch(postUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      const { storageId } = await result.json();
-      pendingStorageId.current = storageId;
-      setResolvedStorageId(storageId);
+      // Clerk is the source of truth for profile fields (see convex/users.ts):
+      // the photo is uploaded to Clerk, which fires a user.updated webhook that
+      // syncs imageUrl into Convex. Writing it to Convex here too keeps the UI
+      // instant instead of waiting for the webhook round-trip, and avoids
+      // storing a Convex signed URL that expires — Clerk CDN URLs do not.
+      const updated = await user?.setProfileImage({ file });
+      const url = updated?.publicUrl;
+      if (url) {
+        await updateProfile({ imageUrl: url });
+      }
+      toast.success("Profile photo updated");
     } catch {
       toast.error("Upload failed. Please try again.");
     } finally {
@@ -103,8 +85,8 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex flex-wrap items-center gap-4">
               <Avatar className="h-16 w-16">
-                {currentUser?.imageUrl ? (
-                  <AvatarImage src={currentUser.imageUrl} alt={currentUser.name ?? "Profile"} />
+                {(user?.imageUrl || currentUser?.imageUrl) ? (
+                  <AvatarImage src={user?.imageUrl || currentUser?.imageUrl} alt={currentUser?.name ?? "Profile"} />
                 ) : null}
                 <AvatarFallback>
                   {(currentUser?.name ?? "?").slice(0, 1).toUpperCase()}

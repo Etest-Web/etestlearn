@@ -311,5 +311,43 @@ export default defineSchema({
   }).index("by_user_created", ["userId", "createdAt"])
     .index("by_user_type", ["userId", "type"])
     .index("by_user_course", ["userId", "courseId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // BEGIN friends block — mutual-approval social graph
+  //
+  // One row per relationship with a `status` field, and NO `pairKey` sort trick:
+  // the directed pair (requester → addressee) is stored as sent, because
+  // Convex indexes cannot express "either column equals me" in one range.
+  // Reading your friends is therefore two range reads (everything you sent that
+  // was accepted, everything sent to you that was accepted) merged in memory —
+  // still index-driven, and no full table scan.
+  //
+  // A duplicate guard belongs in the mutation (check by_requester_addressee
+  // before inserting) rather than in a unique index, which Convex does not
+  // offer; the test suite asserts the second request is rejected.
+  //
+  // Activity visibility is enforced at read time in `friends.getFriendsActivity`:
+  // it may only read the certificates/goals of users who share an accepted
+  // friendship with the caller. That is the reason activity is not stored here
+  // and duplicated per friend.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  friendships: defineTable({
+    requesterId: v.id("users"),
+    addresseeId: v.id("users"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("declined"),
+    ),
+    createdAt: v.number(),
+    respondedAt: v.optional(v.number()),
+  })
+    .index("by_requester_status", ["requesterId", "status"])
+    .index("by_addressee_status", ["addresseeId", "status"])
+    .index("by_requester_addressee", ["requesterId", "addresseeId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // END friends block
 });
 

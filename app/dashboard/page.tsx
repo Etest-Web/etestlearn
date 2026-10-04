@@ -306,32 +306,32 @@ export default function DashboardPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
           <StatCard 
-            icon={<BookOpen className="w-5 h-5 text-[#945DA3]" />}
+            icon={<BookOpen className="w-5 h-5 text-[#945DA3] dark:text-[#C090CE]" />}
             label="Courses"
             value={statistics.totalCoursesEnrolled}
             subValue={`${statistics.completedCourses} completed`}
             iconBg="bg-[#F2EAF7] dark:bg-[#945DA3]/20"
           />
           <StatCard 
-            icon={<Award className="w-5 h-5 text-[#EABE5D]" />}
+            icon={<Award className="w-5 h-5 text-[#945DA3] dark:text-[#C090CE]" />}
             label="Certificates"
             value={statistics.totalCertificatesEarned}
             subValue={`${statistics.totalCertificatesRevoked} revoked`}
-            iconBg="bg-[#FBF1DC] dark:bg-[#EABE5D]/20"
+            iconBg="bg-[#F2EAF7] dark:bg-[#945DA3]/20"
           />
           <StatCard 
-            icon={<Clock className="w-5 h-5 text-[#E63B4B]" />}
+            icon={<Clock className="w-5 h-5 text-[#945DA3] dark:text-[#C090CE]" />}
             label="Study Time"
             value={`${statistics.totalStudyHours}h`}
             subValue={`${statistics.totalStudyMinutes}m total`}
-            iconBg="bg-[#FDECEC] dark:bg-[#FF4949]/20"
+            iconBg="bg-[#F2EAF7] dark:bg-[#945DA3]/20"
           />
           <StatCard 
-            icon={<Flame className="w-5 h-5 text-[#FF6B35]" />}
+            icon={<Flame className="w-5 h-5 text-[#945DA3] dark:text-[#C090CE]" />}
             label="Streak"
             value={`${statistics.currentStreak} days`}
             subValue={`Best: ${statistics.longestStreak} days`}
-            iconBg="bg-[#FFF4ED] dark:bg-[#FF6B35]/20"
+            iconBg="bg-[#F2EAF7] dark:bg-[#945DA3]/20"
           />
         </div>
 

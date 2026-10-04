@@ -8,7 +8,13 @@ import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Badge, Button, Card, CardContent } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui";
 import { VideoPlayer } from "@/components/video-player";
 import { toast } from "sonner";
 import {
@@ -31,11 +37,11 @@ function LessonContent({ contentType, content }: { contentType: string; content?
   if (contentType === "video") {
     if (!content) {
       return (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            The video for this lesson hasn&apos;t been added yet.
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={VideoIcon}
+          title="No video yet"
+          description="The video for this lesson hasn't been added yet."
+        />
       );
     }
     return <VideoPlayer src={content} title="Lesson video" />;
@@ -44,11 +50,11 @@ function LessonContent({ contentType, content }: { contentType: string; content?
   // article
   if (!content) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          The article for this lesson hasn&apos;t been written yet.
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={FileText}
+        title="No article yet"
+        description="The article for this lesson hasn't been written yet."
+      />
     );
   }
 
@@ -146,7 +152,7 @@ export default function LessonPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {course.title}
         </Link>
-        <span className="text-xs text-muted-foreground">
+        <span className="tabular text-xs text-muted-foreground">
           Lesson {index + 1} of {lessons.length}
         </span>
       </div>
@@ -160,90 +166,92 @@ export default function LessonPage() {
             {lesson.contentType}
           </Badge>
           {isCompleted && (
-            <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-200">
+            <Badge variant="outline" className="gap-1 border-emerald-200 text-emerald-600">
               <CheckCircle2 className="h-3 w-3" /> Completed
             </Badge>
           )}
           {lesson.durationMinutes != null && (
-            <span className="text-xs text-muted-foreground">{lesson.durationMinutes} min</span>
+            <span className="tabular text-xs text-muted-foreground">{lesson.durationMinutes} min</span>
           )}
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">{lesson.title}</h1>
+        <PageHeader title={lesson.title} />
       </header>
 
       {!enrollment ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <Lock className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm font-medium">Enroll in this course to access lesson content</p>
-            <Button
-              size="sm"
-              render={<Link href={`/dashboard/courses/${course.slug}`} />}
-            >
+        <EmptyState
+          icon={Lock}
+          title="This lesson is locked"
+          description="Enroll in this course to access lesson content."
+          action={
+            <Button render={<Link href={`/dashboard/courses/${course.slug}`} />}>
               Go to course page
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <>
           {lesson.contentType === "quiz" ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-                <HelpCircle className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm font-medium">This lesson is a knowledge check</p>
+            <EmptyState
+              icon={HelpCircle}
+              title="This lesson is a knowledge check"
+              description="Answer a short set of questions to record your grade for this lesson."
+              action={
                 <Button
-                  size="sm"
                   render={
                     <Link href={`/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`} />
                   }
                 >
                   Open quiz
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           ) : (
             <LessonContent contentType={lesson.contentType} content={lesson.content ?? undefined} />
           )}
 
           {/* Prev + CTA + Next needs ~411px. Stack below sm so the primary action is
               always reachable, then go back to a single row. */}
-          <nav aria-label="Lesson navigation" className="flex flex-col-reverse items-stretch gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <nav aria-label="Lesson navigation" className="flex flex-col-reverse items-stretch gap-3 border-t border-rule pt-4 sm:flex-row sm:items-center sm:justify-between">
             {prev ? (
-              <Link
-                href={lessonHref(prev)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent touch-target"
+              <Button
+                variant="outline"
+                render={<Link href={lessonHref(prev)} />}
+                className="w-full touch-target sm:w-auto"
               >
                 <ArrowLeft className="h-4 w-4" /> Previous
-              </Link>
+              </Button>
             ) : (
               <span className="hidden sm:block" />
             )}
 
             <Button className="w-full sm:w-auto" onClick={handleComplete} disabled={isMarking} variant={isCompleted ? "outline" : "default"}>
               {isMarking ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : isCompleted ? (
-                <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-500" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               ) : (
-                <Circle className="mr-2 h-4 w-4" />
+                <Circle className="h-4 w-4" />
               )}
               {isCompleted ? "Completed — continue" : "Mark complete & continue"}
             </Button>
 
             {next ? (
-              <Link
-                href={lessonHref(next)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent touch-target"
+              <Button
+                variant="outline"
+                render={<Link href={lessonHref(next)} />}
+                className="w-full touch-target sm:w-auto"
               >
                 Next <ArrowRight className="h-4 w-4" />
-              </Link>
+              </Button>
             ) : (
               <span className="hidden sm:block" />
             )}
           </nav>
 
-          <aside className="rounded-xl border bg-muted/30 p-4">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {/* A sunken well, which is what the Card `sunken` variant is for — the
+              outline is secondary to the lesson itself. */}
+          <Card variant="sunken" size="sm" className="gap-3">
+            <h2 className="eyebrow">
               Course outline
             </h2>
             <ol className="space-y-1">
@@ -253,8 +261,10 @@ export default function LessonPage() {
                   <li key={l._id}>
                     <Link
                       href={lessonHref(l)}
-                      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
-                        active ? "bg-background font-medium shadow-sm" : "hover:bg-background/60"
+                      className={`relative flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm ${
+                        active
+                          ? "font-semibold text-foreground after:absolute after:inset-y-1.5 after:left-0 after:w-0.5 after:bg-brand"
+                          : "text-muted-foreground hover:bg-surface-raised/60 hover:text-foreground"
                       }`}
                     >
                       {completed.has(l._id) ? (
@@ -270,7 +280,7 @@ export default function LessonPage() {
                 );
               })}
             </ol>
-          </aside>
+          </Card>
         </>
       )}
     </div>

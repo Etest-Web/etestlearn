@@ -13,6 +13,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -27,16 +29,16 @@ export default function DashboardPage() {
     return (
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-8">
-          <Skeleton className="h-[240px] w-full rounded-3xl" />
-          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-[240px] w-full rounded-sm" />
+          <Skeleton className="h-20 w-full rounded-sm" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Skeleton className="h-48 rounded-2xl" />
-            <Skeleton className="h-48 rounded-2xl" />
-            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-48 rounded-sm" />
+            <Skeleton className="h-48 rounded-sm" />
+            <Skeleton className="h-48 rounded-sm" />
           </div >
         </div >
         <div className="hidden xl:block">
-          <Skeleton className="h-full w-full rounded-3xl" />
+          <Skeleton className="h-full w-full rounded-sm" />
         </div >
       </div >
     );
@@ -64,23 +66,29 @@ export default function DashboardPage() {
       <div className="flex min-w-0 flex-col gap-8">
         
         {/* Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-brand-ink p-6 text-brand-foreground shadow-xl sm:p-8 md:p-12">
+        {/* The hero plate is the one saturated surface on the page, so it needs no
+            shadow at all — the gradient already separates it from the paper. */}
+        <div className="relative overflow-hidden rounded-sm bg-gradient-to-br from-brand to-brand-ink p-6 text-brand-foreground sm:p-8 md:p-12">
           <div className="relative z-10 max-w-lg">
-            <span className="text-xs font-bold uppercase tracking-widest opacity-80 mb-3 block">
-              Online Course
-            </span >
-            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold leading-tight mb-6 md:mb-8">
-              Sharpen Your Skills with Professional Online Courses
-            </h1>
-            <Link 
-              href="/courses" 
-              className="inline-flex items-center gap-3 bg-brand-foreground text-brand rounded-full pl-6 pr-2 py-2 font-semibold hover:bg-brand-foreground/90 transition-all active:scale-95"
-            >
-              Join Now
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-foreground text-brand">
-                <ArrowRight size={16} />
-              </span >
-            </Link>
+            {/* The plate inverts PageHeader's own colour choices, so the eyebrow
+                and title are re-pointed at the foreground-on-brand pair. The
+                component still owns the voice — this only re-tints it. */}
+            <PageHeader
+              eyebrow="Online Course"
+              title="Sharpen Your Skills with Professional Online Courses"
+              className="gap-6 sm:flex-col [&_[data-slot=page-header-eyebrow]]:text-brand-foreground/75 [&_[data-slot=page-header-title]]:text-brand-foreground [&_[data-slot=page-header-actions]]:justify-start"
+              actions={
+                <Link
+                  href="/courses"
+                  className="inline-flex items-center gap-3 rounded-sm bg-brand-foreground py-2 pl-6 pr-2 font-semibold text-brand transition-colors hover:bg-brand-foreground/90 active:scale-95"
+                >
+                  Join Now
+                  <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-foreground text-brand">
+                    <ArrowRight size={16} />
+                  </span >
+                </Link>
+              }
+            />
           </div >
           {/* Decorative Elements */}
           <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-20 hidden md:block">
@@ -91,13 +99,13 @@ export default function DashboardPage() {
         {/* Quick Stats Pills */}
         <div className="flex flex-wrap gap-4">
           {enrolledCourses.slice(0, 3).map((item, idx) => (
-            <div key={item.course._id} className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-card p-4 shadow-sm border border-border">
+            <div key={item.course._id} className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-sm border border-rule bg-card p-4">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0 flex-1">
-                <div className={`w-12 h-12 flex items-center justify-center rounded-xl ${progressColors[idx % 3]}`}>
+                <div className={`w-12 h-12 flex items-center justify-center rounded-sm ${progressColors[idx % 3]}`}>
                   <Play className={iconColors[idx % 3]} size={20} fill="currentColor" />
                 </div >
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="tabular text-xs font-semibold text-muted-foreground">
                     {Math.round(item.enrollment.progressPercent)}% watched
                   </span >
                   <span className="text-sm font-bold text-foreground">
@@ -109,21 +117,25 @@ export default function DashboardPage() {
             </div >
           ))}
           {enrolledCourses.length === 0 && (
-            <div className="w-full text-center py-6 bg-muted rounded-2xl border border-dashed border-border">
-              <p className="text-sm text-muted-foreground font-medium">No courses started yet. Browse catalog to enroll!</p>
-            </div >
+            <EmptyState
+              icon={Play}
+              title="No courses started yet"
+              description="Browse the catalog and enrol in a course to start making progress."
+              action={<Button render={<Link href="/courses" />}>Browse the catalog</Button>}
+              className="w-full"
+            />
           )}
         </div >
 
         {/* Continue Watching Row */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground">Continue Watching</h2>
-            <div className="flex gap-2">
-              <button aria-label="Previous courses" className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="rule-heading eyebrow flex-1">Continue Watching</h2>
+            <div className="flex shrink-0 gap-2">
+              <button aria-label="Previous courses" className="w-9 h-9 rounded-sm border border-rule flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              <button aria-label="Next courses" className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-brand-foreground shadow-sm hover:opacity-90 transition-opacity">
+              <button aria-label="Next courses" className="w-9 h-9 rounded-sm bg-brand flex items-center justify-center text-brand-foreground hover:bg-brand/90 transition-colors">
                 <ChevronRight size={16} />
               </button>
             </div >
@@ -132,26 +144,26 @@ export default function DashboardPage() {
           <div className="flex overflow-x-auto gap-4 pb-4 snap-x sm:gap-6">
             {enrolledCourses.length > 0 ? (
               enrolledCourses.map((item) => (
-                <div key={item.course._id} className="w-[72%] max-w-[280px] min-w-0 shrink-0 sm:w-[280px] snap-start flex flex-col bg-card rounded-2xl shadow-sm border border-border overflow-hidden group">
-                  <div className="h-36 bg-muted relative group cursor-pointer overflow-hidden">
+                <div key={item.course._id} className="w-[72%] max-w-[280px] min-w-0 shrink-0 sm:w-[280px] snap-start flex flex-col rounded-sm border border-rule bg-card overflow-hidden group">
+                  <div className="h-36 bg-surface-sunken relative group cursor-pointer overflow-hidden">
                     <img 
                       src={item.course.thumbnailUrl || "/hero-backdrop.jpg"} 
                       alt="" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
-                    <button aria-label={`Add ${item.course.title} to favourites`} className="absolute top-3 right-3 text-white bg-black/20 p-2 rounded-full hover:bg-destructive transition-colors"><Heart size={16} /></button>
+                    <button aria-label={`Add ${item.course.title} to favourites`} className="absolute top-3 right-3 text-white bg-black/20 p-2 rounded-sm hover:bg-destructive transition-colors"><Heart size={16} /></button>
                   </div >
                   <div className="p-4 flex flex-col gap-2 relative">
                     {item.course.category && (
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded w-fit inline-block mb-1">
+                      <Badge variant="secondary" className="mb-1">
                         {item.course.category}
-                      </span >
+                      </Badge>
                     )}
                     <h3 className="font-bold text-foreground leading-snug line-clamp-2 min-h-[44px]">
                       {item.course.title}
                     </h3>
-                    <div className="flex items-center gap-2 mt-2 pt-4 border-t border-border">
-                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold">
+                    <div className="flex items-center gap-2 mt-2 pt-4 border-t border-rule">
+                      <div className="w-6 h-6 rounded-full bg-surface-sunken flex items-center justify-center text-[11px] font-bold">
                         {item.course.instructorId.substring(0,2).toUpperCase()}
                       </div >
                       <div className="flex min-w-0 flex-col">
@@ -163,25 +175,31 @@ export default function DashboardPage() {
                 </div >
               ))
             ) : (
-                <div className="text-sm text-muted-foreground py-12 px-6">
-                  You are not enrolled in any courses to continue watching.
-                </div >
+                <EmptyState
+                  icon={BookOpen}
+                  title="Nothing to continue yet"
+                  description="You are not enrolled in any courses yet — enrol in one and your lessons appear here."
+                  action={<Button render={<Link href="/courses" />}>Browse the catalog</Button>}
+                  className="w-full"
+                />
             )}
           </div >
         </div >
 
         {/* Your Lesson List */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground">Your Lessons</h2>
-            <Link href="/dashboard/courses" className="text-sm font-semibold text-brand hover:underline">See all</Link>
-          </div >
-          
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-2 overflow-hidden">
+          <h2 className="rule-heading eyebrow mb-4">
+            Your Lessons
+            <Link href="/dashboard/courses" className="ml-auto text-brand hover:underline">See all</Link>
+          </h2>
+
+          {/* The Card is the surface and nothing inside it draws a second border:
+              the table head is a sunken well and the rows are divided by rules. */}
+          <Card className="gap-0 overflow-hidden p-0">
             <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] text-left border-collapse">
-              <thead >
-                <tr className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border">
+              <thead className="bg-surface-sunken">
+                <tr className="border-b border-rule">
                   <th className="font-normal px-4 py-3">Course</th>
                   <th className="font-normal px-4 py-3">Progress</th>
                   <th className="font-normal px-4 py-3">Lessons</th>
@@ -190,10 +208,10 @@ export default function DashboardPage() {
               </thead >
               <tbody >
                 {enrolledCourses.slice(0, 5).map((item) => (
-                  <tr key={item.course._id} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
+                  <tr key={item.course._id} className="border-b border-rule last:border-0 hover:bg-surface-sunken transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold text-xs">
+                         <div className="w-10 h-10 rounded-full bg-surface-sunken flex items-center justify-center font-bold text-xs">
                            {item.course.title.charAt(0)}
                          </div >
                          <div className="flex flex-col">
@@ -209,12 +227,12 @@ export default function DashboardPage() {
                       </div >
                     </td >
                     <td className="px-4 py-3">
-                      <span className="text-sm font-bold text-foreground">
+                      <span className="tabular text-sm font-bold text-foreground">
                         {item.enrollment.completedLessonIds?.length || 0} / {item.course.id ? item.course.id.length : 0}
                       </span >
                     </td >
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/dashboard/courses/${item.course.slug}`} aria-label={`Open ${item.course.title}`} className="inline-flex w-9 h-9 rounded-full border border-border items-center justify-center text-brand hover:bg-brand hover:text-brand-foreground transition-all">
+                      <Link href={`/dashboard/courses/${item.course.slug}`} aria-label={`Open ${item.course.title}`} className="inline-flex w-9 h-9 rounded-sm border border-rule items-center justify-center text-brand hover:bg-brand hover:border-brand hover:text-brand-foreground transition-colors">
                          <ArrowRight size={14} />
                       </Link>
                     </td >
@@ -223,7 +241,7 @@ export default function DashboardPage() {
               </tbody >
             </table >
             </div >
-          </div >
+          </Card>
         </div >
       </div >
 
@@ -231,9 +249,9 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         
         {/* Main Stat Card - Overall Progress */}
-        <Card className="rounded-[32px] p-6 shadow-sm border border-border">
+        <Card>
           <div className="w-full flex justify-between items-center mb-6">
-            <CardTitle className="font-bold text-lg text-foreground">Your Progress</CardTitle>
+            <CardTitle>Your Progress</CardTitle>
             <Button variant="ghost" size="icon" className="text-muted-foreground">
               <MoreVertical size={16} />
             </Button>
@@ -254,16 +272,16 @@ export default function DashboardPage() {
                 className="text-brand transition-all duration-1000 ease-out" 
               />
             </svg>
-            <div className="absolute inset-0 m-auto w-24 h-24 rounded-full overflow-hidden bg-muted border-4 border-card shadow-sm">
+            <div className="absolute inset-0 m-auto w-24 h-24 rounded-full overflow-hidden bg-surface-sunken border-4 border-card">
                 <img src={user?.imageUrl || "https://i.pravatar.cc/100"} alt="User Avatar" className="w-full h-full object-cover" />
             </div >
-            <div className="absolute -top-2 -right-2 bg-brand text-brand-foreground text-[11px] font-bold px-2 py-0.5 rounded-full shadow-md">
+            <Badge className="tabular absolute -top-2 -right-2 px-2">
                {overallProgress}%
-            </div >
+            </Badge>
           </div >
           
           <h2 className="text-2xl font-bold text-foreground mb-1 text-center tracking-tight">Welcome back, <span className="text-brand">{user?.firstName || "Learner"}</span>! 🔥</h2>
-          <p className="text-xs text-muted-foreground text-center mb-8 px-4">
+          <p className="tabular text-xs text-muted-foreground text-center mb-8 px-4">
             {statistics.completedCourses} courses completed, {statistics.totalLessonsCompleted} lessons done
           </p>
           
@@ -279,12 +297,15 @@ export default function DashboardPage() {
                 </defs>
                 <RechartsTooltip 
                   cursor={{fill: 'transparent'}} 
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: 'none', 
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-                    backgroundColor: 'var(--popover)', 
-                    color: 'var(--popover-foreground)' 
+                  contentStyle={{
+                    // The chart tooltip is the one genuinely floating layer on this
+                    // page, so it takes the overlay elevation token rather than a
+                    // hand-written shadow.
+                    borderRadius: 'var(--radius-md)',
+                    border: 'none',
+                    boxShadow: 'var(--elevation-overlay)',
+                    backgroundColor: 'var(--popover)',
+                    color: 'var(--popover-foreground)'
                   }}
                   formatter={(value: number, name: string) => [value, name === 'lessonsCompleted' ? 'Lessons' : name === 'quizzesPassed' ? 'Quizzes' : 'Hours']}
                 />
@@ -324,7 +345,7 @@ export default function DashboardPage() {
             label="Study Time"
             value={`${statistics.totalStudyHours}h`}
             subValue={`${statistics.totalStudyMinutes}m total`}
-            iconBg="bg-muted"
+            iconBg="bg-surface-sunken"
           />
           <StatCard 
             icon={<Flame className="w-5 h-5 text-destructive" />}
@@ -337,9 +358,9 @@ export default function DashboardPage() {
 
         {/* Goals Section */}
         {(userGoals && userGoals.length > 0) && (
-          <Card className="rounded-[32px] p-6 shadow-sm border border-border">
+          <Card>
             <div className="flex items-center justify-between mb-6">
-              <CardTitle className="font-bold text-lg text-foreground flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-brand" />
                 Your Goals
               </CardTitle>
@@ -363,13 +384,13 @@ export default function DashboardPage() {
 
         {/* Next Milestone */}
         {statistics.nextCertificateCourse && (
-          <Card className="rounded-[32px] p-6 shadow-sm border border-border bg-gradient-to-br from-primary/5 to-warning/5">
+          <Card className="bg-gradient-to-br from-primary/5 to-warning/5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-warning" />
                 <span className="font-bold text-lg text-foreground">Next Certificate</span >
               </div >
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="tabular">
                 {statistics.nextCertificateCourse.progressPercent}%
               </Badge>
             </div >
@@ -377,7 +398,7 @@ export default function DashboardPage() {
             <Progress value={statistics.nextCertificateCourse.progressPercent} className="h-2 mb-3" />
             <div className="flex flex-wrap gap-1">
               {statistics.nextCertificateCourse.blockers.map((blocker, i) => (
-                <Badge key={i} variant="outline" className="text-[10px]">
+                <Badge key={i} variant="outline">
                   {blocker}
                 </Badge>
               ))}
@@ -386,23 +407,23 @@ export default function DashboardPage() {
         )}
 
         {/* Weekly Stats Summary */}
-        <Card className="rounded-[32px] p-6 shadow-sm border border-border">
-          <CardTitle className="font-bold text-lg text-foreground mb-4 flex items-center gap-2">
+        <Card>
+          <CardTitle className="mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-brand" />
             This Week
           </CardTitle>
           <div className="grid grid-cols-3 gap-4">
-            <div className="p-3 bg-muted rounded-xl text-center">
-              <div className="text-xl font-bold text-foreground">{statistics.lessonsThisWeek}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Lessons</div>
+            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+              <div className="tabular text-xl font-bold text-foreground">{statistics.lessonsThisWeek}</div>
+              <div className="eyebrow">Lessons</div>
             </div >
-            <div className="p-3 bg-muted rounded-xl text-center">
-              <div className="text-xl font-bold text-foreground">{statistics.quizzesThisWeek}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Quizzes</div>
+            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+              <div className="tabular text-xl font-bold text-foreground">{statistics.quizzesThisWeek}</div>
+              <div className="eyebrow">Quizzes</div>
             </div >
-            <div className="p-3 bg-muted rounded-xl text-center">
-              <div className="text-xl font-bold text-foreground">{statistics.studyHoursThisWeek}h</div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Study</div>
+            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+              <div className="tabular text-xl font-bold text-foreground">{statistics.studyHoursThisWeek}h</div>
+              <div className="eyebrow">Study</div>
             </div >
           </div >
         </Card>
@@ -420,15 +441,15 @@ function StatCard({ icon, label, value, subValue, iconBg }: {
   iconBg: string;
 }) {
   return (
-    <Card className="rounded-2xl p-4 shadow-sm border border-border">
+    <Card size="sm">
       <div className="flex flex-col gap-1">
-        <div className={`w-10 h-10 flex items-center justify-center rounded-xl ${iconBg}`}>
+        <div className={`w-10 h-10 flex items-center justify-center rounded-sm ${iconBg}`}>
           {icon}
         </div >
         <div className="mt-3">
-          <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
-          <p className="text-[10px] text-muted-foreground">{subValue}</p>
+          <p className="eyebrow">{label}</p>
+          <p className="tabular text-2xl font-bold text-foreground">{value}</p>
+          <p className="tabular text-[11px] text-muted-foreground">{subValue}</p>
         </div >
       </div >
     </Card>
@@ -455,19 +476,19 @@ function GoalProgressCard({ goal }: { goal: any }) {
   };
 
   return (
-    <div className="bg-muted/50 rounded-xl p-4">
+    <div className="rounded-sm bg-surface-sunken p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <span className="w-8 h-8 rounded-sm bg-primary/10 flex items-center justify-center text-primary">
             {typeIcons[goal.type] || <Target className="w-4 h-4" />}
           </span >
           <span className="text-sm font-semibold text-foreground">{typeLabels[goal.type] || goal.type}</span>
         </div >
-        <Badge variant="secondary" className="text-[10px]">
+        <Badge variant="secondary">
           {goal.period}
         </Badge>
       </div >
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+      <div className="tabular flex items-center justify-between text-xs text-muted-foreground mb-2">
         <span>{goal.current} / {goal.target}</span>
         <span>{goal.progressPercent}%</span>
       </div >

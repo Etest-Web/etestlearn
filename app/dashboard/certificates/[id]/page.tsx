@@ -40,7 +40,7 @@ export default function CertificateDetailPage() {
     return (
       <div className="mx-auto max-w-3xl space-y-4 py-8">
         <Skeleton className="h-9 w-56" />
-        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-72 w-full rounded-sm" />
       </div>
     );
   }
@@ -59,17 +59,22 @@ export default function CertificateDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <Card className="border-2 border-border bg-card text-foreground shadow-lg print:border-0 print:shadow-none">
+      {/* A double frame, because a certificate is meant to read as a printed
+          sheet — but no shadow: the frame is the whole effect. */}
+      <Card className="border-2 border-rule print:border-0">
         <CardContent className="space-y-5 px-4 py-8 text-center sm:px-8 sm:py-10">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground sm:tracking-[0.35em]">
+          <p className="eyebrow">
             {revoked ? "Certificate of completion (revoked)" : "Certificate of completion"}
           </p>
 
           <div className="space-y-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+            {/* The certificate is a printed document rather than a page header,
+                so it keeps its centred layout and takes the display voice
+                directly rather than through PageHeader. */}
+            <h1 className="display-heading text-2xl text-balance sm:text-3xl">
               {cert.courseTitle}
             </h1>
-            <p className="text-sm text-muted-foreground">Awarded to</p>
+            <p className="eyebrow">Awarded to</p>
             {/* The previous version hardcoded "You" here because listMyCertificates
                 did not join the holder name. */}
             <p className="text-xl font-semibold tracking-tight">{cert.holderName}</p>
@@ -78,15 +83,15 @@ export default function CertificateDetailPage() {
             </p>
           </div>
 
-          <dl className="mx-auto grid max-w-md grid-cols-1 gap-3 border-t pt-5 text-left sm:grid-cols-2">
+          <dl className="mx-auto grid max-w-md grid-cols-1 gap-3 border-t border-rule pt-5 text-left sm:grid-cols-2">
             <div>
-              <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              <dt className="eyebrow">
                 Certificate ID
               </dt>
               <dd className="font-mono text-xs">{cert.serial ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              <dt className="eyebrow">
                 Issued by
               </dt>
               <dd className="text-xs">{cert.issuerName ?? "Glypha Learn"}</dd>
@@ -94,7 +99,7 @@ export default function CertificateDetailPage() {
           </dl>
 
           {revoked && (
-            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <p className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               This certificate was revoked
               {cert.revocationReason ? `: ${cert.revocationReason}` : "."} Contact
               the course instructor if you think this is a mistake.
@@ -106,21 +111,21 @@ export default function CertificateDetailPage() {
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap print:hidden">
         {cert.pdfUrl && !revoked && (
           <Button size="sm" render={<a href={cert.pdfUrl} target="_blank" rel="noopener noreferrer" />}>
-            <Download className="mr-2 h-4 w-4" /> Download PDF
+            <Download className="h-4 w-4" /> Download PDF
           </Button>
         )}
         <Button size="sm" variant="outline" onClick={copyLink}>
-          <Copy className="mr-2 h-4 w-4" />
+          <Copy className="h-4 w-4" />
           {copied ? "Link copied" : "Copy verification link"}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Print
+          <Printer className="h-4 w-4" /> Print
         </Button>
         <Link
           href={verifyPath}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-[#945DA3] hover:underline touch-target"
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-brand hover:underline touch-target"
         >
           <BadgeCheck className="h-4 w-4" /> Public verification page
         </Link>

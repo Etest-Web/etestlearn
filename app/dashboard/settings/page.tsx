@@ -9,6 +9,7 @@ import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
+import { PageHeader } from "@/components/ui/page-header";
 import { Loader2, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,7 +73,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto w-full space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+      <PageHeader title="Settings" />
 
       <Card>
         <CardHeader>
@@ -109,11 +110,11 @@ export default function SettingsPage() {
                 >
                   {isUploadingAvatar ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
                     </>
                   ) : (
                     <>
-                      <Upload className="mr-2 h-4 w-4" /> Change photo
+                      <Upload className="h-4 w-4" /> Change photo
                     </>
                   )}
                 </Button>
@@ -142,11 +143,11 @@ export default function SettingsPage() {
             <Button type="submit" disabled={isSaving || !currentUser}>
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving...
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" /> Save changes
+                  <Save className="h-4 w-4" /> Save changes
                 </>
               )}
             </Button>

@@ -9,9 +9,11 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  EmptyState,
   Input,
   Button,
 } from "@/components/ui";
+import { MessagesSquare } from "lucide-react";
 
 export default function CourseDiscussionsPage() {
   const params = useParams<{ slug: string }>();
@@ -80,15 +82,18 @@ export default function CourseDiscussionsPage() {
       <div className="w-full md:w-1/3 space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">
-              Threads for {courseData.course.title}
-            </CardTitle>
+            <CardTitle>Threads for {courseData.course.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {threadList.length === 0 ? (
-              <p className="text-muted-foreground text-xs">
-                No discussions yet. Start the first thread.
-              </p>
+              /* Inside a Card the Card is the boundary, so the empty state drops
+                 its own rules rather than drawing a box inside a box. */
+              <EmptyState
+                icon={MessagesSquare}
+                title="No discussions yet"
+                description="Start the first thread."
+                className="border-y-0 px-0 py-8"
+              />
             ) : (
               <ul className="space-y-1">
                 {threadList.map((t: any) => (
@@ -96,10 +101,10 @@ export default function CourseDiscussionsPage() {
                     <button
                       type="button"
                       onClick={() => setSelectedThreadId(t._id)}
-                      className={`w-full rounded-md px-2 py-1.5 text-left text-xs ${
+                      className={`relative w-full rounded-sm px-2 py-1.5 text-left text-xs ${
                         selectedThreadId === t._id
-                          ? "bg-primary/10 text-primary"
-                          : "hover:bg-muted"
+                          ? "font-semibold text-foreground after:absolute after:inset-y-1 after:left-0 after:w-0.5 after:bg-brand"
+                          : "text-muted-foreground hover:bg-surface-sunken hover:text-foreground"
                       }`}
                     >
                       {t.title}
@@ -113,9 +118,7 @@ export default function CourseDiscussionsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">
-              New thread
-            </CardTitle>
+            <CardTitle>New thread</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Input
@@ -133,7 +136,7 @@ export default function CourseDiscussionsPage() {
       <div className="w-full md:w-2/3 space-y-4">
         <Card className="h-full">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">
+            <CardTitle>
               {selectedThreadId
                 ? "Thread messages"
                 : "Select a thread to view messages"}
@@ -142,16 +145,19 @@ export default function CourseDiscussionsPage() {
           <CardContent className="flex h-full flex-col gap-3 text-sm">
             {selectedThreadId && (
               <>
-                <div className="flex-1 space-y-2 overflow-y-auto rounded-md border px-3 py-2">
+                <div className="flex-1 space-y-2 overflow-y-auto rounded-sm border border-rule px-3 py-2">
                   {messageList.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No messages yet. Be the first to reply.
-                    </p>
+                    <EmptyState
+                      icon={MessagesSquare}
+                      title="No messages yet"
+                      description="Be the first to reply."
+                      className="border-y-0 px-0 py-8"
+                    />
                   ) : (
                     messageList.map((m: any) => (
                       <div
                         key={m._id}
-                        className="rounded-md bg-muted px-2 py-1.5 text-xs"
+                        className="rounded-sm bg-surface-sunken px-2 py-1.5 text-xs"
                       >
                         {m.body}
                       </div>
@@ -180,4 +186,3 @@ export default function CourseDiscussionsPage() {
     </div>
   );
 }
-

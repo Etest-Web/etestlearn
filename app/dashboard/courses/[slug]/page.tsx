@@ -4,8 +4,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress } from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, PageHeader, Progress } from "@/components/ui";
 import { useRouter, useParams } from "next/navigation";
+import { FileText } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DashboardCoursePage() {
@@ -96,71 +97,76 @@ export default function DashboardCoursePage() {
           <div className="flex flex-wrap gap-2">
             {course.category && <Badge variant="secondary">{course.category}</Badge>}
             {course.level && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline">
                 {course.level}
               </Badge>
             )}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            {course.title}
-          </h1>
-          <p className="text-sm text-muted-foreground">{course.description}</p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            {enrollment ? (
-              <>
-                {continueHref() ? (
-                  <Button size="sm" render={<Link href={continueHref()!} />}>
-                    Continue learning
-                  </Button>
-                ) : null}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Progress</span>
-                  <Progress value={progress} className="w-32" />
-                  <span>{Math.round(progress)}%</span>
-                </div>
-                {certStatus?.certificate ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    render={<Link href={`/dashboard/certificates/${certStatus.certificate._id}`} />}
-                  >
-                    {certStatus.certificate.revokedAt
-                      ? "View revoked certificate"
-                      : "View certificate"}
-                  </Button>
-                ) : certStatus?.completion?.eligible ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleIssueCertificate}
-                    disabled={isIssuing}
-                  >
-                    {isIssuing ? "Generating..." : "Get certificate"}
-                  </Button>
-                ) : certStatus?.completion ? (
-                  <p className="text-xs text-muted-foreground">
-                    To earn your certificate:{" "}
-                    {certStatus.completion.blockers.join(" ")}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <Button size="sm" onClick={handleEnroll} disabled={isEnrolling}>
-                {isEnrolling ? "Enrolling..." : "Enroll in this course"}
-              </Button>
-            )}
-          </div>
+          {/* The header sits in a narrow column, so its action slot is pinned
+              back to the start rather than pushed to the far edge. */}
+          <PageHeader
+            title={course.title}
+            description={course.description}
+            className="[&_[data-slot=page-header-actions]]:justify-start"
+            actions={
+            <div className="flex flex-wrap items-center gap-3">
+              {enrollment ? (
+                <>
+                  {continueHref() ? (
+                    <Button size="sm" render={<Link href={continueHref()!} />}>
+                      Continue learning
+                    </Button>
+                  ) : null}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Progress</span>
+                    <Progress value={progress} className="w-32" />
+                    <span className="tabular">{Math.round(progress)}%</span>
+                  </div>
+                  {certStatus?.certificate ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      render={<Link href={`/dashboard/certificates/${certStatus.certificate._id}`} />}
+                    >
+                      {certStatus.certificate.revokedAt
+                        ? "View revoked certificate"
+                        : "View certificate"}
+                    </Button>
+                  ) : certStatus?.completion?.eligible ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleIssueCertificate}
+                      disabled={isIssuing}
+                    >
+                      {isIssuing ? "Generating..." : "Get certificate"}
+                    </Button>
+                  ) : certStatus?.completion ? (
+                    <p className="text-xs text-muted-foreground">
+                      To earn your certificate:{" "}
+                      {certStatus.completion.blockers.join(" ")}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <Button size="sm" onClick={handleEnroll} disabled={isEnrolling}>
+                  {isEnrolling ? "Enrolling..." : "Enroll in this course"}
+                </Button>
+              )}
+            </div>
+            }
+          />
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">
+            <CardTitle>
               Course info
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>
-              Lessons: <span className="font-medium text-foreground">{lessons.length}</span>
+              Lessons: <span className="tabular font-medium text-foreground">{lessons.length}</span>
             </p>
             <p className="text-xs">
               A focused learning space where you&apos;ll eventually see notes,
@@ -170,7 +176,7 @@ export default function DashboardCoursePage() {
               Join{" "}
               <Link
                 href={`/dashboard/courses/${course.slug}/discussions`}
-                className="text-primary underline"
+                className="link-quiet text-primary"
               >
                 course discussions
               </Link>{" "}
@@ -181,16 +187,16 @@ export default function DashboardCoursePage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-foreground">Lesson outline</h2>
+        <h2 className="rule-heading eyebrow">Lesson outline</h2>
         {lessons.length === 0 ? (
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              Lessons for this course haven&apos;t been added yet.
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={FileText}
+            title="No lessons yet"
+            description="Lessons for this course haven't been added yet."
+          />
         ) : (
           <Card>
-            <CardContent className="divide-y px-0">
+            <CardContent className="divide-y divide-rule px-0">
               {lessons.map((lesson: any, index: number) => {
                 const href =
                   lesson.contentType === "quiz"
@@ -203,17 +209,15 @@ export default function DashboardCoursePage() {
                   >
                     <div>
                       <p className="font-medium">
-                        {index + 1}.{" "}
+                        <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
                         <Link href={href} className="text-primary hover:underline">
                           {lesson.title}
                         </Link>
                       </p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {lesson.contentType}
-                      </p>
+                      <p className="eyebrow">{lesson.contentType}</p>
                     </div>
                     {lesson.durationMinutes && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="tabular text-xs text-muted-foreground">
                         {lesson.durationMinutes} min
                       </span>
                     )}

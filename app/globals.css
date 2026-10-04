@@ -42,13 +42,50 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  /* ── Editorial additions ────────────────────────────────────────────────
+     `--rule` and `--rule-strong` are the hairline dividers this design leans
+     on for structure. They are separate from `--border` on purpose: an
+     editorial layout uses a visible rule as a compositional element, so
+     borrowing `--border` for it would force rules to be invisible everywhere
+     else to stay subtle. `--surface-sunken` is for wells and table headers —
+     a recessed plane, not a raised one. */
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+
+  /* Radius collapses to a hairline. Everything at or above `--radius-lg`
+     resolves to 3–6px: the scale keeps its ordering so `rounded-sm` still
+     reads as tighter than `rounded-4xl`, but the whole system sits inside a
+     range that reads as printed rather than moulded. This is what makes every
+     existing `rounded-2xl` / `rounded-3xl` in the codebase sharp without
+     touching a single page file. */
+  --radius-sm: calc(var(--radius) * 0.35);
+  --radius-md: calc(var(--radius) * 0.55);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.1);
+  --radius-2xl: calc(var(--radius) * 1.25);
+  --radius-3xl: calc(var(--radius) * 1.4);
+  --radius-4xl: calc(var(--radius) * 1.5);
+
+  /* ── Typographic scale ──────────────────────────────────────────────────
+     Display type is condensed (Bebas Neue) and needs positive tracking plus
+     leading well below 1 to sit tight without the caps colliding. Body copy
+     wants the opposite. Both are tokens so a heading is never re-specified by
+     hand at a call site. */
+  --tracking-editorial: 0.16em;
+  --tracking-editorial-wide: 0.28em;
+  --leading-display: 0.86;
+  --leading-display-tight: 0.94;
+  --leading-body: 1.6;
+
+  /* ── Elevation ──────────────────────────────────────────────────────────
+     Two steps only. An editorial surface is separated by a rule, not by a
+     shadow, so `--elevation-raised` is barely there and `--elevation-overlay`
+     exists solely for layers that float above the page (dialog, sheet,
+     popover) where a shadow is the only thing communicating that. */
+  --elevation-raised: 0 1px 2px -1px oklch(14.5% 0.012 318.82 / 0.07);
+  --elevation-overlay: 0 12px 32px -8px oklch(14.5% 0.012 318.82 / 0.16);
 }
 
 :root {
@@ -93,7 +130,19 @@
   --chart-3: oklch(44% 0.109 318.82);
   --chart-4: oklch(57% 0.108 84.92);
   --chart-5: oklch(72% 0.102 318.82);
-  --radius: 0.625rem;
+  --radius: 0.25rem;
+  /* ── Editorial surfaces ─────────────────────────────────────────────────
+     The neutrals above are a hair cooler than the brand cast. These three
+     carry a fraction more of it, which is what makes a page read as paper
+     rather than as a white div: `--surface-sunken` for wells and table
+     heads, `--surface-raised` for a plane that sits above the page without
+     resorting to a shadow, and a warm off-white background so pure white is
+     reserved for the cards that sit on it. */
+  --rule: oklch(88% 0.014 318.82);
+  --rule-strong: oklch(74% 0.02 318.82);
+  --surface-sunken: oklch(98% 0.009 318.82);
+  --surface-raised: oklch(100% 0.004 318.82);
+  --background: oklch(99.2% 0.005 318.82);
   --sidebar: oklch(98.5% 0.007 318.82);
   --sidebar-foreground: oklch(14.5% 0.012 318.82);
   --sidebar-primary: oklch(56.556% 0.121 318.82);
@@ -102,6 +151,14 @@
   --sidebar-accent-foreground: oklch(20.5% 0.011 318.82);
   --sidebar-border: oklch(92.2% 0.01 318.82);
   --sidebar-ring: oklch(56.556% 0.121 318.82);
+
+  /* Dark rules sit at a lower alpha than light rules rather than a different
+     hue: on a near-black surface, opacity is the only lever that keeps a
+     hairline visible without it turning into a hard grey line. */
+  --rule: oklch(100% 0 0 / 14%);
+  --rule-strong: oklch(100% 0 0 / 28%);
+  --surface-sunken: oklch(17.5% 0.011 318.82);
+  --surface-raised: oklch(23% 0.012 318.82);
 }
 
 .dark {
@@ -163,6 +220,86 @@
 @keyframes marquee {
   to {
     transform: translateX(-50%);
+  }
+}
+
+@layer utilities {
+  /* ── Editorial vocabulary ────────────────────────────────────────────────
+     These exist so the treatments below are written once. Each was previously
+     re-specified by hand at every call site, which is how a codebase drifts
+     into looking assembled rather than designed. */
+
+  /* Small uppercase label that sits above a heading or a group of fields.
+     The condensed face plus wide tracking is the single strongest signal that
+     this is a printed layout rather than a dashboard. */
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: var(--tracking-editorial-wide);
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Display heading. `text-balance` keeps a two-line headline from ragging
+     badly, which is most of what separates a considered headline from a long
+     unbroken grey bar. */
+  .display-heading {
+    font-family: var(--font-display);
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-editorial);
+    text-wrap: balance;
+  }
+
+  .display-subheading {
+    font-family: var(--font-display);
+    line-height: var(--leading-display-tight);
+    letter-spacing: var(--tracking-editorial);
+  }
+
+  /* Section rule. In an editorial layout a full-width hairline with a label
+     sitting on it is the primary way content is divided — cheaper vertically
+     than nested cards and easier to scan. */
+  .rule-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .rule-heading::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  /* Numerals that must not shift width as they tick — counts, scores,
+     progress values, anything in a table column. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Underline that appears on hover rather than a colour change, so the link
+     is still discoverable without reading the colour. */
+  .link-quiet {
+    text-decoration: underline;
+    text-decoration-color: var(--rule-strong);
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color 120ms ease;
+  }
+  .link-quiet:hover {
+    text-decoration-color: currentColor;
+  }
+
+  /* Focus ring shared by every focusable surface. Centralised so a control
+     cannot ship with a subtly different ring from its neighbours. */
+  .focus-ring {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 

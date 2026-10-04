@@ -13,6 +13,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,7 +50,7 @@ export default function AdminApplicationsPage() {
   if (dbUser === undefined) {
     return (
       <div className="flex flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-9 w-64" />
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-48 w-full" />
@@ -62,15 +63,13 @@ export default function AdminApplicationsPage() {
   // Not admin
   if (!dbUser || dbUser.role !== "admin") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full bg-destructive/10 p-4">
-          <ShieldAlert className="h-10 w-10 text-destructive" />
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight">Admin Only</h2>
-        <p className="max-w-md text-sm text-muted-foreground">
-          This page is restricted to administrators. You do not have
-          permission to review instructor applications.
-        </p>
+      <div className="mx-auto w-full max-w-md">
+        <EmptyState
+          icon={ShieldAlert}
+          title="Admin only"
+          description="This page is restricted to administrators. You do not have permission to review instructor applications."
+          tone="warning"
+        />
       </div>
     );
   }
@@ -101,26 +100,29 @@ export default function AdminApplicationsPage() {
     }
   };
 
+  /* Every status carries an icon and a word, so the queue can be read without
+     relying on the tint: pending is a recessed plate, approved a hairline, and
+     rejected the one destructive plate in the set. */
   const statusBadge = (status: string) => {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="secondary" className="capitalize">
-            <Clock className="mr-1 h-3 w-3" />
+          <Badge variant="secondary">
+            <Clock className="h-3 w-3" />
             Pending
           </Badge>
         );
       case "approved":
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 capitalize">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
+          <Badge variant="outline">
+            <CheckCircle2 className="h-3 w-3" />
             Approved
           </Badge>
         );
       case "rejected":
         return (
-          <Badge variant="destructive" className="capitalize">
-            <XCircle className="mr-1 h-3 w-3" />
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3" />
             Rejected
           </Badge>
         );
@@ -130,18 +132,19 @@ export default function AdminApplicationsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Instructor Applications
-        </h2>
-        <p className="text-muted-foreground">
-          Review and manage instructor applications.
-        </p>
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Instructor Applications"
+        description="Review and manage instructor applications."
+      />
 
-      {/* Filter Tabs — wrap so all four stay reachable on a narrow phone */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filter strip — wraps so all four stay reachable on a narrow phone, and
+          reads as one control so the active filter is unambiguous. */}
+      <div
+        className="flex w-max gap-0.5 overflow-x-auto rounded-md border border-rule bg-surface-sunken p-0.5"
+        role="group"
+        aria-label="Filter applications by status"
+      >
         {(
           [
             { value: "pending", label: "Pending" },
@@ -152,8 +155,10 @@ export default function AdminApplicationsPage() {
         ).map((filter) => (
           <Button
             key={filter.label}
-            variant={statusFilter === filter.value ? "default" : "outline"}
+            aria-pressed={statusFilter === filter.value}
+            variant={statusFilter === filter.value ? "secondary" : "ghost"}
             size="sm"
+            className="rounded-sm"
             onClick={() => setStatusFilter(filter.value)}
           >
             {filter.label}
@@ -169,17 +174,16 @@ export default function AdminApplicationsPage() {
           ))}
         </div>
       ) : applications.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Briefcase className="h-10 w-10 text-muted-foreground mb-4" />
-            <h3 className="font-semibold">No applications found</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              {statusFilter
-                ? `No ${statusFilter} applications at the moment.`
-                : "No applications have been submitted yet."}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Briefcase}
+          title="No applications found"
+          description={
+            statusFilter
+              ? `No ${statusFilter} applications at the moment.`
+              : "No applications have been submitted yet."
+          }
+          tone="brand"
+        />
       ) : (
         <div className="grid gap-4">
           {applications.map((app) => (
@@ -187,12 +191,12 @@ export default function AdminApplicationsPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <CardTitle className="flex items-center gap-2">
+                      <User aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="truncate">{app.fullName}</span>
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-1">
-                      <Mail className="h-3 w-3 shrink-0" />
+                    <CardDescription className="mt-1 flex items-center gap-1">
+                      <Mail aria-hidden className="h-3 w-3 shrink-0" />
                       <span className="break-all">{app.email}</span>
                     </CardDescription>
                   </div>
@@ -210,7 +214,7 @@ export default function AdminApplicationsPage() {
                   <span className="font-medium text-muted-foreground">
                     Bio:
                   </span>
-                  <p className="mt-1 text-foreground whitespace-pre-wrap">
+                  <p className="mt-1 whitespace-pre-wrap leading-[1.6] text-foreground">
                     {app.bio}
                   </p>
                 </div>
@@ -218,46 +222,46 @@ export default function AdminApplicationsPage() {
                   <span className="font-medium text-muted-foreground">
                     Motivation:
                   </span>
-                  <p className="mt-1 text-foreground whitespace-pre-wrap">
+                  <p className="mt-1 whitespace-pre-wrap leading-[1.6] text-foreground">
                     {app.motivation}
                   </p>
                 </div>
                 {app.portfolioUrl && (
                   <div className="flex items-start gap-1">
-                    <ExternalLink className="h-3 w-3 shrink-0 mt-1 text-muted-foreground" />
+                    <ExternalLink aria-hidden className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" />
                     <a
                       href={app.portfolioUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary underline text-xs break-all"
+                      className="link-quiet break-all text-xs text-primary"
                     >
                       {app.portfolioUrl}
                     </a>
                   </div>
                 )}
-                <div className="text-xs text-muted-foreground">
-                  Applied:{" "}
+                <p className="tabular text-xs text-muted-foreground">
+                  Applied{" "}
                   {new Date(app.createdAt).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
                   })}
-                </div>
+                </p>
 
                 {/* Review Note (for already-reviewed) */}
                 {app.reviewNote && app.status !== "pending" && (
-                  <div className="rounded-md bg-muted/50 p-3 mt-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Admin note:
-                    </span>
-                    <p className="text-sm mt-1">{app.reviewNote}</p>
+                  <div className="mt-2 border border-rule bg-surface-sunken p-3">
+                    <span className="eyebrow">Admin note</span>
+                    <p className="mt-1 text-sm leading-[1.6]">{app.reviewNote}</p>
                   </div>
                 )}
               </CardContent>
 
-              {/* Review Actions (only for pending) */}
+              {/* Review Actions (only for pending). Approve and Reject keep
+                  their own words, icons and plates — the decision must not rest
+                  on a colour difference between two adjacent buttons. */}
               {app.status === "pending" && (
-                <CardFooter className="flex flex-col gap-3 border-t pt-4">
+                <CardFooter className="flex-col gap-3">
                   {reviewingId === app._id ? (
                     <>
                       <Textarea
@@ -289,8 +293,10 @@ export default function AdminApplicationsPage() {
                           }
                           disabled={isProcessing}
                         >
-                          {isProcessing && (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          {isProcessing ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <XCircle className="h-3 w-3" />
                           )}
                           Reject
                         </Button>
@@ -302,8 +308,10 @@ export default function AdminApplicationsPage() {
                           }
                           disabled={isProcessing}
                         >
-                          {isProcessing && (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          {isProcessing ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
                           )}
                           Approve
                         </Button>

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui";
 import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { slugify } from "@/lib/slug";
@@ -66,12 +67,19 @@ export default function CreateCoursePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
-      <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/instructor")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-2xl font-bold tracking-tight">Create New Course</h2>
-      </div>
+      {/* Back sits above the header rather than inside its action slot, so it
+          keeps its place at the leading edge of the page. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Back to my courses"
+        className="-ml-2 self-start"
+        onClick={() => router.push("/dashboard/instructor")}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+
+      <PageHeader title="Create New Course" />
 
       <Card>
         <form onSubmit={handleSubmit}>
@@ -81,8 +89,8 @@ export default function CreateCoursePage() {
               Provide the basic information for your new course. You can add more details and content later.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
+          <CardContent className="space-y-5">
+            <div className="space-y-1.5">
               <Label htmlFor="title">Course Title *</Label>
               <Input
                 id="title"
@@ -93,8 +101,8 @@ export default function CreateCoursePage() {
                 required
               />
             </div>
-            
-            <div className="space-y-2">
+
+            <div className="space-y-1.5">
               <Label htmlFor="slug">Course URL Slug *</Label>
               <Input
                 id="slug"
@@ -104,12 +112,12 @@ export default function CreateCoursePage() {
                 onChange={handleChange}
                 required
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs leading-[1.5] text-muted-foreground">
                 This will be used in the URL: /courses/{formData.slug || "..."}
               </p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="description">Short Description *</Label>
               <Textarea
                 id="description"
@@ -121,7 +129,7 @@ export default function CreateCoursePage() {
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>
               <Input
                 id="priceNaira"
@@ -132,8 +140,9 @@ export default function CreateCoursePage() {
                 placeholder="Leave empty for a free course (e.g. 15000)"
                 value={formData.priceNaira}
                 onChange={handleChange}
+                className="tabular"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs leading-[1.5] text-muted-foreground">
                 Paid courses are collected via Paystack. Leave blank to make this course free.
               </p>
             </div>

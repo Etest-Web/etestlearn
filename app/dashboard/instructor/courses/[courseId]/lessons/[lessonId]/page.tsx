@@ -10,6 +10,7 @@ import { Input } from "@/components/ui";
 import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
@@ -24,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -134,10 +135,10 @@ export default function LessonEditPage() {
     return (
       <div className="flex flex-col gap-6 w-full pb-20">
         <div className="flex flex-wrap items-center gap-4">
-          <Skeleton className="h-10 w-10" />
+          <Skeleton className="size-9.5" />
           <Skeleton className="h-8 w-48" />
         </div>
-        <Card className="mt-2">
+        <Card>
           <CardHeader>
             <Skeleton className="h-6 w-32 mb-2" />
             <Skeleton className="h-4 w-64" />
@@ -157,29 +158,42 @@ export default function LessonEditPage() {
 
   if (courseData === null || !lesson) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <h2 className="text-xl font-semibold">Lesson not found</h2>
-        <Button onClick={() => router.push(`/dashboard/instructor/courses/${courseId}`)}>
-          Back to Course Edit
-        </Button>
+      <div className="w-full pb-20">
+        <EmptyState
+          icon={SearchX}
+          title="Lesson not found"
+          description="This lesson does not exist, or it has been removed from the course."
+          action={
+            <Button onClick={() => router.push(`/dashboard/instructor/courses/${courseId}`)}>
+              Back to Course Edit
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
-      <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/instructor/courses/${courseId}`)}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold tracking-tight">Edit Lesson</h2>
-        </div>
-        <div className="flex gap-2">
+      {/* Back sits above the header rather than inside its action slot, so it
+          keeps its place at the leading edge of the page. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Back to course edit"
+        className="-ml-2 self-start"
+        onClick={() => router.push(`/dashboard/instructor/courses/${courseId}`)}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+
+      <PageHeader
+        title="Edit Lesson"
+        actions={
           <AlertDialog>
             <AlertDialogTrigger render={
               <Button variant="destructive" size="sm" type="button" disabled={isDeleting}>
-                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Delete
               </Button>
             } />
@@ -198,8 +212,8 @@ export default function LessonEditPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </div>
-      </div>
+        }
+      />
 
       <form onSubmit={handleSubmit}>
         <Card>
@@ -209,7 +223,7 @@ export default function LessonEditPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="title">Lesson Title *</Label>
                 <Input
                   id="title"
@@ -219,7 +233,7 @@ export default function LessonEditPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="durationMinutes">Duration (Minutes)</Label>
                 <Input
                   id="durationMinutes"
@@ -229,11 +243,12 @@ export default function LessonEditPage() {
                   value={formData.durationMinutes}
                   onChange={handleChange}
                   placeholder="e.g. 15"
+                  className="tabular"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="contentType">Content Type</Label>
               <Select
                 value={formData.contentType}
@@ -266,7 +281,7 @@ export default function LessonEditPage() {
             </div>
 
             {formData.contentType === "video" && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="content">Video URL</Label>
                 <Input
                   id="content"
@@ -275,15 +290,17 @@ export default function LessonEditPage() {
                   value={formData.content}
                   onChange={handleChange}
                 />
-                <p className="text-xs text-muted-foreground">Enter a link to YouTube, Vimeo, or a direct MP4 file.</p>
+                <p className="text-xs leading-[1.5] text-muted-foreground">Enter a link to YouTube, Vimeo, or a direct MP4 file.</p>
               </div>
             )}
 
             {formData.contentType === "article" && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="content">Article Content (Markdown)</Label>
+                {/* Write and Preview are two views of the same text, so they get
+                    the `segmented` variant rather than a section rule. */}
                 <Tabs defaultValue="write">
-                  <TabsList className="touch-target">
+                  <TabsList variant="segmented" className="touch-target">
                     <TabsTrigger value="write">Write</TabsTrigger>
                     <TabsTrigger value="preview">Preview</TabsTrigger>
                   </TabsList>
@@ -295,18 +312,18 @@ export default function LessonEditPage() {
                       placeholder="# Hello World&#10;&#10;Write your article here using markdown."
                       value={formData.content}
                       onChange={handleChange}
-                      className="font-mono text-sm rounded-t-none border-t-0"
+                      className="font-mono text-sm"
                     />
                   </TabsContent>
                   <TabsContent value="preview">
                     {formData.content.trim() ? (
-                      <div className="min-h-[240px] rounded-lg border p-4 prose prose-sm dark:prose-invert max-w-none">
+                      <div className="min-h-[240px] border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {formData.content}
                         </ReactMarkdown>
                       </div>
                     ) : (
-                      <div className="flex min-h-[240px] items-center justify-center rounded-lg border text-sm text-muted-foreground">
+                      <div className="flex min-h-[240px] items-center justify-center border border-rule text-sm text-muted-foreground">
                         Nothing to preview yet — start writing in the Write tab.
                       </div>
                     )}
@@ -318,25 +335,26 @@ export default function LessonEditPage() {
             {formData.contentType === "quiz" && (
               <div className="space-y-6">
                 {!quizData ? (
-                  <div className="rounded-md border p-6 text-center bg-muted/20">
-                    <HelpCircle className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-                    <h3 className="text-lg font-medium">No Quiz Found</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Create a quiz for this lesson to start adding questions.
-                    </p>
-                    <Button type="button" onClick={handleCreateQuiz}>
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Initialize Quiz
-                    </Button>
-                  </div>
+                  <EmptyState
+                    icon={HelpCircle}
+                    title="No Quiz Found"
+                    description="Create a quiz for this lesson to start adding questions."
+                    tone="brand"
+                    action={
+                      <Button type="button" onClick={handleCreateQuiz}>
+                        <PlusCircle className="h-4 w-4" />
+                        Initialize Quiz
+                      </Button>
+                    }
+                  />
                 ) : (
-                  <div className="space-y-6 border-t pt-6 mt-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-medium">Quiz Questions</h3>
+                  <div className="space-y-6 border-t border-rule pt-6 mt-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="display-subheading text-lg tracking-editorial text-foreground">Quiz Questions</h3>
                       <Dialog>
                         <DialogTrigger render={
                           <Button size="sm" type="button">
-                            <PlusCircle className="mr-2 h-4 w-4" />
+                            <PlusCircle className="h-4 w-4" />
                             Add Question
                           </Button>
                         } />
@@ -347,23 +365,25 @@ export default function LessonEditPage() {
                     </div>
 
                     {quizData.questions.length === 0 ? (
-                      <div className="rounded-md border p-8 text-center border-dashed">
-                        <p className="text-sm text-muted-foreground">No questions added yet.</p>
-                      </div>
+                      <EmptyState
+                        icon={HelpCircle}
+                        title="No questions added yet."
+                        description="Add the first multiple-choice question to this quiz."
+                      />
                     ) : (
                       <div className="space-y-4">
                         {quizData.questions.map((q, index) => (
                           <Card key={q.question._id}>
-                            <CardHeader className="py-4 flex flex-row items-start justify-between space-y-0">
-                              <div className="space-y-1">
-                                <CardTitle className="text-base font-medium">
-                                  {index + 1}. {q.question.prompt}
-                                </CardTitle>
-                              </div>
+                            <CardHeader className="flex flex-row items-start justify-between gap-3">
+                              <CardTitle>
+                                <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
+                                {q.question.prompt}
+                              </CardTitle>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-2 -mr-2"
+                                aria-label={`Delete question ${index + 1}`}
+                                className="-mt-1 -mr-1 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 onClick={async () => {
                                   if (confirm("Delete this question?")) {
                                     await deleteQuizQuestion({ questionId: q.question._id });
@@ -374,19 +394,23 @@ export default function LessonEditPage() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </CardHeader>
-                            <CardContent className="py-0 pb-4">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <CardContent>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 {q.options.map((opt) => (
                                   <div
                                     key={opt._id}
-                                    className={`flex items-center gap-2 p-2 rounded-md border text-sm ${
-                                      correctOptionIds.has(opt._id) ? "bg-green-500/10 border-green-500/20" : "bg-muted/50"
+                                    className={`flex items-center gap-2 border p-2 text-sm ${
+                                      /* Correctness is carried by the tick/cross icon as
+                                         well as the tint, never by colour alone. */
+                                      correctOptionIds.has(opt._id)
+                                        ? "border-green-500/20 bg-green-500/10"
+                                        : "border-rule bg-surface-sunken"
                                     }`}
                                   >
                                     {correctOptionIds.has(opt._id) ? (
-                                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                                      <CheckCircle className="h-4 w-4 shrink-0 text-green-600 dark:text-green-500" />
                                     ) : (
-                                      <XCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      <XCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     )}
                                     <span className={correctOptionIds.has(opt._id) ? "font-medium" : "text-muted-foreground"}>
                                       {opt.text}
@@ -405,9 +429,9 @@ export default function LessonEditPage() {
             )}
 
           </CardContent>
-          <CardFooter className="flex justify-end border-t pt-4">
+          <CardFooter className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save Changes
             </Button>
           </CardFooter>
@@ -467,7 +491,7 @@ function AddQuestionForm({ quizId }: { quizId: Id<"quizzes"> }) {
       </DialogHeader>
       
       <div className="grid gap-6 py-4">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label>Question</Label>
           <Textarea 
             value={prompt} 
@@ -497,12 +521,12 @@ function AddQuestionForm({ quizId }: { quizId: Id<"quizzes"> }) {
                     setOptions((prev) => prev.map((o, i) => (i === idx ? { ...o, text } : o)));
                   }}
                   placeholder={`Option ${idx + 1}`}
-                  className={option.isCorrect ? "border-green-500" : ""}
+                  className={option.isCorrect ? "border-green-600 dark:border-green-500" : ""}
                 />
               </div>
             ))}
           </RadioGroup>
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-xs leading-[1.5] text-muted-foreground">
             Select the radio button next to the correct option. Leave extra options blank to omit them.
           </p>
         </div>
@@ -510,7 +534,7 @@ function AddQuestionForm({ quizId }: { quizId: Id<"quizzes"> }) {
       
       <DialogFooter>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           Add Question
         </Button>
       </DialogFooter>

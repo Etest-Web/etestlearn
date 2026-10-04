@@ -14,6 +14,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -47,7 +48,7 @@ export default function AdminUnpublishRequestsPage() {
   if (dbUser === undefined) {
     return (
       <div className="flex flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-9 w-64" />
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-48 w-full" />
@@ -59,15 +60,13 @@ export default function AdminUnpublishRequestsPage() {
 
   if (!dbUser || dbUser.role !== "admin") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full bg-destructive/10 p-4">
-          <ShieldAlert className="h-10 w-10 text-destructive" />
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight">Admin Only</h2>
-        <p className="max-w-md text-sm text-muted-foreground">
-          This page is restricted to administrators. You do not have permission
-          to review unpublish requests.
-        </p>
+      <div className="mx-auto w-full max-w-md">
+        <EmptyState
+          icon={ShieldAlert}
+          title="Admin only"
+          description="This page is restricted to administrators. You do not have permission to review unpublish requests."
+          tone="warning"
+        />
       </div>
     );
   }
@@ -97,26 +96,29 @@ export default function AdminUnpublishRequestsPage() {
     }
   };
 
+  /* Icon plus word on every status: this queue decides whether a paid course
+     stays on sale, so the state must survive a greyscale print and a
+     colour-blind reader. */
   const statusBadge = (status: string) => {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="secondary" className="capitalize">
-            <Clock className="mr-1 h-3 w-3" />
+          <Badge variant="secondary">
+            <Clock className="h-3 w-3" />
             Pending
           </Badge>
         );
       case "approved":
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 capitalize">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
+          <Badge variant="outline">
+            <CheckCircle2 className="h-3 w-3" />
             Approved
           </Badge>
         );
       default:
         return (
-          <Badge variant="destructive" className="capitalize">
-            <XCircle className="mr-1 h-3 w-3" />
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3" />
             Rejected
           </Badge>
         );
@@ -124,19 +126,17 @@ export default function AdminUnpublishRequestsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Unpublish Requests
-        </h2>
-        <p className="text-muted-foreground">
-          Instructors cannot take a course that learners have already paid for
-          off sale on their own. Approving a request here takes the course down;
-          rejecting it leaves it selling.
-        </p>
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Unpublish Requests"
+        description="Instructors cannot take a course that learners have already paid for off sale on their own. Approving a request here takes the course down; rejecting it leaves it selling."
+      />
 
-      <div className="flex flex-wrap gap-2">
+      <div
+        className="flex w-max gap-0.5 overflow-x-auto rounded-md border border-rule bg-surface-sunken p-0.5"
+        role="group"
+        aria-label="Filter unpublish requests by status"
+      >
         {(
           [
             { value: "pending", label: "Pending" },
@@ -147,8 +147,10 @@ export default function AdminUnpublishRequestsPage() {
         ).map((filter) => (
           <Button
             key={filter.label}
-            variant={statusFilter === filter.value ? "default" : "outline"}
+            aria-pressed={statusFilter === filter.value}
+            variant={statusFilter === filter.value ? "secondary" : "ghost"}
             size="sm"
+            className="rounded-sm"
             onClick={() => setStatusFilter(filter.value)}
           >
             {filter.label}
@@ -163,17 +165,16 @@ export default function AdminUnpublishRequestsPage() {
           ))}
         </div>
       ) : requests.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <EyeOff className="mb-4 h-10 w-10 text-muted-foreground" />
-            <h3 className="font-semibold">Nothing to review</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {statusFilter
-                ? `No ${statusFilter} requests at the moment.`
-                : "No instructor has asked to unpublish a sold course."}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={EyeOff}
+          title="Nothing to review"
+          description={
+            statusFilter
+              ? `No ${statusFilter} requests at the moment.`
+              : "No instructor has asked to unpublish a sold course."
+          }
+          tone="brand"
+        />
       ) : (
         <div className="grid gap-4">
           {requests.map((request) => (
@@ -181,7 +182,7 @@ export default function AdminUnpublishRequestsPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <CardTitle className="flex items-center gap-2 text-lg">
+                    <CardTitle>
                       <span className="truncate">
                         {request.course?.title ?? "Course no longer exists"}
                       </span>
@@ -189,13 +190,13 @@ export default function AdminUnpublishRequestsPage() {
                     <CardDescription className="mt-1">
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="flex items-center gap-1">
-                          <User className="h-3 w-3 shrink-0" />
+                          <User aria-hidden className="h-3 w-3 shrink-0" />
                           {request.requester?.name ??
                             request.requester?.email ??
                             "Unknown instructor"}
                         </span>
                         <span>
-                          {request.paidSales} paid sale
+                          <span className="tabular">{request.paidSales}</span> paid sale
                           {request.paidSales === 1 ? "" : "s"} affected
                         </span>
                         {request.course && (
@@ -203,9 +204,9 @@ export default function AdminUnpublishRequestsPage() {
                             href={`/courses/${request.course.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary underline"
+                            className="inline-flex items-center gap-1 text-primary link-quiet"
                           >
-                            <ExternalLink className="h-3 w-3" />
+                            <ExternalLink aria-hidden className="h-3 w-3" />
                             View listing
                           </a>
                         )}
@@ -217,21 +218,21 @@ export default function AdminUnpublishRequestsPage() {
               </CardHeader>
 
               <CardContent className="space-y-3 text-sm">
-                <div className="text-xs text-muted-foreground">
+                <p className="tabular text-xs text-muted-foreground">
                   Requested{" "}
                   {new Date(request.createdAt).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
                   })}
-                </div>
+                </p>
 
                 {request.reason ? (
                   <div>
                     <span className="font-medium text-muted-foreground">
                       Instructor&apos;s reason:
-                    </span>{" "}
-                    <p className="mt-1 whitespace-pre-wrap text-foreground">
+                    </span>
+                    <p className="mt-1 whitespace-pre-wrap leading-[1.6] text-foreground">
                       {request.reason}
                     </p>
                   </div>
@@ -242,17 +243,19 @@ export default function AdminUnpublishRequestsPage() {
                 )}
 
                 {request.reviewNote && request.status !== "pending" && (
-                  <div className="mt-2 rounded-md bg-muted/50 p-3">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Admin note:
-                    </span>
-                    <p className="mt-1 text-sm">{request.reviewNote}</p>
+                  <div className="mt-2 border border-rule bg-surface-sunken p-3">
+                    <span className="eyebrow">Admin note</span>
+                    <p className="mt-1 text-sm leading-[1.6]">{request.reviewNote}</p>
                   </div>
                 )}
               </CardContent>
 
+              {/* Unpublish takes a sold course off sale, so it is the
+                  destructive plate and the only filled button in the row; "Keep
+                  live" is outlined. The two words are what actually tell an
+                  admin which is which. */}
               {request.status === "pending" && (
-                <CardFooter className="flex-col gap-3 border-t pt-4">
+                <CardFooter className="flex-col gap-3">
                   {reviewingId === request._id ? (
                     <>
                       <Textarea
@@ -282,8 +285,10 @@ export default function AdminUnpublishRequestsPage() {
                           onClick={() => handleReview(request._id, "rejected")}
                           disabled={isProcessing}
                         >
-                          {isProcessing && (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          {isProcessing ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <XCircle className="h-3 w-3" />
                           )}
                           Keep live
                         </Button>
@@ -294,8 +299,10 @@ export default function AdminUnpublishRequestsPage() {
                           onClick={() => handleReview(request._id, "approved")}
                           disabled={isProcessing}
                         >
-                          {isProcessing && (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          {isProcessing ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <EyeOff className="h-3 w-3" />
                           )}
                           Unpublish
                         </Button>

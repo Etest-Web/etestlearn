@@ -30,8 +30,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
+  PageHeader,
   Skeleton,
   Textarea,
 } from "@/components/ui";
@@ -41,7 +43,6 @@ import type { GroupDetail, GroupMessageCursor, GroupMessageItem } from "@/lib/gr
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
   ArchivedPill,
-  GroupsEmptyState,
   MemberAvatar,
   MemberRoleBadge,
   PrivacyPill,
@@ -67,58 +68,59 @@ export function GroupDetail({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
-          className="self-start -ml-2 text-muted-foreground"
+          className="-ml-2 self-start text-muted-foreground"
         >
           <ArrowLeft size={16} aria-hidden />
           All groups
         </Button>
 
-        <div className="flex flex-col gap-3">
-          <h1 className="text-3xl font-bold text-foreground text-balance">
-            {detail.name}
-          </h1>
-          <p className="text-muted-foreground font-medium flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Link
-              href={`/dashboard/courses/${detail.course.slug}`}
-              className="inline-flex items-center gap-1 hover:text-brand-ink hover:underline rounded-md focus-visible:ring-2 focus-visible:ring-[#945DA3]/20"
-            >
-              <BookOpen size={15} aria-hidden />
-              {detail.course.title}
-            </Link>
-            <span aria-hidden>·</span>
-            <span>
-              Started by {detail.createdBy.name} {formatRelativeTime(detail.createdAt)}
+        <PageHeader
+          title={detail.name}
+          description={
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Link
+                href={`/dashboard/courses/${detail.course.slug}`}
+                className="link-quiet inline-flex items-center gap-1 hover:text-brand-ink"
+              >
+                <BookOpen size={15} aria-hidden />
+                {detail.course.title}
+              </Link>
+              <span aria-hidden>·</span>
+              <span className="tabular">
+                Started by {detail.createdBy.name} {formatRelativeTime(detail.createdAt)}
+              </span>
             </span>
-          </p>
+          }
+        >
           <div className="flex flex-wrap items-center gap-2">
             <PrivacyPill isPrivate={detail.isPrivate} />
             {detail.isArchived ? <ArchivedPill /> : null}
             {detail.myRole ? (
               <MemberRoleBadge role={detail.myRole} />
             ) : detail.hasPendingRequest ? (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-amber-600 bg-amber-500/10">
+              <span className="inline-flex items-center gap-1 rounded-sm border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-800 dark:text-amber-400">
                 <Clock size={14} aria-hidden />
                 Request pending
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-muted-foreground bg-muted">
+              <span className="inline-flex items-center gap-1 rounded-sm border border-rule bg-surface-sunken px-2 py-1 text-xs font-bold text-muted-foreground">
                 <Users size={14} aria-hidden />
                 Not a member
               </span>
             )}
           </div>
           {detail.description ? (
-            <p className="text-sm text-muted-foreground max-w-2xl">
+            <p className="max-w-[62ch] text-sm leading-body text-muted-foreground">
               {detail.description}
             </p>
           ) : null}
-        </div>
-      </header>
+        </PageHeader>
+      </div>
 
       <GroupActions detail={detail} />
 
@@ -179,7 +181,6 @@ function GroupActions({ detail }: { detail: GroupDetail }) {
           <Button
             onClick={() => setJoinOpen(true)}
             disabled={detail.isArchived || blocked}
-            className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
           >
             <UserPlus size={16} aria-hidden />
             Request to join
@@ -196,7 +197,6 @@ function GroupActions({ detail }: { detail: GroupDetail }) {
                 "You have joined this group",
               )
             }
-            className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
           >
             {pending === "join" ? (
               <Loader2 size={16} aria-hidden className="animate-spin" />
@@ -352,7 +352,6 @@ function GroupActions({ detail }: { detail: GroupDetail }) {
               <Button
                 type="submit"
                 disabled={blocked}
-                className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
               >
                 {pending === "join" ? (
                   <Loader2 size={16} aria-hidden className="animate-spin" />
@@ -505,31 +504,31 @@ function MessageFeed({
   return (
     <section
       aria-label="Group conversation"
-      className="bg-card rounded-[24px] border border-border shadow-sm flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden border border-rule bg-card"
     >
-      <header className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <header className="flex items-center gap-2 border-b border-rule px-5 py-4">
         <MessageSquare size={18} aria-hidden className="text-brand-ink" />
-        <h2 className="font-bold text-foreground">Conversation</h2>
+        <h2 className="display-subheading text-base text-foreground">Conversation</h2>
       </header>
 
-      <div className="px-4 sm:px-5 py-4 flex flex-col gap-4 min-h-[220px]">
+      <div className="flex flex-col gap-4 px-4 py-4 min-h-[220px] sm:px-5">
         {!canRead ? (
-          <GroupsEmptyState
-            icon={<Lock size={32} />}
+          <EmptyState
+            icon={Lock}
             title="Members only"
-            body="The conversation in a group is for its members. Join above to read and reply."
+            description="The conversation in a group is for its members. Join above to read and reply."
           />
         ) : page === undefined ? (
           <div className="flex flex-col gap-4" aria-busy="true">
-            <Skeleton className="h-12 w-3/4 rounded-2xl" />
-            <Skeleton className="h-12 w-1/2 self-end rounded-2xl" />
-            <Skeleton className="h-12 w-2/3 rounded-2xl" />
+            <Skeleton className="h-12 w-3/4 rounded-sm" />
+            <Skeleton className="h-12 w-1/2 self-end rounded-sm" />
+            <Skeleton className="h-12 w-2/3 rounded-sm" />
           </div>
         ) : messages.length === 0 ? (
-          <GroupsEmptyState
-            icon={<MessageSquare size={32} />}
+          <EmptyState
+            icon={MessageSquare}
             title="No messages yet"
-            body="Be the first to post. Questions, links to useful notes and half-formed ideas are all welcome."
+            description="Be the first to post. Questions, links to useful notes and half-formed ideas are all welcome."
           />
         ) : (
           <>
@@ -559,7 +558,7 @@ function MessageFeed({
         )}
       </div>
 
-      <div className="border-t border-border px-4 sm:px-5 py-4">
+      <div className="border-t border-rule px-4 py-4 sm:px-5">
         {canPost ? (
           <Composer groupId={groupId} />
         ) : (
@@ -582,11 +581,11 @@ function MessageBubble({ message }: { message: GroupMessageItem }) {
         message.isMine && "self-end items-end",
       )}
     >
-      <span className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+      <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <span className="truncate">{message.authorName ?? "Former member"}</span>
         {message.authorRole === "instructor" ||
         message.authorRole === "admin" ? (
-          <span className="inline-flex items-center gap-1 text-brand-ink bg-brand/15 px-1.5 py-0.5 rounded font-bold">
+          <span className="inline-flex items-center gap-1 rounded-sm border border-brand/30 bg-brand/10 px-1.5 py-0.5 font-bold text-brand-ink">
             <ShieldCheck size={11} aria-hidden />
             {message.authorRole === "admin" ? "Admin" : "Instructor"}
           </span>
@@ -594,8 +593,10 @@ function MessageBubble({ message }: { message: GroupMessageItem }) {
       </span>
       <div
         className={cn(
-          "rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap break-words",
-          message.isMine ? "bg-[#945DA3] text-white" : "bg-muted text-foreground",
+          "rounded-md px-4 py-2.5 text-sm whitespace-pre-wrap break-words",
+          message.isMine
+            ? "bg-brand text-brand-foreground"
+            : "bg-surface-sunken text-foreground",
         )}
       >
         {message.body}
@@ -663,7 +664,7 @@ function Composer({ groupId }: { groupId: string }) {
         className="min-h-[80px]"
       />
       <div className="flex items-center justify-between gap-3">
-        <p aria-live="polite" className="text-xs text-muted-foreground">
+        <p aria-live="polite" className="tabular text-xs text-muted-foreground">
           {remaining > 0
             ? `You can post again in ${Math.ceil(remaining / 1000)}s.`
             : `${body.trim().length} of 2000 characters`}
@@ -671,7 +672,6 @@ function Composer({ groupId }: { groupId: string }) {
         <Button
           type="submit"
           disabled={sending || remaining > 0 || body.trim().length === 0}
-          className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
         >
           {sending ? (
             <Loader2 size={16} aria-hidden className="animate-spin" />
@@ -699,17 +699,17 @@ function MembersPanel({ groupId }: { groupId: string }) {
   return (
     <section
       aria-label="Group members"
-      className="bg-card rounded-[24px] border border-border shadow-sm flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden border border-rule bg-card"
     >
-      <header className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <header className="flex items-center gap-2 border-b border-rule px-5 py-4">
         <Users size={18} aria-hidden className="text-brand-ink" />
-        <h2 className="font-bold text-foreground">Members</h2>
-        <span className="ml-auto text-xs font-bold text-muted-foreground">
+        <h2 className="display-subheading text-base text-foreground">Members</h2>
+        <span className="tabular ml-auto text-xs font-bold text-muted-foreground">
           {members ? members.members.length : "—"}
         </span>
       </header>
 
-      <div className="px-4 sm:px-5 py-4">
+      <div className="px-4 py-4 sm:px-5">
         {members === undefined ? (
           <div className="flex flex-col gap-3" aria-busy="true">
             {[0, 1, 2].map((i) => (
@@ -816,24 +816,24 @@ function PendingRequestsPanel({ groupId }: { groupId: string }) {
   return (
     <section
       aria-label="Pending join requests"
-      className="bg-card rounded-[24px] border border-border shadow-sm flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden border border-rule bg-card"
     >
-      <header className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <header className="flex items-center gap-2 border-b border-rule px-5 py-4">
         <Inbox size={18} aria-hidden className="text-brand-ink" />
-        <h2 className="font-bold text-foreground">Join requests</h2>
-        <span className="ml-auto text-xs font-bold text-muted-foreground">
+        <h2 className="display-subheading text-base text-foreground">Join requests</h2>
+        <span className="tabular ml-auto text-xs font-bold text-muted-foreground">
           {requests ? requests.requests.length : "—"}
         </span>
       </header>
 
-      <div className="px-4 sm:px-5 py-4" aria-live="polite">
+      <div className="px-4 py-4 sm:px-5" aria-live="polite">
         {requests === undefined ? (
           <div className="flex flex-col gap-3" aria-busy="true">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-sm" />
+            <Skeleton className="h-16 w-full rounded-sm" />
           </div>
         ) : requests.requests.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-body text-muted-foreground">
             Nothing waiting. Requests from people who want into a private group
             land here.
           </p>
@@ -842,7 +842,7 @@ function PendingRequestsPanel({ groupId }: { groupId: string }) {
             {requests.requests.map((request) => (
               <li
                 key={request._id}
-                className="flex flex-col gap-2 rounded-xl border border-border p-3"
+                className="flex flex-col gap-2 rounded-sm border border-rule p-3"
               >
                 <div className="flex items-center gap-3">
                   <MemberAvatar
@@ -859,7 +859,7 @@ function PendingRequestsPanel({ groupId }: { groupId: string }) {
                   </div>
                 </div>
                 {request.message ? (
-                  <p className="text-sm text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                  <p className="rounded-sm bg-surface-sunken px-3 py-2 text-sm leading-body text-muted-foreground">
                     {request.message}
                   </p>
                 ) : null}
@@ -870,7 +870,6 @@ function PendingRequestsPanel({ groupId }: { groupId: string }) {
                     onClick={() =>
                       decide(request._id, "approve", request.requesterName)
                     }
-                    className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
                   >
                     {pendingId === request._id ? (
                       <Loader2 size={14} aria-hidden className="animate-spin" />
@@ -904,8 +903,8 @@ function GroupDetailSkeleton() {
       <Skeleton className="h-9 w-72 max-w-full" />
       <Skeleton className="h-5 w-96 max-w-full" />
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
-        <Skeleton className="h-96 rounded-[24px]" />
-        <Skeleton className="h-64 rounded-[24px]" />
+        <Skeleton className="h-96" />
+        <Skeleton className="h-64" />
       </div>
     </div>
   );

@@ -21,10 +21,20 @@ import { Skeleton } from "@/components/ui/skeleton";
  * Kept in one file because they are only meaningful together: the pill set is
  * how the page says what state something is in, and every one of them pairs its
  * colour with a word, so nothing here is ever colour-only.
+ *
+ * Each pill is a tinted plate plus a hairline. At 8–10% a tint alone is
+ * invisible on paper, so the border is what makes the chip read as a chip.
  */
 
 const PILL_BASE =
-  "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold";
+  "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-bold";
+
+const MODERATOR_PILL = "border-brand/30 bg-brand/10 text-brand-ink";
+const JOINED_PILL =
+  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+const PENDING_PILL =
+  "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-400";
+const NEUTRAL_PILL = "border-rule bg-surface-sunken text-muted-foreground";
 
 /**
  * The caller's seat in a group. Colour + icon + word together: a purple pill
@@ -40,9 +50,7 @@ export function RelationshipPill({
 }) {
   if (relationship === "moderator") {
     return (
-      <span
-        className={cn(PILL_BASE, "text-brand-ink bg-brand/20", className)}
-      >
+      <span className={cn(PILL_BASE, MODERATOR_PILL, className)}>
         <ShieldCheck size={14} aria-hidden />
         Moderator
       </span>
@@ -50,7 +58,7 @@ export function RelationshipPill({
   }
   if (relationship === "member") {
     return (
-      <span className={cn(PILL_BASE, "text-emerald-600 bg-emerald-500/10", className)}>
+      <span className={cn(PILL_BASE, JOINED_PILL, className)}>
         <UserCheck size={14} aria-hidden />
         Joined
       </span>
@@ -58,7 +66,7 @@ export function RelationshipPill({
   }
   if (relationship === "pending") {
     return (
-      <span className={cn(PILL_BASE, "text-amber-600 bg-amber-500/10", className)}>
+      <span className={cn(PILL_BASE, PENDING_PILL, className)}>
         <Users size={14} aria-hidden />
         Request pending
       </span>
@@ -66,14 +74,14 @@ export function RelationshipPill({
   }
   if (relationship === "request_pending") {
     return (
-      <span className={cn(PILL_BASE, "text-muted-foreground bg-muted", className)}>
+      <span className={cn(PILL_BASE, NEUTRAL_PILL, className)}>
         <Users size={14} aria-hidden />
         Previously declined
       </span>
     );
   }
   return (
-    <span className={cn(PILL_BASE, "text-muted-foreground bg-muted", className)}>
+    <span className={cn(PILL_BASE, NEUTRAL_PILL, className)}>
       <Users size={14} aria-hidden />
       Not joined
     </span>
@@ -89,14 +97,12 @@ export function PrivacyPill({
   className?: string;
 }) {
   return isPrivate ? (
-    <span
-      className={cn(PILL_BASE, "text-brand-ink bg-brand/10", className)}
-    >
+    <span className={cn(PILL_BASE, MODERATOR_PILL, className)}>
       <Lock size={14} aria-hidden />
       Private
     </span>
   ) : (
-    <span className={cn(PILL_BASE, "text-muted-foreground bg-muted", className)}>
+    <span className={cn(PILL_BASE, NEUTRAL_PILL, className)}>
       <Globe2 size={14} aria-hidden />
       Open
     </span>
@@ -106,7 +112,7 @@ export function PrivacyPill({
 /** Archived is a state, not a deletion: the messages are all still there. */
 export function ArchivedPill({ className }: { className?: string }) {
   return (
-    <span className={cn(PILL_BASE, "text-muted-foreground bg-muted", className)}>
+    <span className={cn(PILL_BASE, NEUTRAL_PILL, className)}>
       <Archive size={14} aria-hidden />
       Archived
     </span>
@@ -121,50 +127,15 @@ export function MemberRoleBadge({
   className?: string;
 }) {
   return role === "moderator" ? (
-    <span className={cn(PILL_BASE, "text-brand-ink bg-brand/20", className)}>
+    <span className={cn(PILL_BASE, MODERATOR_PILL, className)}>
       <ShieldCheck size={14} aria-hidden />
       Moderator
     </span>
   ) : (
-    <span
-      className={cn(PILL_BASE, "text-muted-foreground bg-muted", className)}
-    >
+    <span className={cn(PILL_BASE, NEUTRAL_PILL, className)}>
       <Users size={14} aria-hidden />
       Member
     </span>
-  );
-}
-
-/**
- * The empty state every list in this feature falls back to: dashed card, a
- * muted rounded square holding a 32px icon, a bold heading, a centred line of
- * copy and — when there is somewhere to go — a real button. A blank region
- * reads as "broken", not "empty".
- */
-export function GroupsEmptyState({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  body: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 bg-card rounded-3xl border border-dashed border-border">
-      <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 text-muted-foreground">
-        {icon}
-      </div>
-      <h3 className="text-lg font-bold text-foreground mb-2 text-center">
-        {title}
-      </h3>
-      <p className="text-muted-foreground max-w-sm text-center text-sm">
-        {body}
-      </p>
-      {action ? <div className="mt-6">{action}</div> : null}
-    </div>
   );
 }
 
@@ -186,7 +157,7 @@ export function MemberAvatar({
         src={imageUrl}
         alt=""
         className={cn(
-          "size-9 rounded-full border border-border object-cover bg-muted shrink-0",
+          "size-9 shrink-0 rounded-full border border-rule bg-surface-sunken object-cover",
           className,
         )}
       />
@@ -196,7 +167,7 @@ export function MemberAvatar({
     <span
       aria-hidden
       className={cn(
-        "size-9 rounded-full border border-border bg-muted text-muted-foreground text-xs font-bold flex items-center justify-center shrink-0",
+        "flex size-9 shrink-0 items-center justify-center rounded-full border border-rule bg-surface-sunken text-xs font-bold text-muted-foreground",
         className,
       )}
     >
@@ -236,23 +207,21 @@ export function StatsStrip({
   return (
     <div
       aria-live="polite"
-      className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-3"
     >
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex items-center gap-3 bg-card rounded-[24px] border border-border shadow-sm px-5 py-4"
+          className="flex items-center gap-3 border border-rule bg-card px-5 py-4"
         >
-          <span className="w-10 h-10 rounded-2xl bg-brand/10 text-brand-ink flex items-center justify-center shrink-0">
+          <span className="flex size-10 shrink-0 items-center justify-center bg-brand/10 text-brand-ink">
             {item.icon}
           </span>
           <span className="min-w-0">
-            <span className="block text-lg font-bold text-foreground leading-tight">
+            <span className="display-subheading tabular block text-xl leading-none text-foreground">
               {item.value}
             </span>
-            <span className="block text-xs text-muted-foreground font-medium">
-              {item.label}
-            </span>
+            <span className="eyebrow mt-1 block">{item.label}</span>
           </span>
         </div>
       ))}
@@ -262,13 +231,13 @@ export function StatsStrip({
 
 export function StatsStripSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="flex items-center gap-3 bg-card rounded-[24px] border border-border shadow-sm px-5 py-4"
+          className="flex items-center gap-3 border border-rule bg-card px-5 py-4"
         >
-          <Skeleton className="size-10 rounded-2xl" />
+          <Skeleton className="size-10" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-3 w-32" />
@@ -282,16 +251,16 @@ export function StatsStripSkeleton() {
 /** One group card's worth of skeleton, so the grid does not jump on load. */
 export function GroupCardSkeleton() {
   return (
-    <div className="bg-card rounded-[24px] border border-border shadow-sm p-6 flex flex-col gap-4">
+    <div className="flex flex-col gap-4 border border-rule bg-card p-6">
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-4 w-full" />
       <div className="flex gap-2">
-        <Skeleton className="h-6 w-20 rounded-md" />
-        <Skeleton className="h-6 w-20 rounded-md" />
+        <Skeleton className="h-6 w-20 rounded-sm" />
+        <Skeleton className="h-6 w-20 rounded-sm" />
       </div>
-      <div className="pt-4 border-t border-border flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-rule pt-4">
         <Skeleton className="h-3 w-28" />
-        <Skeleton className="h-9 w-24 rounded-xl" />
+        <Skeleton className="h-9 w-24 rounded-sm" />
       </div>
     </div>
   );
@@ -306,7 +275,7 @@ export function GroupsPageSkeleton() {
         <Skeleton className="h-5 w-full max-w-md" />
       </div>
       <StatsStripSkeleton />
-      <Skeleton className="h-12 w-64 rounded-2xl" />
+      <Skeleton className="h-12 w-64" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <GroupCardSkeleton />
         <GroupCardSkeleton />
@@ -326,7 +295,7 @@ export function TextButtonLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-sm font-bold text-brand-ink hover:underline focus-visible:ring-2 focus-visible:ring-[#945DA3]/20 rounded-md px-1 py-2"
+      className="link-quiet inline-flex items-center gap-1 rounded-sm px-1 py-2 text-sm font-semibold text-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {children}
     </Link>

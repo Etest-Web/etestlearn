@@ -23,8 +23,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -48,7 +50,6 @@ import { cn, formatRelativeTime, pluralize } from "@/lib/utils";
 import {
   ArchivedPill,
   GroupCardSkeleton,
-  GroupsEmptyState,
   PrivacyPill,
   RelationshipPill,
   StatsStrip,
@@ -102,13 +103,10 @@ export function GroupsScreen() {
   // page look slow for no reason.
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">Study Groups</h1>
-        <p className="text-muted-foreground font-medium">
-          Study with other people on the courses you are taking. Any student
-          enrolled in a course — or the instructor running it — can open a group.
-        </p>
-      </div>
+      <PageHeader
+        title="Study Groups"
+        description="Study with other people on the courses you are taking. Any student enrolled in a course — or the instructor running it — can open a group."
+      />
 
       {stats === undefined ? <StatsStripSkeleton /> : <StatsStrip stats={stats} />}
 
@@ -127,20 +125,16 @@ export function GroupsScreen() {
           className="w-full"
         >
           {/* Two triggers fit 375px; the wrapper keeps any future third one from
-              widening the document, and lifts the targets to 44px on touch. */}
+              widening the document, and lifts the targets to 44px on touch.
+              `rule` because these are two sections of the hub — your groups and
+              the course directory — rather than filters over one list. */}
           <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
-              <TabsTrigger
-                value="mine"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-              >
+            <TabsList variant="rule" className="touch-target">
+              <TabsTrigger value="mine">
                 My groups
                 {myGroups ? ` (${myGroups.length})` : ""}
               </TabsTrigger>
-              <TabsTrigger
-                value="browse"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-              >
+              <TabsTrigger value="browse">
                 Browse
                 {courses ? ` (${courses.length})` : ""}
               </TabsTrigger>
@@ -193,15 +187,12 @@ function MyGroupsPanel({
 
   if (groups.length === 0) {
     return (
-      <GroupsEmptyState
-        icon={<Users size={32} />}
+      <EmptyState
+        icon={Users}
         title="You have not joined any groups yet"
-        body="Study groups are organised by course, so the fastest way in is to browse the groups in a course you are taking — or start one yourself."
+        description="Study groups are organised by course, so the fastest way in is to browse the groups in a course you are taking — or start one yourself."
         action={
-          <Button
-            onClick={onBrowse}
-            className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
-          >
+          <Button onClick={onBrowse}>
             <Users size={16} aria-hidden />
             Browse groups
           </Button>
@@ -229,21 +220,21 @@ function GroupCard({
   onOpen: (id: string) => void;
 }) {
   return (
-    <article className="flex h-full flex-col bg-card rounded-[24px] border border-border shadow-sm p-6 hover:shadow-md transition-shadow">
+    <article className="flex h-full flex-col border border-rule bg-card p-6 transition-colors hover:border-rule-strong">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-bold text-xl text-foreground line-clamp-2 leading-snug">
+        <h3 className="display-subheading line-clamp-2 text-xl leading-snug text-foreground">
           {group.name}
         </h3>
         {group.isArchived ? <ArchivedPill className="shrink-0" /> : null}
       </div>
 
-      <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground font-medium">
+      <p className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
         <BookOpen size={14} aria-hidden />
         <span className="truncate">{group.course.title}</span>
       </p>
 
       {group.description ? (
-        <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
+        <p className="mt-3 line-clamp-2 text-sm leading-body text-muted-foreground">
           {group.description}
         </p>
       ) : null}
@@ -253,13 +244,13 @@ function GroupCard({
           relationship={group.myRole === "moderator" ? "moderator" : "member"}
         />
         <PrivacyPill isPrivate={group.isPrivate} />
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-muted-foreground bg-muted">
+        <span className="tabular inline-flex items-center gap-1 rounded-sm border border-rule bg-surface-sunken px-2 py-1 text-xs font-bold text-muted-foreground">
           <Users size={14} aria-hidden />
           {pluralize(group.memberCount, "member")}
         </span>
       </div>
 
-      <div className="mt-auto pt-4 border-t border-border flex items-center justify-between gap-3">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-rule pt-4">
         <div className="min-w-0">
           {group.latestMessage ? (
             <p className="text-xs text-muted-foreground truncate">
@@ -317,7 +308,7 @@ function BrowsePanel({
   if (courses === undefined) {
     return (
       <div className="flex flex-col gap-6" aria-busy="true">
-        <Skeleton className="h-12 w-full max-w-sm rounded-xl" />
+        <Skeleton className="h-12 w-full max-w-sm" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <GroupCardSkeleton />
           <GroupCardSkeleton />
@@ -328,17 +319,14 @@ function BrowsePanel({
 
   if (courses.length === 0) {
     return (
-      <GroupsEmptyState
-        icon={<BookOpen size={32} />}
+      <EmptyState
+        icon={BookOpen}
         title="No courses to browse yet"
-        body="Study groups hang off a course, so you need to be enrolled in one (or teaching one) before there is anything to browse. Enrol in a course from the catalogue and its groups will appear here."
+        description="Study groups hang off a course, so you need to be enrolled in one (or teaching one) before there is anything to browse. Enrol in a course from the catalogue and its groups will appear here."
         action={
-          <Link
-            href="/courses"
-            className="inline-flex items-center justify-center rounded-md bg-[#945DA3] hover:bg-[#7d4b8a] text-white text-sm font-medium h-10 px-5 focus-visible:ring-2 focus-visible:ring-[#945DA3]/20"
-          >
+          <Button render={<Link href="/courses" />} size="lg">
             Browse the course catalogue
-          </Link>
+          </Button>
         }
       />
     );
@@ -374,14 +362,14 @@ function BrowsePanel({
         <Button
           onClick={() => setCreateOpen(true)}
           disabled={!selected}
-          className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white sm:w-auto"
+          className="sm:w-auto"
         >
           <Plus size={16} aria-hidden />
           Create a group
         </Button>
       </div>
 
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-[62ch] text-sm leading-body text-muted-foreground">
         Both students and instructors can create groups
         {selected ? (
           <>
@@ -405,15 +393,12 @@ function BrowsePanel({
           <GroupCardSkeleton />
         </div>
       ) : groups.length === 0 ? (
-        <GroupsEmptyState
-          icon={<Lock size={32} />}
+        <EmptyState
+          icon={Lock}
           title="No groups in this course yet"
-          body="Nobody has opened one. Starting a group takes about ten seconds — give it a name, say whether it is open or invite-only, and you are its first moderator."
+          description="Nobody has opened one. Starting a group takes about ten seconds — give it a name, say whether it is open or invite-only, and you are its first moderator."
           action={
-            <Button
-              onClick={() => setCreateOpen(true)}
-              className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
-            >
+            <Button onClick={() => setCreateOpen(true)}>
               <Plus size={16} aria-hidden />
               Create the first group
             </Button>
@@ -481,23 +466,23 @@ function BrowseGroupCard({
   }
 
   return (
-    <article className="flex h-full flex-col bg-card rounded-[24px] border border-border shadow-sm p-6 hover:shadow-md transition-shadow">
+    <article className="flex h-full flex-col border border-rule bg-card p-6 transition-colors hover:border-rule-strong">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-bold text-xl text-foreground line-clamp-2 leading-snug">
+        <h3 className="display-subheading line-clamp-2 text-xl leading-snug text-foreground">
           {group.name}
         </h3>
         <PrivacyPill isPrivate={group.isPrivate} className="shrink-0" />
       </div>
 
       {group.description ? (
-        <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+        <p className="mt-2 line-clamp-2 text-sm leading-body text-muted-foreground">
           {group.description}
         </p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <RelationshipPill relationship={group.relationship} />
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold text-muted-foreground bg-muted">
+        <span className="tabular inline-flex items-center gap-1 rounded-sm border border-rule bg-surface-sunken px-2 py-1 text-xs font-bold text-muted-foreground">
           <Users size={14} aria-hidden />
           {pluralize(group.memberCount, "member")}
         </span>
@@ -509,7 +494,7 @@ function BrowseGroupCard({
         </p>
       ) : null}
 
-      <div className="mt-auto pt-4 border-t border-border flex flex-col gap-3">
+      <div className="mt-auto flex flex-col gap-3 border-t border-rule pt-4">
         {group.pendingRequestCount > 0 && isMember ? (
             <Button
               variant="outline"
@@ -534,7 +519,6 @@ function BrowseGroupCard({
                   `You have joined ${group.name}`,
                 )
               }
-              className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
             >
               {pending ? (
                 <Loader2 size={15} aria-hidden className="animate-spin" />
@@ -606,10 +590,10 @@ function BrowseGroupCard({
           ) : (
             <span
               className={cn(
-                "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold",
+                "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-bold",
                 group.relationship === "moderator"
-                  ? "text-brand-ink bg-brand/20"
-                  : "text-emerald-600 bg-emerald-500/10",
+                  ? "border-brand/30 bg-brand/10 text-brand-ink"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
               )}
             >
               {action.label}
@@ -675,7 +659,6 @@ function BrowseGroupCard({
               <Button
                 type="submit"
                 disabled={pending}
-                className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
               >
                 {pending ? (
                   <Loader2 size={16} aria-hidden className="animate-spin" />
@@ -767,13 +750,13 @@ function CreateGroupDialog({
                 placeholder="What you will work on together, and when."
               />
             </div>
-            <div className="flex items-start gap-3 rounded-xl border border-border p-3">
+            <div className="flex items-start gap-3 rounded-sm border border-rule p-3">
               <input
                 id="new-group-private"
                 type="checkbox"
                 checked={isPrivate}
                 onChange={(event) => setIsPrivate(event.target.checked)}
-                className="mt-1 size-4 accent-[#945DA3]"
+                className="mt-1 size-4 accent-brand"
               />
               <Label htmlFor="new-group-private" className="leading-snug">
                 Invite only
@@ -796,7 +779,6 @@ function CreateGroupDialog({
             <Button
               type="submit"
               disabled={saving || name.trim().length < 3}
-              className="bg-[#945DA3] hover:bg-[#7d4b8a] text-white"
             >
               {saving ? (
                 <Loader2 size={16} aria-hidden className="animate-spin" />
@@ -828,17 +810,15 @@ class GroupErrorBoundary extends Component<
   render() {
     if (this.state.failed) {
       return (
-        <GroupsEmptyState
-          icon={<AlertTriangle size={32} />}
+        <EmptyState
+          icon={AlertTriangle}
           title="Group unavailable"
-          body="This group does not exist, or it belongs to a course you cannot reach. Study groups are only visible to people enrolled in the course, to its instructor, and to admins."
+          description="This group does not exist, or it belongs to a course you cannot reach. Study groups are only visible to people enrolled in the course, to its instructor, and to admins."
+          tone="warning"
           action={
-            <Link
-              href="/dashboard/groups"
-              className="inline-flex items-center justify-center rounded-md bg-[#945DA3] hover:bg-[#7d4b8a] text-white text-sm font-medium h-10 px-5 focus-visible:ring-2 focus-visible:ring-[#945DA3]/20"
-            >
+            <Button render={<Link href="/dashboard/groups" />} size="lg">
               Back to my groups
-            </Link>
+            </Button>
           }
         />
       );

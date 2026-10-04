@@ -11,19 +11,33 @@ import { cn } from "@/lib/utils";
  * colour*, never colour alone — an overdue task and a finished one must be
  * distinguishable to somebody who cannot see the tint, and "Due in 3 days" has
  * to survive being copied out of the page.
+ *
+ * The pill is a tinted plate plus a hairline rather than a fill alone: at 8–10%
+ * a tint is invisible on paper, so the border is what makes the chip read as a
+ * chip. `tabular` is on the base because nearly every pill in this feature is a
+ * count or a score, and a number that shifts width as it ticks reads as a glitch.
+ *
+ * `danger` / `warning` / `success` deliberately use Tailwind's own ramps with
+ * explicit dark steps rather than the `--destructive` / `--warning` /
+ * `--success` custom properties. Those three are declared in `:root` but are
+ * never mapped into `@theme inline`, so `bg-success`, `bg-warning` and
+ * `text-warning-foreground` are not generated as utilities at all; only
+ * `--destructive` is mapped. Reported to the design-system owner rather than
+ * worked around in globals.css, which is out of scope here.
  */
 
 export type PillTone = "brand" | "danger" | "warning" | "success" | "neutral";
 
 const TONE_CLASS: Record<PillTone, string> = {
-  brand: "text-brand-ink bg-brand/20",
-  danger: "text-red-700 bg-red-500/10 dark:text-red-400",
-  warning: "text-amber-800 bg-amber-500/10 dark:text-amber-400",
-  success: "text-emerald-700 bg-emerald-500/10 dark:text-emerald-400",
-  neutral: "text-muted-foreground bg-muted",
+  brand: "border-brand/30 bg-brand/10 text-brand-ink",
+  danger: "border-destructive/30 bg-destructive/10 text-destructive",
+  warning: "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-400",
+  success:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  neutral: "border-rule bg-surface-sunken text-muted-foreground",
 };
 
-/** The house status pill: 14px icon + bold text in a tinted rounded-md box. */
+/** The house status pill: 14px icon + bold text in a tinted hairline box. */
 export function StatusPill({
   tone,
   icon,
@@ -38,7 +52,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold",
+        "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-bold tabular",
         TONE_CLASS[tone],
         className,
       )}
@@ -96,33 +110,6 @@ export function DuePill({
   );
 }
 
-/**
- * The dashed empty state every tab, filter and list falls back to. Always has
- * an icon, a heading and a next action — a bare "no items" line reads as a bug.
- */
-export function EmptyState({
-  icon,
-  title,
-  body,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  body: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-card px-6 py-14 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground [&>svg]:size-8">
-        {icon}
-      </div>
-      <h3 className="mb-2 text-lg font-bold text-foreground">{title}</h3>
-      <p className="max-w-sm text-sm text-muted-foreground">{body}</p>
-      {action ? <div className="mt-6">{action}</div> : null}
-    </div>
-  );
-}
-
 /** One number in a stat strip. Value + label, so it is readable without colour. */
 export function StatCard({
   label,
@@ -138,15 +125,13 @@ export function StatCard({
   tone?: PillTone;
 }) {
   return (
-    <div className="bg-card rounded-[24px] border border-border shadow-sm p-5">
+    <div className="border border-rule bg-card p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          {label}
-        </p>
+        <p className="eyebrow">{label}</p>
         <span
           aria-hidden
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+            "flex size-8 shrink-0 items-center justify-center rounded-sm border",
             TONE_CLASS[tone],
             "[&>svg]:size-4",
           )}
@@ -154,7 +139,9 @@ export function StatCard({
           {icon}
         </span>
       </div>
-      <p className="mt-3 text-2xl font-bold tabular-nums text-foreground">{value}</p>
+      <p className="display-subheading tabular mt-3 text-[26px] text-foreground">
+        {value}
+      </p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
@@ -186,11 +173,11 @@ export function FilterPills<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              "shrink-0 rounded-sm border px-4 py-2 text-sm font-semibold transition-colors",
+              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               active
-                ? "border-[#945DA3] bg-[#945DA3] text-white"
-                : "border-border bg-card text-muted-foreground hover:border-[#945DA3]/40 hover:text-foreground",
+                ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90"
+                : "border-rule bg-card text-muted-foreground hover:border-rule-strong hover:text-foreground",
             )}
           >
             {option.label}
@@ -212,11 +199,13 @@ export function SectionHeading({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule pb-2">
+      <h2 className="display-subheading flex items-center gap-2 text-lg text-foreground">
         {title}
         {count !== undefined ? (
-          <span className="text-sm font-semibold text-muted-foreground">({count})</span>
+          <span className="tabular text-sm font-semibold text-muted-foreground">
+            ({count})
+          </span>
         ) : null}
       </h2>
       {children}

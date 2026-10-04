@@ -5,7 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { ClipboardCheck, ListTodo, NotebookPen } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import { Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import {
+  PageHeader,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui";
 import { AssignmentsTab } from "./assignments-tab";
 import { GradingTab } from "./grading-tab";
 import { MyTasksTab } from "./my-tasks-tab";
@@ -70,22 +77,18 @@ function TasksContent() {
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">Tasks</h1>
-        <p className="text-muted-foreground font-medium">
-          Coursework your instructors set, and the study plan you set for yourself.
-        </p>
-      </div>
+      <PageHeader
+        title="Tasks"
+        description="Coursework your instructors set, and the study plan you set for yourself."
+      />
 
       <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
         {/* Three triggers do not fit at 375px. They scroll inside their own
-            wrapper rather than widening the document. */}
+            wrapper rather than widening the document. `segmented` because these
+            three are peer views of the same page rather than separate sections. */}
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
-            <TabsTrigger
-              value="assignments"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
-            >
+          <TabsList variant="segmented" className="touch-target">
+            <TabsTrigger value="assignments">
               <NotebookPen className="h-4 w-4" aria-hidden />
               Assignments
             </TabsTrigger>
@@ -93,19 +96,13 @@ function TasksContent() {
                 `data-[state=active]` would match nothing. See the note in
                 `components/ui/tabs.tsx`. */}
             {canGrade ? (
-              <TabsTrigger
-                value="grading"
-                className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
-              >
+              <TabsTrigger value="grading">
                 <ClipboardCheck className="h-4 w-4" aria-hidden />
                 Grading
                 <AwaitingGradeBadge />
               </TabsTrigger>
             ) : null}
-            <TabsTrigger
-              value="my-tasks"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white"
-            >
+            <TabsTrigger value="my-tasks">
               <ListTodo className="h-4 w-4" aria-hidden />
               My Tasks
             </TabsTrigger>
@@ -135,7 +132,7 @@ function AwaitingGradeBadge() {
   return (
     <span
       aria-live="polite"
-      className="ml-1 rounded-md bg-brand/20 px-1.5 py-0.5 text-xs font-bold text-brand-ink"
+      className="tabular rounded-sm border border-brand/30 bg-brand/10 px-1.5 py-0.5 text-xs font-bold text-brand-ink"
     >
       {summary.awaitingGrade} to mark
     </span>
@@ -146,18 +143,18 @@ function TasksSkeleton() {
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full" aria-hidden>
       <div className="flex flex-col gap-2">
-        <Skeleton className="h-9 w-40 rounded-xl" />
-        <Skeleton className="h-5 w-72 max-w-full rounded-xl" />
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-5 w-72 max-w-full" />
       </div>
       <div className="-mx-4 overflow-hidden px-4 sm:mx-0 sm:px-0">
-        <Skeleton className="h-12 w-80 max-w-full rounded-2xl" />
+        <Skeleton className="h-12 w-80 max-w-full" />
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-28 w-full rounded-[24px]" />
+          <Skeleton key={i} className="h-28 w-full" />
         ))}
       </div>
-      <Skeleton className="h-40 w-full rounded-[24px]" />
+      <Skeleton className="h-40 w-full" />
     </div>
   );
 }

@@ -13,6 +13,46 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Loader2, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+/** Decodable by `createImageBitmap`; anything else (SVG, HEIC) is passed
+ *  through untouched so Clerk, not this function, decides what it rejects. */
+const RASTER = /^image\/(jpeg|png|webp|gif|avif)$/;
+
+/**
+ * Downscales an avatar before it goes to Clerk.
+ *
+ * Clerk's `/v1/me/profile_image` answers a bare `413` for an oversized body, so
+ * the old path failed for any modern phone photo (3-8 MB) with nothing to show
+ * the user. Canvas + `createImageBitmap` do the resize for free; `ponytail:`
+ * assuming Clerk's cap stays above ~100 KB of JPEG — if it ever drops, step the
+ * quality down here rather than reintroducing a client-side image library.
+ */
+async function fitForClerk(file: File, maxEdge = 512): Promise<File> {
+  if (!RASTER.test(file.type) || file.size <= 200 * 1024) return file;
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("This browser cannot resize images");
+    // JPEG has no alpha, so transparent pixels would otherwise become black.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
+    if (!blob) throw new Error("Could not process that image");
+    return new File([blob], "avatar.jpg", { type: "image/jpeg" });
+  } finally {
+    bitmap.close();
+  }
+}
+
 export default function SettingsPage() {
   const { user } = useUser();
   const currentUser = useQuery(api.users.getCurrentUser);
@@ -57,14 +97,18 @@ export default function SettingsPage() {
       // syncs imageUrl into Convex. Writing it to Convex here too keeps the UI
       // instant instead of waiting for the webhook round-trip, and avoids
       // storing a Convex signed URL that expires — Clerk CDN URLs do not.
-      const updated = await user?.setProfileImage({ file });
+      const updated = await user?.setProfileImage({
+        file: await fitForClerk(file),
+      });
       const url = updated?.publicUrl;
       if (url) {
         await updateProfile({ imageUrl: url });
       }
       toast.success("Profile photo updated");
-    } catch {
-      toast.error("Upload failed. Please try again.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? `Upload failed: ${err.message}` : "Upload failed. Please try again.",
+      );
     } finally {
       setIsUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";

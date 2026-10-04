@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -123,10 +124,17 @@ function FriendsView() {
   // Every query lives above the Tabs panels on purpose: Base UI unmounts a
   // hidden panel, so a query inside one would be torn down and refetched on
   // every tab switch.
-  const friends = useQuery(friendsApi.listFriends);
-  const requests = useQuery(friendsApi.listRequests);
-  const pendingCount = useQuery(friendsApi.getPendingRequestCount);
-  const activity = useQuery(friendsApi.getFriendsActivity, { limit: 8 });
+  // Every one of these `requireUser`, so they stay unsubscribed until the
+  // Convex `users` row exists — otherwise a first load (webhook still in flight,
+  // or `EnsureCurrentUser` about to create it) throws "Not authenticated".
+  const dbUser = useQuery(api.users.getCurrentUser);
+  const friends = useQuery(friendsApi.listFriends, dbUser ? {} : "skip");
+  const requests = useQuery(friendsApi.listRequests, dbUser ? {} : "skip");
+  const pendingCount = useQuery(friendsApi.getPendingRequestCount, dbUser ? {} : "skip");
+  const activity = useQuery(
+    friendsApi.getFriendsActivity,
+    dbUser ? { limit: 8 } : "skip",
+  );
 
   const sendRequest = useMutation(friendsApi.sendRequest);
   const acceptRequest = useMutation(friendsApi.acceptRequest);

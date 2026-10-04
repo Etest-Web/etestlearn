@@ -97,11 +97,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // Real friends now, replacing a hardcoded pravatar.cc placeholder list.
     // The sidebar is chrome, so this is capped and cheap; the full list and
     // every activity summary live on /dashboard/friends.
-    const friends = useQuery(friendsApi.listSidebarFriends, { limit: 6 });
-    const pendingFriendRequests = useQuery(friendsApi.getPendingRequestCount);
+    // Gated on `dbUser`: these three all `requireUser`, which throws until the
+    // Convex `users` row exists. That row is created by the Clerk webhook, or
+    // by `EnsureCurrentUser` a beat after first paint — so subscribing before it
+    // lands logs "Not authenticated" for every dashboard load. Skipping is also
+    // correct for a suspended account, which reads as signed out everywhere.
+    const friends = useQuery(
+        friendsApi.listSidebarFriends,
+        dbUser ? { limit: 6 } : "skip",
+    );
+    const pendingFriendRequests = useQuery(
+        friendsApi.getPendingRequestCount,
+        dbUser ? {} : "skip",
+    );
     // Drives the header's Messages / Notifications badges. One query for both
     // counts rather than two, so the header costs a single subscription.
-    const unread = useQuery(inboxApi.getUnreadCounts);
+    const unread = useQuery(inboxApi.getUnreadCounts, dbUser ? {} : "skip");
 
     // Navigation state is read here because the sidebar renders on every
     // dashboard route, so it is the one place that can mark the current item.

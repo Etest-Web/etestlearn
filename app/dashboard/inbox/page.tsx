@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -240,8 +241,12 @@ function InboxPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
 
-  const counts = useQuery(inboxApi.getUnreadCounts, {});
-  const threads = useQuery(inboxApi.listThreads, { limit: 50 });
+  // `requireUser` in every inbox query, so they stay unsubscribed until the
+  // Convex `users` row exists — otherwise a first load (webhook still in flight,
+  // or `EnsureCurrentUser` about to create it) throws "Not authenticated".
+  const dbUser = useQuery(api.users.getCurrentUser);
+  const counts = useQuery(inboxApi.getUnreadCounts, dbUser ? {} : "skip");
+  const threads = useQuery(inboxApi.listThreads, dbUser ? { limit: 50 } : "skip");
 
   const unreadMessages = counts?.messages ?? 0;
   const unreadNotifications = counts?.notifications ?? 0;
@@ -986,10 +991,13 @@ function NotificationsPane({
   unreadCount: number;
   onNavigate: (href: string) => void;
 }) {
-  const notifications = useQuery(inboxApi.listNotifications, {
-    limit: FEED_PAGE_SIZE,
-    unreadOnly,
-  });
+  // Same `requireUser` gate as the page: identical query, so Convex shares the
+  // subscription rather than adding one.
+  const dbUser = useQuery(api.users.getCurrentUser);
+  const notifications = useQuery(
+    inboxApi.listNotifications,
+    dbUser ? { limit: FEED_PAGE_SIZE, unreadOnly } : "skip",
+  );
   const markNotificationRead = useMutation(inboxApi.markNotificationRead);
   const markAllNotificationsRead = useMutation(inboxApi.markAllNotificationsRead);
   const [markingAll, setMarkingAll] = useState(false);

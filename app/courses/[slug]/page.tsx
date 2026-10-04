@@ -3,10 +3,19 @@
 import { useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui";
 import { notFound, useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, ListChecks, Loader2, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 
@@ -65,78 +74,87 @@ export default function CoursePage() {
   function renderCta() {
     if (!isSignedIn) {
       return (
-        <Button size="lg" className="mt-2" onClick={() => router.push("/sign-in")}>
+        <Button size="lg" onClick={() => router.push("/sign-in")}>
           Sign in to enroll
         </Button>
       );
     }
     if (hasAccess) {
       return (
-        <Button size="lg" className="mt-2" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
+        <Button size="lg" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
           Continue learning
         </Button>
       );
     }
     if (isPaidCourse) {
       return (
-        <Button size="lg" className="mt-2" disabled={isPaying} onClick={handlePay}>
+        <Button size="lg" disabled={isPaying} onClick={handlePay}>
           {isPaying ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting to Paystack...
+              <Loader2 className="animate-spin" /> Redirecting to Paystack...
             </>
           ) : (
             <>
-              <Lock className="mr-2 h-4 w-4" /> Pay {formatNaira(course.price)} with Paystack
+              <Lock /> Pay {formatNaira(course.price)} with Paystack
             </>
           )}
         </Button>
       );
     }
     return (
-      <Button size="lg" className="mt-2" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
+      <Button size="lg" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
         Enroll &amp; start learning
       </Button>
     );
   }
 
   return (
-    <>
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:py-12 space-y-8">
-      <header className="space-y-4">
-        <Button onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /> Back</Button>
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Fixed square so it sits inline with the badges — w-full in a
-              flex-wrap row claimed a whole line at 1:1 on phones. */}
-          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+    <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:py-12">
+      {/* Kept outside PageHeader rather than in its `actions` slot: that slot
+          sits beside the title on desktop but *below* it on mobile, and "Back"
+          has to stay above the title at every width. */}
+      <Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => router.back()}>
+        <ArrowLeft /> Back
+      </Button>
+
+      <PageHeader
+        title={course.title}
+        description={course.description}
+        actions={renderCta()}
+      >
+        {/* Fixed square so it sits inline with the badges — w-full in a
+            flex-wrap row claimed a whole line at 1:1 on phones. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-sm object-cover" />
           {course.category && <Badge variant="secondary">{course.category}</Badge>}
-          {course.level && (
-            <Badge variant="outline" className="text-xs">
-              {course.level}
-            </Badge>
-          )}
-          <Badge variant={isPaidCourse ? "default" : "secondary"}>{formatNaira(course.price)}</Badge>
+          {course.level && <Badge variant="outline">{course.level}</Badge>}
+          {/* Price is a number a buyer scans for, so it is set as a price rather
+              than as a 10px chip. `tabular` stops it reflowing as digits change. */}
+          <span className="tabular text-[15px] font-semibold text-foreground">
+            {formatNaira(course.price)}
+          </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-balance">{course.title}</h1>
-        <p className="text-muted-foreground">{course.description}</p>
-        {renderCta()}
-      </header>
+      </PageHeader>
 
       <section>
         <Card>
           <CardHeader>
-            <CardTitle>Course outline</CardTitle>
+            <CardTitle className="rule-heading">Course outline</CardTitle>
           </CardHeader>
           <CardContent>
             {lessons.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Lessons will appear here once you add them in Convex.
-              </p>
+              <EmptyState
+                icon={ListChecks}
+                tone="neutral"
+                title="No lessons published yet"
+                description="Lessons will appear here once the instructor has added them in Convex."
+              />
             ) : (
               <ol className="space-y-3">
                 {lessons.map((lesson) => (
                   <li
                     key={lesson._id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    className="flex items-center justify-between border border-rule px-3 py-2 text-sm"
                   >
                     <div>
                       <p className="font-medium">{lesson.title}</p>
@@ -145,7 +163,7 @@ export default function CoursePage() {
                       </p>
                     </div>
                     {lesson.durationMinutes && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="tabular text-xs text-muted-foreground">
                         {lesson.durationMinutes} min
                       </span>
                     )}
@@ -158,11 +176,10 @@ export default function CoursePage() {
       </section>
 
       {isPaidCourse && !hasAccess && (
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-center text-muted-foreground">
           Payments are processed securely by Paystack — cards, bank transfer &amp; USSD accepted.
         </p>
       )}
     </main>
-    </>
   );
 }

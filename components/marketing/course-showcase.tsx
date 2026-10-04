@@ -5,7 +5,8 @@ import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, BookOpen } from "lucide-react";
+import { Button, EmptyState } from "@/components/ui";
 import { SectionHeading } from "./section-heading";
 import { Reveal } from "./reveal";
 
@@ -31,9 +32,9 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-[box-shadow,transform] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_oklch(0_0_0/0.25)]"
+      className="group flex flex-col overflow-hidden rounded-sm border border-rule bg-card transition-[border-color,transform] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring hover:-translate-y-1 hover:border-rule-strong"
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+      <div className="relative aspect-[16/10] overflow-hidden bg-surface-sunken">
         {course.thumbnailUrl ? (
           <Image
             src={course.thumbnailUrl}
@@ -49,11 +50,11 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
             </span>
           </div>
         )}
-        <span className="absolute left-3 top-3 rounded-full bg-background/90 px-3 py-1 text-[11px] font-semibold backdrop-blur-sm">
+        <span className="absolute left-3 top-3 rounded-sm bg-background/90 px-3 py-1 text-[11px] font-semibold backdrop-blur-sm">
           {price ? (
-            <span className="tabular-nums">{price}</span>
+            <span className="tabular">{price}</span>
           ) : (
-            <span className="text-emerald-600 dark:text-emerald-400">Free</span>
+            <span className="text-success">Free</span>
           )}
         </span>
       </div>
@@ -61,7 +62,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
           {course.category ? (
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+            <span className="text-[11px] font-semibold uppercase tracking-editorial text-primary">
               {course.category}
             </span>
           ) : (
@@ -72,7 +73,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
               <span
                 key={n}
                 aria-hidden="true"
-                className={`h-1.5 w-1.5 rounded-full ${dots >= n ? "bg-brand" : "bg-border"}`}
+                className={`size-1.5 rounded-full ${dots >= n ? "bg-brand" : "bg-rule-strong"}`}
               />
             ))}
           </div>
@@ -94,30 +95,31 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
 
 function CardSkeleton() {
   return (
-    <div className="flex animate-pulse flex-col overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="aspect-[16/10] bg-muted" />
+    <div className="flex animate-pulse flex-col overflow-hidden rounded-sm border border-rule bg-card">
+      <div className="aspect-[16/10] bg-surface-sunken" />
       <div className="space-y-3 p-5">
-        <div className="h-3 w-16 rounded bg-muted" />
-        <div className="h-4 w-3/4 rounded bg-muted" />
-        <div className="h-3 w-full rounded bg-muted" />
+        <div className="h-3 w-16 rounded-sm bg-surface-sunken" />
+        <div className="h-4 w-3/4 rounded-sm bg-surface-sunken" />
+        <div className="h-3 w-full rounded-sm bg-surface-sunken" />
       </div>
     </div>
   );
 }
 
-function EmptyState() {
+function CatalogEmptyState() {
   return (
-    <div className="rounded-2xl border border-dashed border-border p-12 text-center">
-      <p className="font-display text-2xl tracking-wide">The catalog is being curated</p>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Our first courses are in review right now. Check back shortly — or apply to teach the first one.
-      </p>
-      <Link
-        href="/become-instructor"
-        className="mt-5 inline-flex h-10 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background"
-      >
-        Become an instructor
-      </Link>
+    <div className="col-span-full border border-rule bg-card">
+      <EmptyState
+        icon={BookOpen}
+        tone="brand"
+        title="The catalog is being curated"
+        description="Our first courses are in review right now. Check back shortly — or apply to teach the first one."
+        action={
+          <Button render={<Link href="/become-instructor" />}>
+            Become an instructor
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -157,16 +159,16 @@ export function CourseShowcase() {
           </>
         )}
 
-        {courses !== undefined && courses.length === 0 && <EmptyState />}
+        {courses !== undefined && courses.length === 0 && <CatalogEmptyState />}
       </div>
 
       {courses !== undefined && courses.length > 6 && (
         <div className="mt-10 flex justify-center">
           <Link
             href="/courses"
-            className="inline-flex h-11 items-center justify-center rounded-full border border-border px-6 text-sm font-medium transition-colors hover:bg-accent"
+            className="inline-flex h-11 items-center justify-center rounded-sm border border-rule-strong px-6 text-sm font-medium transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            Browse all {courses.length} courses
+            Browse all <span className="tabular">{courses.length}</span> courses
           </Link>
         </div>
       )}

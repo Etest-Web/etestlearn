@@ -33,7 +33,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
     const [open, setOpen] = useState(false);
 
     return (
-        <div className="border-b border-border">
+        <div className="border-b border-rule">
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
@@ -56,7 +56,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
                 )}
             >
                 <div className="overflow-hidden">
-                    <p className="max-w-2xl pb-5 text-sm leading-relaxed text-pretty text-muted-foreground">{a}</p>
+                    <p className="max-w-2xl pb-5 text-sm leading-body text-pretty text-muted-foreground">{a}</p>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@ export function FaqSection() {
                     description="Everything learners usually want to know before their first enrollment."
                 />
                 <Reveal>
-                    <div className="border-t border-border">
+                    <div className="border-t border-rule">
                         {FAQS.map(faq => (
                             <FaqItem key={faq.q} q={faq.q} a={faq.a} />
                         ))}

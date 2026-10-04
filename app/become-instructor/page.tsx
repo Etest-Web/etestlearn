@@ -7,8 +7,10 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
+    EmptyState,
     Input,
     Label,
+    PageHeader,
     Textarea,
 } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
@@ -83,270 +85,280 @@ export default function BecomeInstructorPage() {
     // Already an instructor/admin
     if (dbUser && (dbUser.role === "instructor" || dbUser.role === "admin")) {
         return (
-            <>
-                <main className="mx-auto max-w-2xl px-4 py-20 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="rounded-full bg-green-500/10 p-4">
-                            <CheckCircle2 className="h-10 w-10 text-green-500" />
-                        </div>
-                        <h1 className="text-3xl font-bold tracking-tight">You&apos;re already an instructor!</h1>
-                        <p className="text-muted-foreground max-w-md">
-                            You already have instructor access. Head to your Instructor Dashboard to create and manage
-                            courses.
-                        </p>
-                        <Button onClick={() => router.push("/dashboard/instructor")}>Go to Instructor Dashboard</Button>
-                    </div>
-                </main>
-            </>
+            <main className="mx-auto max-w-2xl px-4 py-20">
+                {/* EmptyState owns an h3; the h1 keeps this branch's page title
+                    in the document outline the same way the form branch's
+                    PageHeader does. */}
+                <h1 className="sr-only">You&apos;re already an instructor</h1>
+                <EmptyState
+                    icon={CheckCircle2}
+                    tone="brand"
+                    title="You're already an instructor!"
+                    description="You already have instructor access. Head to your Instructor Dashboard to create and manage courses."
+                    action={
+                        <Button onClick={() => router.push("/dashboard/instructor")}>
+                            Go to Instructor Dashboard
+                        </Button>
+                    }
+                />
+            </main>
         );
     }
 
     // Has a pending or reviewed application
     if (myApplication) {
         return (
-            <>
-                <main className="mx-auto max-w-2xl px-4 py-20">
-                    <Card className="border-2">
-                        <CardHeader className="text-center">
-                            {myApplication.status === "pending" && (
-                                <>
-                                    <div className="mx-auto rounded-full bg-brand/20 p-4 mb-4">
-                                        <Clock className="h-10 w-10 text-brand-ink" />
-                                    </div>
-                                    <CardTitle className="text-2xl">Application Under Review</CardTitle>
-                                    <CardDescription className="max-w-md mx-auto mt-2">
-                                        Thanks for applying, {myApplication.fullName}! Our team is reviewing your
-                                        application. We&apos;ll update your account once a decision is made.
-                                    </CardDescription>
-                                </>
-                            )}
-                            {myApplication.status === "approved" && (
-                                <>
-                                    <div className="mx-auto rounded-full bg-green-500/10 p-4 mb-4">
-                                        <CheckCircle2 className="h-10 w-10 text-green-500" />
-                                    </div>
-                                    <CardTitle className="text-2xl">Application Approved! 🎉</CardTitle>
-                                    <CardDescription className="max-w-md mx-auto mt-2">
-                                        Congratulations! You&apos;ve been approved as an instructor. You can now access
-                                        the Instructor Dashboard and start creating courses.
-                                    </CardDescription>
-                                </>
-                            )}
-                            {myApplication.status === "rejected" && (
-                                <>
-                                    <div className="mx-auto rounded-full bg-red-500/10 p-4 mb-4">
-                                        <XCircle className="h-10 w-10 text-red-500" />
-                                    </div>
-                                    <CardTitle className="text-2xl">Application Not Approved</CardTitle>
-                                    <CardDescription className="max-w-md mx-auto mt-2">
-                                        Unfortunately, your application wasn&apos;t approved at this time.
-                                        {myApplication.reviewNote && (
-                                            <span className="block mt-2 text-foreground font-medium">
-                                                &ldquo;{myApplication.reviewNote}&rdquo;
-                                            </span>
-                                        )}
-                                    </CardDescription>
-                                </>
-                            )}
-                        </CardHeader>
-                        <CardContent className="text-center">
-                            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                                <span>Status:</span>
-                                <Badge
-                                    variant={
-                                        myApplication.status === "approved"
-                                            ? "default"
-                                            : myApplication.status === "rejected"
-                                              ? "destructive"
-                                              : "secondary"
-                                    }
-                                    className="capitalize"
-                                >
-                                    {myApplication.status}
-                                </Badge>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="justify-center">
-                            {myApplication.status === "approved" ? (
-                                <Button onClick={() => router.push("/dashboard/instructor")}>
-                                    Go to Instructor Dashboard
-                                </Button>
-                            ) : (
-                                <Button variant="outline" onClick={() => router.push("/dashboard")}>
-                                    Back to Dashboard
-                                </Button>
-                            )}
-                        </CardFooter>
-                    </Card>
-                </main>
-            </>
+            <main className="mx-auto max-w-2xl px-4 py-20">
+                {/* CardTitle renders a div, so this branch's status heading is
+                    not a document heading; the sr-only h1 gives all three
+                    branches of this page the same outline. */}
+                <h1 className="sr-only">Instructor application status</h1>
+                <Card>
+                    <CardHeader className="items-center text-center">
+                        {myApplication.status === "pending" && (
+                            <>
+                                <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                                    <Clock className="h-6 w-6" />
+                                </div>
+                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                    Application Under Review
+                                </CardTitle>
+                                <CardDescription className="mx-auto mt-2 max-w-md text-center">
+                                    Thanks for applying, {myApplication.fullName}! Our team is reviewing your
+                                    application. We&apos;ll update your account once a decision is made.
+                                </CardDescription>
+                            </>
+                        )}
+                        {myApplication.status === "approved" && (
+                            <>
+                                <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-success/10 text-success">
+                                    <CheckCircle2 className="h-6 w-6" />
+                                </div>
+                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                    Application Approved! 🎉
+                                </CardTitle>
+                                <CardDescription className="mx-auto mt-2 max-w-md text-center">
+                                    Congratulations! You&apos;ve been approved as an instructor. You can now access
+                                    the Instructor Dashboard and start creating courses.
+                                </CardDescription>
+                            </>
+                        )}
+                        {myApplication.status === "rejected" && (
+                            <>
+                                <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                                    <XCircle className="h-6 w-6" />
+                                </div>
+                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                    Application Not Approved
+                                </CardTitle>
+                                <CardDescription className="mx-auto mt-2 max-w-md text-center">
+                                    Unfortunately, your application wasn&apos;t approved at this time.
+                                    {myApplication.reviewNote && (
+                                        <span className="mt-2 block font-medium text-foreground">
+                                            &ldquo;{myApplication.reviewNote}&rdquo;
+                                        </span>
+                                    )}
+                                </CardDescription>
+                            </>
+                        )}
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <span>Status:</span>
+                        {/* The word carries the state; the tint only reinforces it. */}
+                        <Badge
+                            variant={
+                                myApplication.status === "approved"
+                                    ? "success"
+                                    : myApplication.status === "rejected"
+                                        ? "destructive"
+                                        : "secondary"
+                            }
+                        >
+                            {myApplication.status}
+                        </Badge>
+                    </CardContent>
+                    <CardFooter className="justify-center">
+                        {myApplication.status === "approved" ? (
+                            <Button onClick={() => router.push("/dashboard/instructor")}>
+                                Go to Instructor Dashboard
+                            </Button>
+                        ) : (
+                            <Button variant="outline" onClick={() => router.push("/dashboard")}>
+                                Back to Dashboard
+                            </Button>
+                        )}
+                    </CardFooter>
+                </Card>
+            </main>
         );
     }
 
     return (
-        <>
-            <main className="mx-auto max-w-3xl px-4 py-12 space-y-8">
-                {/* Hero */}
-                <section className="text-center space-y-4">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#945DA3] to-[#5B3368] text-white shadow-lg">
-                        <GraduationCap className="h-8 w-8" />
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Become an Instructor</h1>
-                    <p className="text-muted-foreground max-w-xl mx-auto">
-                        Share your expertise with thousands of learners. Apply to join our instructor community, and
-                        once approved, start creating and publishing courses on Glypha Learning.
-                    </p>
-                </section>
+        <main className="mx-auto max-w-3xl space-y-12 px-4 py-12">
+            {/* Hero. The icon plate stays above the title (its own element) so
+                the mark-over-heading composition survives the move to
+                PageHeader, whose `children` slot sits below the description. */}
+            <div className="space-y-6">
+                <div aria-hidden className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                    <GraduationCap className="h-6 w-6" />
+                </div>
+                <PageHeader
+                    title="Become an Instructor"
+                    description="Share your expertise with thousands of learners. Apply to join our instructor community, and once approved, start creating and publishing courses on Glypha Learning."
+                />
+            </div>
 
-                {/* Benefits */}
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {[
-                        {
-                            icon: "🎯",
-                            title: "Reach Learners",
-                            desc: "Publish to a growing community of motivated students.",
-                        },
-                        {
-                            icon: "🛠️",
-                            title: "Powerful Tools",
-                            desc: "Create video, article, and quiz-based lessons with ease.",
-                        },
-                        {
-                            icon: "📊",
-                            title: "Track Impact",
-                            desc: "See enrollment stats and student progress on your courses.",
-                        },
-                    ].map(benefit => (
-                        <Card key={benefit.title} className="text-center border-dashed">
-                            <CardContent className="pt-6 space-y-2">
-                                <span className="text-2xl">{benefit.icon}</span>
-                                <h3 className="font-semibold text-sm">{benefit.title}</h3>
-                                <p className="text-xs text-muted-foreground">{benefit.desc}</p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </section>
-
-                {/* Sign-in prompt for unauthenticated users */}
-                {!isLoaded ? (
-                    <div className="flex justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                ) : !user ? (
-                    <Card className="border-2 border-dashed">
-                        <CardContent className="flex flex-col items-center gap-4 py-12">
-                            <Sparkles className="h-8 w-8 text-brand-ink" />
-                            <h3 className="text-lg font-semibold">Sign in to apply</h3>
-                            <p className="text-sm text-muted-foreground text-center max-w-sm">
-                                You need an Glypha Learning account before you can submit your instructor application.
-                            </p>
-                            <Button onClick={() => router.push("/sign-in")}>Sign in to get started</Button>
+            {/* Benefits — `sunken` rather than a dashed outline: the editorial
+                system separates with rules and recessed planes, never dashes. */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {[
+                    {
+                        icon: "🎯",
+                        title: "Reach Learners",
+                        desc: "Publish to a growing community of motivated students.",
+                    },
+                    {
+                        icon: "🛠️",
+                        title: "Powerful Tools",
+                        desc: "Create video, article, and quiz-based lessons with ease.",
+                    },
+                    {
+                        icon: "📊",
+                        title: "Track Impact",
+                        desc: "See enrollment stats and student progress on your courses.",
+                    },
+                ].map(benefit => (
+                    <Card key={benefit.title} variant="sunken">
+                        <CardContent className="space-y-2">
+                            <span aria-hidden className="text-2xl">{benefit.icon}</span>
+                            <h3 className="text-sm font-semibold">{benefit.title}</h3>
+                            <p className="text-xs text-muted-foreground">{benefit.desc}</p>
                         </CardContent>
                     </Card>
-                ) : (
-                    /* Application Form */
-                    <Card>
-                        <form onSubmit={handleSubmit}>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Sparkles className="h-5 w-5 text-brand-ink" />
-                                    Instructor Application
-                                </CardTitle>
-                                <CardDescription>
-                                    Tell us about yourself and why you&apos;d like to teach on our platform. Fields
-                                    marked * are required.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-5">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="fullName">Full Name *</Label>
-                                        <Input
-                                            id="fullName"
-                                            name="fullName"
-                                            placeholder="Your full name"
-                                            value={effectiveFullName}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email Address *</Label>
-                                        <Input
-                                            id="email"
-                                            name="email"
-                                            type="email"
-                                            placeholder="you@example.com"
-                                            value={effectiveEmail}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                </div>
+                ))}
+            </section>
 
+            {/* Sign-in prompt for unauthenticated users */}
+            {!isLoaded ? (
+                <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : !user ? (
+                <EmptyState
+                    icon={Sparkles}
+                    tone="brand"
+                    title="Sign in to apply"
+                    description="You need an Glypha Learning account before you can submit your instructor application."
+                    action={
+                        <Button onClick={() => router.push("/sign-in")}>
+                            Sign in to get started
+                        </Button>
+                    }
+                />
+            ) : (
+                /* Application Form */
+                <Card>
+                    <form onSubmit={handleSubmit}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-brand" />
+                                Instructor Application
+                            </CardTitle>
+                            <CardDescription>
+                                Tell us about yourself and why you&apos;d like to teach on our platform. Fields
+                                marked * are required.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="expertise">Area of Expertise *</Label>
+                                    <Label htmlFor="fullName">Full Name *</Label>
                                     <Input
-                                        id="expertise"
-                                        name="expertise"
-                                        placeholder="e.g. Web Development, Graphic Design, Data Science"
-                                        value={formData.expertise}
+                                        id="fullName"
+                                        name="fullName"
+                                        placeholder="Your full name"
+                                        value={effectiveFullName}
                                         onChange={handleChange}
                                         required
                                     />
                                 </div>
-
                                 <div className="space-y-2">
-                                    <Label htmlFor="bio">Professional Bio *</Label>
-                                    <Textarea
-                                        id="bio"
-                                        name="bio"
-                                        rows={4}
-                                        placeholder="Tell us about your background, experience, and qualifications..."
-                                        value={formData.bio}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="portfolioUrl">Portfolio / Website URL (optional)</Label>
+                                    <Label htmlFor="email">Email Address *</Label>
                                     <Input
-                                        id="portfolioUrl"
-                                        name="portfolioUrl"
-                                        type="url"
-                                        placeholder="https://your-portfolio.com"
-                                        value={formData.portfolioUrl}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="motivation">Why do you want to teach on Glypha Learning? *</Label>
-                                    <Textarea
-                                        id="motivation"
-                                        name="motivation"
-                                        rows={3}
-                                        placeholder="What motivates you to create courses and share your knowledge?"
-                                        value={formData.motivation}
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={effectiveEmail}
                                         onChange={handleChange}
                                         required
                                     />
                                 </div>
-                            </CardContent>
-                            <CardFooter className="flex justify-between border-t pt-4">
-                                <Button type="button" variant="ghost" onClick={() => router.push("/")}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={isSubmitting}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Submit Application
-                                </Button>
-                            </CardFooter>
-                        </form>
-                    </Card>
-                )}
-            </main>
-        </>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="expertise">Area of Expertise *</Label>
+                                <Input
+                                    id="expertise"
+                                    name="expertise"
+                                    placeholder="e.g. Web Development, Graphic Design, Data Science"
+                                    value={formData.expertise}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="bio">Professional Bio *</Label>
+                                <Textarea
+                                    id="bio"
+                                    name="bio"
+                                    rows={4}
+                                    placeholder="Tell us about your background, experience, and qualifications..."
+                                    value={formData.bio}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="portfolioUrl">Portfolio / Website URL (optional)</Label>
+                                <Input
+                                    id="portfolioUrl"
+                                    name="portfolioUrl"
+                                    type="url"
+                                    placeholder="https://your-portfolio.com"
+                                    value={formData.portfolioUrl}
+                                    onChange={handleChange}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="motivation">Why do you want to teach on Glypha Learning? *</Label>
+                                <Textarea
+                                    id="motivation"
+                                    name="motivation"
+                                    rows={3}
+                                    placeholder="What motivates you to create courses and share your knowledge?"
+                                    value={formData.motivation}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
+                        </CardContent>
+                        {/* CardFooter already carries `border-t border-rule pt-4`. */}
+                        <CardFooter className="flex justify-between">
+                            <Button type="button" variant="ghost" onClick={() => router.push("/")}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="animate-spin" />}
+                                Submit Application
+                            </Button>
+                        </CardFooter>
+                    </form>
+                </Card>
+            )}
+        </main>
     );
 }

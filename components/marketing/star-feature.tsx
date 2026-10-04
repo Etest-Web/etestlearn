@@ -12,7 +12,7 @@ export function StarFeature() {
     return (
         <section className="mx-auto max-w-6xl px-4 py-20 md:py-28">
             <Reveal>
-                <div className="relative overflow-hidden rounded-3xl border border-brand/30 bg-gradient-to-br from-brand/15 via-card to-card p-8 sm:p-12 lg:p-16">
+                <div className="relative overflow-hidden rounded-sm border border-brand/30 bg-gradient-to-br from-brand/15 via-card to-card p-8 sm:p-12 lg:p-16">
                     <div
                         aria-hidden="true"
                         className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand/20 blur-3xl"
@@ -35,15 +35,15 @@ export function StarFeature() {
                             </p>
                             <Link
                                 href="/courses"
-                                className="inline-flex h-11 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition-transform duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                className="inline-flex h-11 items-center justify-center rounded-sm bg-foreground px-6 text-sm font-medium text-background transition-transform duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                             >
                                 Start earning yours
                             </Link>
                         </div>
 
-                        <ul className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+                        <ul className="space-y-4 rounded-sm border border-rule bg-card p-6 sm:p-8">
                             {PERKS.map(perk => (
-                                <li key={perk} className="flex items-start gap-3 text-sm leading-relaxed">
+                                <li key={perk} className="flex items-start gap-3 text-sm leading-body">
                                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
                                         <Check className="h-3 w-3" strokeWidth={3} />
                                     </span>

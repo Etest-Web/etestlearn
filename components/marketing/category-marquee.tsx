@@ -18,7 +18,7 @@ function Row({ hidden }: { hidden?: boolean }) {
     <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
       {TOPICS.map((topic) => (
         <span key={topic} className="flex items-center">
-          <span className="px-6 font-display text-xl tracking-wider text-muted-foreground sm:text-2xl">
+          <span className="px-6 font-display text-xl tracking-editorial text-muted-foreground sm:text-2xl">
             {topic.toUpperCase()}
           </span>
           <svg viewBox="0 0 24 24" className="h-3 w-3 text-primary" fill="currentColor">
@@ -32,7 +32,7 @@ function Row({ hidden }: { hidden?: boolean }) {
 
 export function CategoryMarquee() {
   return (
-    <div className="marquee overflow-hidden border-y bg-card py-4">
+    <div className="marquee overflow-hidden border-y border-rule bg-card py-4">
       <div className="marquee-track flex w-max">
         <Row />
         <Row hidden />

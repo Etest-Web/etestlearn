@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, EmptyState } from "@/components/ui";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import { BadgeCheck, GraduationCap, Loader2, XCircle } from "lucide-react";
@@ -17,108 +18,137 @@ export default function VerifyCertificatePage() {
   );
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-background to-muted flex items-center justify-center px-4 py-10 sm:py-12">
+    /* A flat sunken plane with a single raised document on it, rather than a
+       gradient: someone reading this page is checking a credential, so it
+       should read as a document and not as a landing page. */
+    <main className="flex min-h-dvh items-center justify-center bg-surface-sunken px-4 py-10 sm:py-12">
       <div className="w-full max-w-lg">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <GraduationCap className="h-6 w-6 text-[#945DA3]" />
-          <span className="text-xl font-bold tracking-tight">Glypha Learn</span>
+        <div className="mb-8 flex items-center justify-center gap-2">
+          <GraduationCap aria-hidden className="h-5 w-5 text-brand" />
+          <span className="display-subheading text-lg tracking-editorial">
+            Glypha Learn
+          </span>
         </div>
 
         {result === undefined && (
-          <div className="bg-card rounded-2xl shadow-sm border p-10 text-center space-y-3">
-            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground">Verifying certificate...</p>
+          <div className="border border-rule bg-card p-10 text-center">
+            <Loader2
+              aria-hidden
+              className="mx-auto h-8 w-8 animate-spin text-muted-foreground"
+            />
+            <p className="mt-3 text-sm text-muted-foreground">
+              Verifying certificate&hellip;
+            </p>
           </div>
         )}
 
         {result === null && (
-          <div className="bg-card rounded-2xl shadow-sm border p-10 text-center space-y-3">
-            <XCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <h1 className="text-xl font-bold">Certificate not found</h1>
-            <p className="text-muted-foreground text-sm">
-              This verification link is invalid. Check the link and try again.
-            </p>
-            <Link href="/" className="inline-block text-sm font-medium text-[#945DA3] hover:underline">
-              Back to Glypha Learn
-            </Link>
+          <div className="border border-rule bg-card">
+            {/* EmptyState owns an h3; the h1 keeps the page heading in the
+                document outline. */}
+            <h1 className="sr-only">Certificate not found</h1>
+            <EmptyState
+              className="border-y-0"
+              icon={XCircle}
+              tone="warning"
+              title="Certificate not found"
+              description="This verification link is invalid. Check the link and try again."
+              action={
+                <Button variant="outline" render={<Link href="/" />}>
+                  Back to Glypha Learn
+                </Button>
+              }
+            />
           </div>
         )}
 
         {result && !result.valid && (
-          <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-            <div className="bg-red-50 border-b border-red-100 p-5 flex items-start gap-3">
-              <XCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="border border-rule bg-card">
+            {/* Tint plus hairline rather than a hardcoded pale red plate, so the
+                banner survives dark mode. The word "revoked" carries the state;
+                the colour only reinforces it. */}
+            <div className="flex items-start gap-3 border-b border-destructive/25 bg-destructive/8 p-5">
+              <XCircle
+                aria-hidden
+                className="mt-0.5 h-5 w-5 shrink-0 text-destructive"
+              />
               <div>
-                <p className="font-semibold text-red-800">Certificate revoked</p>
-                <p className="text-sm text-red-700/80">
+                <p className="font-semibold text-destructive">
+                  Certificate revoked
+                </p>
+                <p className="text-sm text-foreground/75">
                   {result.revocationReason
                     ? `This certificate was withdrawn: ${result.revocationReason}`
                     : "This certificate was withdrawn by the issuing instructor and is no longer valid."}
                 </p>
               </div>
             </div>
-            <dl className="p-8 space-y-6">
+            <dl className="space-y-6 p-8">
               <div>
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  Originally awarded to
-                </dt>
-                <dd className="text-2xl font-bold mt-1">{result.holderName}</dd>
+                <dt className="eyebrow">Originally awarded to</dt>
+                <dd className="display-subheading mt-1 text-2xl text-foreground">
+                  {result.holderName}
+                </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  Course
-                </dt>
-                <dd className="text-lg font-semibold mt-1">{result.courseTitle}</dd>
+                <dt className="eyebrow">Course</dt>
+                <dd className="mt-1 text-lg font-semibold text-foreground">
+                  {result.courseTitle}
+                </dd>
               </div>
             </dl>
           </div>
         )}
 
         {result?.valid && (
-          <div className="bg-card rounded-2xl shadow-sm border overflow-hidden">
-            <div className="bg-emerald-50 border-b border-emerald-100 p-5 flex items-start gap-3">
-              <BadgeCheck className="h-6 w-6 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="border border-rule bg-card">
+            <div className="flex items-start gap-3 border-b border-success/25 bg-success/10 p-5">
+              <BadgeCheck
+                aria-hidden
+                className="mt-0.5 h-5 w-5 shrink-0 text-success"
+              />
               <div>
-                <p className="font-semibold text-emerald-800">Authentic certificate</p>
-                <p className="text-sm text-emerald-700/80">
-                  This certificate was issued by Glypha Learn and its details below are verified.
+                <p className="font-semibold text-success">
+                  Authentic certificate
+                </p>
+                <p className="text-sm text-foreground/75">
+                  This certificate was issued by Glypha Learn and its details
+                  below are verified.
                 </p>
               </div>
             </div>
 
-            <dl className="p-8 space-y-6">
+            <dl className="space-y-6 p-8">
               <div>
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  Awarded to
-                </dt>
-                <dd className="text-2xl font-bold mt-1">{result.holderName}</dd>
+                <dt className="eyebrow">Awarded to</dt>
+                <dd className="display-subheading mt-1 text-2xl text-foreground">
+                  {result.holderName}
+                </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  For successfully completing
-                </dt>
-                <dd className="text-lg font-semibold mt-1">{result.courseTitle}</dd>
+                <dt className="eyebrow">For successfully completing</dt>
+                <dd className="mt-1 text-lg font-semibold text-foreground">
+                  {result.courseTitle}
+                </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  Issued on
-                </dt>
-                <dd className="mt-1">{formatCertificateDate(result.issuedAt)}</dd>
+                <dt className="eyebrow">Issued on</dt>
+                <dd className="tabular mt-1 text-foreground">
+                  {formatCertificateDate(result.issuedAt)}
+                </dd>
               </div>
               {result.serial && (
                 <div>
-                  <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                    Certificate ID
-                  </dt>
-                  <dd className="mt-1 font-mono text-sm">{result.serial}</dd>
+                  <dt className="eyebrow">Certificate ID</dt>
+                  <dd className="mt-1 font-mono text-sm text-foreground">
+                    {result.serial}
+                  </dd>
                 </div>
               )}
               {result.issuerName && (
                 <div>
-                  <dt className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                    Issued by
-                  </dt>
-                  <dd className="mt-1">{result.issuerName}</dd>
+                  <dt className="eyebrow">Issued by</dt>
+                  <dd className="mt-1 text-foreground">{result.issuerName}</dd>
                 </div>
               )}
             </dl>

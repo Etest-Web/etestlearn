@@ -9,7 +9,7 @@ export function ClosingCta() {
     const { user } = useUser();
 
     return (
-        <footer className="border-t bg-card">
+        <footer className="border-t border-rule bg-card">
             <section className="mx-auto max-w-6xl px-4 py-20 text-center md:py-28">
                 <Reveal>
                     <p className="flex items-center justify-center gap-3 font-mono text-xs uppercase tracking-[0.24em] text-muted-foreground">
@@ -23,7 +23,7 @@ export function ClosingCta() {
                     <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
                         <Link
                             href={user ? "/dashboard" : "/courses"}
-                            className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand px-7 text-sm font-semibold text-brand-foreground transition-transform duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                            className="group inline-flex h-12 items-center justify-center gap-2 rounded-sm bg-brand px-7 text-sm font-semibold text-brand-foreground transition-transform duration-200 hover:-translate-y-0.5 hover:bg-brand/90 active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                         >
                             {user ? "Continue learning" : "Browse courses — free to explore"}
                             <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -32,7 +32,7 @@ export function ClosingCta() {
                 </Reveal>
             </section>
 
-            <div className="border-t">
+            <div className="border-t border-rule">
                 <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-6 sm:flex-row">
                     <p className="text-xs text-muted-foreground">
                         © {new Date().getFullYear()} Glypha Learning. Learn skills that move you forward.
@@ -41,13 +41,16 @@ export function ClosingCta() {
                         className="flex items-center gap-6 text-xs font-medium text-muted-foreground"
                         aria-label="Footer"
                     >
-                        <Link href="/courses" className="transition-colors hover:text-foreground">
+                        {/* `.link-quiet` rather than a colour swap alone, so the
+                            links stay discoverable as links without relying on
+                            the hover state. */}
+                        <Link href="/courses" className="link-quiet">
                             Courses
                         </Link>
-                        <Link href="/become-instructor" className="transition-colors hover:text-foreground">
+                        <Link href="/become-instructor" className="link-quiet">
                             Teach
                         </Link>
-                        <Link href="/sign-in" className="transition-colors hover:text-foreground">
+                        <Link href="/sign-in" className="link-quiet">
                             Sign in
                         </Link>
                     </nav>

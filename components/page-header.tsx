@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-interface PageHeaderProps extends React.ComponentPropsWithoutRef<"header"> {
+interface PageHeaderProps extends Omit<React.ComponentPropsWithoutRef<"header">, "title"> {
   title: React.ReactNode
   description?: string
   subheading?: string

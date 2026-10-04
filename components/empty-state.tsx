@@ -17,7 +17,7 @@ export function EmptyState({
   variant = "default",
   className,
   ...props
-}: Required<Pick<EmptyStateProps, "title" | "description" | "icon" | "action">> & React.ComponentPropsWithoutRef<"div">) {
+}: EmptyStateProps) {
   return (
     <div
       className={cn(

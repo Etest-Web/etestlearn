@@ -79,6 +79,12 @@
   --accent: oklch(95.5% 0.028 318.82);
   --accent-foreground: oklch(20.5% 0.011 318.82);
   --destructive: oklch(57.7% 0.245 27.325);
+  --success: oklch(62.1% 0.174 145.2);
+  --success-foreground: oklch(100% 0 0);
+  --warning: oklch(76.8% 0.155 82.5);
+  --warning-foreground: oklch(20% 0.05 82.5);
+  --info: oklch(65% 0.12 250);
+  --info-foreground: oklch(100% 0 0);
   --border: oklch(92.2% 0.01 318.82);
   --input: oklch(92.2% 0.01 318.82);
   --ring: oklch(56.556% 0.121 318.82);

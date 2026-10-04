@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+
+# agent worktrees (git worktree add)
+/.worktrees
 /.pnp
 .pnp.*
 .yarn/*

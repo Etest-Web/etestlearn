@@ -17,18 +17,22 @@ import type * as courses from "../courses.js";
 import type * as discussions from "../discussions.js";
 import type * as enrollments from "../enrollments.js";
 import type * as files from "../files.js";
+import type * as friends from "../friends.js";
 import type * as goals from "../goals.js";
+import type * as groups from "../groups.js";
 import type * as helpers_audit from "../helpers/audit.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_completion from "../helpers/completion.js";
 import type * as helpers_rateLimit from "../helpers/rateLimit.js";
 import type * as http from "../http.js";
+import type * as inbox from "../inbox.js";
 import type * as instructorApplications from "../instructorApplications.js";
 import type * as payments from "../payments.js";
 import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as statistics from "../statistics.js";
+import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
 
 import type {
@@ -47,18 +51,22 @@ declare const fullApi: ApiFromModules<{
   discussions: typeof discussions;
   enrollments: typeof enrollments;
   files: typeof files;
+  friends: typeof friends;
   goals: typeof goals;
+  groups: typeof groups;
   "helpers/audit": typeof helpers_audit;
   "helpers/auth": typeof helpers_auth;
   "helpers/completion": typeof helpers_completion;
   "helpers/rateLimit": typeof helpers_rateLimit;
   http: typeof http;
+  inbox: typeof inbox;
   instructorApplications: typeof instructorApplications;
   payments: typeof payments;
   paystack: typeof paystack;
   quizzes: typeof quizzes;
   rateLimit: typeof rateLimit;
   statistics: typeof statistics;
+  tasks: typeof tasks;
   users: typeof users;
 }>;
 

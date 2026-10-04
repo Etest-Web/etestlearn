@@ -31,14 +31,17 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  Badge,
   Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
+  PageHeader,
   Separator,
   Skeleton,
   Tabs,
@@ -94,7 +97,7 @@ const NOTIFICATION_ICONS: Record<
 > = {
   certificate_earned: {
     icon: Award,
-    tint: "text-[#945DA3] bg-[#945DA3]/10",
+    tint: "text-brand-ink bg-brand/10",
     verb: "Certificate earned",
   },
   course_completed: {
@@ -134,14 +137,14 @@ const NOTIFICATION_ICONS: Record<
   },
   friend_request: {
     icon: UserPlus,
-    tint: "text-[#945DA3] bg-[#945DA3]/10",
+    tint: "text-brand-ink bg-brand/10",
     verb: "Friend request",
   },
 };
 
 // ─── Small shared pieces ────────────────────────────────────────────────────
 
-/** Tinted rounded square holding a type icon — the feed's list treatment. */
+/** Tinted square holding a type icon — the feed's list treatment. */
 function IconTile({
   icon: Icon,
   tint,
@@ -155,7 +158,7 @@ function IconTile({
     <span
       aria-hidden
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-2xl",
+        "flex size-10 shrink-0 items-center justify-center rounded-sm",
         tint,
         className,
       )}
@@ -185,7 +188,7 @@ function PersonAvatar({
 /** Role as a word, never colour alone. */
 function RolePill({ role }: { role: "student" | "instructor" | "admin" }) {
   return (
-    <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-1 rounded-md">
+    <span className="rounded-sm border border-rule bg-surface-sunken px-2 py-1 text-xs font-bold text-muted-foreground">
       {ROLE_LABELS[role]}
     </span>
   );
@@ -219,33 +222,6 @@ function ThreadTime({
     return <span className={cn("text-xs text-muted-foreground", className)}>New</span>;
   }
   return <TimeAgo at={at} className={className} />;
-}
-
-/**
- * The house empty state: dashed card, muted icon square, bold heading, a line of
- * explanation and — where there is one — the action that fills the gap.
- */
-function EmptyState({
-  icon: Icon,
-  title,
-  body,
-  action,
-}: {
-  icon: typeof Award;
-  title: string;
-  body: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 bg-card rounded-3xl border border-dashed border-border text-center">
-      <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 text-muted-foreground">
-        <Icon size={32} />
-      </div>
-      <h3 className="text-lg font-bold text-foreground mb-2">{title}</h3>
-      <p className="text-muted-foreground max-w-sm text-center text-sm">{body}</p>
-      {action ? <div className="mt-6">{action}</div> : null}
-    </div>
-  );
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -300,10 +276,10 @@ function InboxPage() {
     // two-pane mailbox needs the room — at 6xl the conversation pane collapses to
     // roughly the width of a phone on a desktop screen.
     <div className="flex flex-col gap-8 max-w-7xl w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">Inbox</h1>
-        <p className="text-muted-foreground font-medium">{unreadSummary}</p>
-      </div>
+      <PageHeader
+        title="Inbox"
+        description={<span className="tabular">{unreadSummary}</span>}
+      />
 
       {/* Both badge counts change in place, so they are announced politely
           rather than only being visible. */}
@@ -315,33 +291,28 @@ function InboxPage() {
       <Tabs value={tab} onValueChange={selectTab}>
         {/* Three triggers with badges do not fit 375px. Let them scroll
             horizontally inside the page padding instead of widening the
-            document. */}
+            document. `segmented` because these are peer views of the same
+            mailbox rather than separate sections of the page. */}
         <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
-            <TabsTrigger
-              value="messages"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
-            >
+          <TabsList variant="segmented" className="touch-target">
+            <TabsTrigger value="messages">
               <Mail size={16} />
               Messages
               {unreadMessages > 0 ? (
-                <Badge count={unreadMessages} label="unread messages" />
+                <UnreadCount count={unreadMessages} label="unread messages" />
               ) : null}
             </TabsTrigger>
-            <TabsTrigger
-              value="notifications"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
-            >
+            <TabsTrigger value="notifications">
               <Bell size={16} />
               Notifications
               {unreadNotifications > 0 ? (
-                <Badge count={unreadNotifications} label="unread notifications" />
+                <UnreadCount
+                  count={unreadNotifications}
+                  label="unread notifications"
+                />
               ) : null}
             </TabsTrigger>
-            <TabsTrigger
-              value="replies"
-              className="group/tabs-trigger rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold text-muted-foreground transition-all data-active:bg-[#945DA3] data-active:text-white data-active:bg-[#945DA3] data-active:text-white"
-            >
+            <TabsTrigger value="replies">
               <MessagesSquare size={16} />
               Course replies
             </TabsTrigger>
@@ -389,19 +360,14 @@ function InboxPage() {
   );
 }
 
-/** Count pill inside a tab trigger. The dot is decorative; the label is text. */
-function Badge({ count, label }: { count: number; label: string }) {
+/** Count chip inside a tab trigger. The dot is decorative; the label is text. */
+function UnreadCount({ count, label }: { count: number; label: string }) {
   return (
-    <span className="flex items-center gap-1">
-      <span
-        aria-hidden
-        className="size-1.5 rounded-full bg-[#FF4949] group-data-[active]/tabs-trigger:bg-white"
-      />
-      <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[11px] font-bold tabular-nums group-data-[active]/tabs-trigger:bg-white/20">
-        {formatUnreadBadge(count)}
-        <span className="sr-only"> {label}</span>
-      </span>
-    </span>
+    <Badge variant="secondary" className="tabular gap-1.5">
+      <span aria-hidden className="size-1.5 rounded-full bg-brand" />
+      {formatUnreadBadge(count)}
+      <span className="sr-only"> {label}</span>
+    </Badge>
   );
 }
 
@@ -451,12 +417,12 @@ function ThreadListPane({
     <section
       aria-label="Conversations"
       className={cn(
-        "flex-col bg-card rounded-[24px] border border-border shadow-sm overflow-hidden",
+        "flex-col overflow-hidden border border-rule bg-card",
         visibility,
       )}
     >
-      <header className="flex items-center justify-between gap-3 p-4 border-b border-border">
-        <h2 className="font-bold text-foreground">Messages</h2>
+      <header className="flex items-center justify-between gap-3 border-b border-rule p-4">
+        <h2 className="display-subheading text-base text-foreground">Messages</h2>
         <div className="flex items-center gap-2">
           {unreadTotal > 0 ? (
             <Button
@@ -487,7 +453,7 @@ function ThreadListPane({
           <EmptyState
             icon={Mail}
             title="No conversations yet"
-            body="Message a classmate, an instructor or an admin directly — everyone on Glypha Learn can be reached from here."
+            description="Message a classmate, an instructor or an admin directly — everyone on Glypha Learn can be reached from here."
             action={
               <Button onClick={onNewMessage}>
                 <PencilLine size={16} />
@@ -497,27 +463,27 @@ function ThreadListPane({
           />
         </div>
       ) : (
-        <ul className="flex-1 overflow-y-auto max-h-[32rem]">
+        <ul className="max-h-[32rem] flex-1 overflow-y-auto">
           {threads.map((thread) => {
             const isSelected = thread.threadId === selectedThreadId;
             const unread = thread.unreadCount > 0;
             return (
-              <li key={thread.threadId}>
+              <li key={thread.threadId} className="border-b border-rule last:border-b-0">
                 <button
                   type="button"
                   onClick={() => onSelect(thread.threadId)}
                   aria-current={isSelected ? "true" : undefined}
                   className={cn(
-                    "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#945DA3]",
+                    "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand",
                     isSelected
-                      ? "bg-[#945DA3]/10"
-                      : "hover:bg-muted/60",
+                      ? "bg-brand/10"
+                      : "hover:bg-surface-sunken",
                   )}
                 >
                   <PersonAvatar
                     name={thread.name}
                     imageUrl={thread.imageUrl}
-                    className={cn(unread && "ring-2 ring-[#945DA3] ring-offset-2 ring-offset-card")}
+                    className={cn(unread && "ring-2 ring-brand ring-offset-2 ring-offset-card")}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
@@ -551,10 +517,10 @@ function ThreadListPane({
                         )}
                       </span>
                       {unread ? (
-                        <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-[#945DA3]">
+                        <span className="tabular flex shrink-0 items-center gap-1 text-xs font-bold text-brand-ink">
                           <span
                             aria-hidden
-                            className="size-2 rounded-full bg-[#945DA3]"
+                            className="size-2 rounded-full bg-brand"
                           />
                           {thread.unreadCapped
                             ? `${formatUnreadBadge(thread.unreadCount)}+`
@@ -579,13 +545,13 @@ function ThreadListPane({
 
 function ThreadListSkeleton() {
   return (
-    <ul className="divide-y divide-border" aria-hidden>
+    <ul className="divide-y divide-rule" aria-hidden>
       {[0, 1, 2, 3].map((index) => (
         <li key={index} className="flex items-center gap-3 px-4 py-4">
           <Skeleton className="size-8 rounded-full" />
           <div className="flex-1 space-y-2">
-            <Skeleton className="h-3.5 w-1/2 rounded-md" />
-            <Skeleton className="h-3 w-4/5 rounded-md" />
+            <Skeleton className="h-3.5 w-1/2 rounded-sm" />
+            <Skeleton className="h-3 w-4/5 rounded-sm" />
           </div>
         </li>
       ))}
@@ -613,7 +579,7 @@ function ConversationPane({
   const visible = threadId ? "flex" : "hidden md:flex";
 
   const paneClass = cn(
-    "flex-col bg-card rounded-[24px] border border-border shadow-sm",
+    "flex-col overflow-hidden border border-rule bg-card",
     visible,
   );
 
@@ -624,7 +590,7 @@ function ConversationPane({
           <EmptyState
             icon={MessageSquare}
             title="Pick a conversation"
-            body="Choose a thread on the left to read it and reply, or start a new one with anyone on the platform."
+            description="Choose a thread on the left to read it and reply, or start a new one with anyone on the platform."
             action={
               <Button onClick={onNewMessage}>
                 <PencilLine size={16} />
@@ -644,9 +610,9 @@ function ConversationPane({
         className={cn(paneClass, "overflow-hidden")}
         aria-busy
       >
-        <header className="flex items-center gap-3 p-4 border-b border-border">
+        <header className="flex items-center gap-3 border-b border-rule p-4">
           <Skeleton className="size-8 rounded-full" />
-          <Skeleton className="h-3.5 w-32 rounded-md" />
+          <Skeleton className="h-3.5 w-32 rounded-sm" />
         </header>
         <ConversationSkeleton />
         <span className="sr-only">Loading conversation…</span>
@@ -661,7 +627,8 @@ function ConversationPane({
           <EmptyState
             icon={MessageSquare}
             title="Conversation not found"
-            body="This conversation is no longer available to you. It may have been opened with the wrong link."
+            description="This conversation is no longer available to you. It may have been opened with the wrong link."
+            tone="warning"
             action={
               <Button variant="outline" onClick={onBack}>
                 <ArrowLeft size={16} />
@@ -679,7 +646,7 @@ function ConversationPane({
       aria-label="Conversation"
       className={cn(paneClass, "overflow-hidden")}
     >
-      <header className="flex items-center gap-3 p-4 border-b border-border">
+      <header className="flex items-center gap-3 border-b border-rule p-4">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -845,7 +812,7 @@ function Conversation({
           <EmptyState
             icon={PencilLine}
             title="No messages yet"
-            body="Say hello — this conversation has not started. Whoever you message will see it in their inbox straight away."
+            description="Say hello — this conversation has not started. Whoever you message will see it in their inbox straight away."
           />
         ) : (
           <>
@@ -886,10 +853,10 @@ function Conversation({
                     ) : null}
                     <div
                       className={cn(
-                        "max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5",
+                        "max-w-[85%] rounded-md px-4 py-2.5 sm:max-w-[70%]",
                         message.isMine
-                          ? "bg-[#945DA3] text-white rounded-br-md"
-                          : "bg-muted text-foreground rounded-bl-md",
+                          ? "rounded-br-sm bg-brand text-brand-foreground"
+                          : "rounded-bl-sm bg-surface-sunken text-foreground",
                       )}
                     >
                       {!message.isMine && startsRun ? (
@@ -905,7 +872,9 @@ function Conversation({
                         at={message.createdAt}
                         className={cn(
                           "mt-1 block text-[11px]",
-                          message.isMine ? "text-white/70" : "text-muted-foreground",
+                          message.isMine
+                            ? "text-brand-foreground/70"
+                            : "text-muted-foreground",
                         )}
                       />
                     </div>
@@ -914,9 +883,9 @@ function Conversation({
               })}
               {optimistic.map((entry) => (
                 <li key={entry.key} className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[70%] rounded-2xl rounded-br-md bg-[#945DA3]/70 px-4 py-2.5 text-white">
+                  <div className="max-w-[85%] rounded-md rounded-br-sm bg-brand/70 px-4 py-2.5 text-brand-foreground sm:max-w-[70%]">
                     <p className="text-sm whitespace-pre-wrap break-words">{entry.body}</p>
-                    <span className="mt-1 flex items-center gap-1 text-[11px] text-white/80">
+                    <span className="mt-1 flex items-center gap-1 text-[11px] text-brand-foreground/80">
                       <Loader2 size={11} className="animate-spin" />
                       Sending…
                     </span>
@@ -991,15 +960,15 @@ function ConversationSkeleton() {
   return (
     <div className="flex-1 space-y-4 p-4" aria-hidden>
       <div className="flex justify-start">
-        <Skeleton className="h-14 w-52 rounded-2xl" />
+        <Skeleton className="h-14 w-52 rounded-sm" />
       </div>
       <div className="flex justify-end">
-        <Skeleton className="h-14 w-40 rounded-2xl" />
+        <Skeleton className="h-14 w-40 rounded-sm" />
       </div>
       <div className="flex justify-start">
-        <Skeleton className="h-14 w-64 rounded-2xl" />
+        <Skeleton className="h-14 w-64 rounded-sm" />
       </div>
-      <Skeleton className="h-11 w-full rounded-md" />
+      <Skeleton className="h-11 w-full" />
     </div>
   );
 }
@@ -1109,7 +1078,7 @@ function NotificationsPane({
         <EmptyState
           icon={Bell}
           title={unreadOnly ? "Nothing unread" : "No notifications yet"}
-          body={
+          description={
             unreadOnly
               ? "You have read everything. Switch to All to look back through your history."
               : "Course completions, quiz grades, certificates and replies to your discussions land here as they happen."
@@ -1126,13 +1095,10 @@ function NotificationsPane({
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
             <section key={group.key} aria-labelledby={`group-${group.key}`}>
-              <h2
-                id={`group-${group.key}`}
-                className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground"
-              >
-                {group.label}
+              <h2 id={`group-${group.key}`} className="rule-heading eyebrow mb-3">
+                <span className="shrink-0">{group.label}</span>
               </h2>
-              <ul className="bg-card rounded-[24px] border border-border shadow-sm overflow-hidden divide-y divide-border">
+              <ul className="divide-y divide-rule overflow-hidden border border-rule bg-card">
                 {group.items.map((item) => (
                   <li key={item.id}>
                     <NotificationRow
@@ -1166,10 +1132,11 @@ function FilterPill({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#945DA3]",
+        "rounded-sm border px-3 py-1.5 text-sm font-semibold transition-colors",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         active
-          ? "bg-[#945DA3] border-[#945DA3] text-white"
-          : "bg-card border-border text-muted-foreground hover:bg-muted",
+          ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90"
+          : "border-rule bg-card text-muted-foreground hover:bg-surface-sunken",
       )}
     >
       {label}
@@ -1195,18 +1162,16 @@ function NotificationRow({
       disabled={busy}
       aria-label={`${item.isRead ? "Read" : "Unread"}: ${verb}. ${item.title}. ${item.href ? "Open" : "Mark as read"}.`}
       className={cn(
-        "flex w-full items-start gap-4 p-4 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#945DA3] disabled:opacity-60",
+        "flex w-full items-start gap-4 p-4 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:opacity-60",
         // Unread is carried by the tinted row *and* a dot *and* the sr-only
         // word in the label — never by colour on its own.
-        !item.isRead && "bg-[#945DA3]/[0.04]",
+        !item.isRead && "bg-brand/5",
       )}
     >
       <IconTile icon={icon} tint={tint} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {verb}
-          </span>
+          <span className="eyebrow">{verb}</span>
           {item.actor ? (
             <PersonAvatar
               name={item.actor.name}
@@ -1218,29 +1183,29 @@ function NotificationRow({
         </span>
         <span
           className={cn(
-            "mt-1 block text-sm text-foreground",
+            "mt-1 block text-sm leading-body text-foreground",
             item.isRead ? "font-medium" : "font-bold",
           )}
         >
           {item.title}
         </span>
         {item.body ? (
-          <span className="mt-1 block text-sm text-muted-foreground line-clamp-2">
+          <span className="mt-1 block text-sm leading-body text-muted-foreground line-clamp-2">
             {buildNotificationPreview(item.body)}
           </span>
         ) : null}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1 pt-1">
         {!item.isRead ? (
-          <span className="flex items-center gap-1 text-xs font-bold text-[#945DA3]">
-            <span aria-hidden className="size-2 rounded-full bg-[#945DA3]" />
+          <span className="text-xs font-bold text-brand-ink">
+            <span aria-hidden className="me-1 inline-block size-2 rounded-full bg-brand align-middle" />
             New
           </span>
         ) : (
           <span className="text-xs font-medium text-muted-foreground">Read</span>
         )}
         {item.href ? (
-          <span className="flex items-center gap-1 text-xs font-semibold text-[#945DA3]">
+          <span className="flex items-center gap-1 text-xs font-semibold text-brand-ink">
             Open
             <ArrowRight size={12} />
           </span>
@@ -1252,17 +1217,14 @@ function NotificationRow({
 
 function NotificationSkeleton() {
   return (
-    <ul
-      aria-hidden
-      className="bg-card rounded-[24px] border border-border shadow-sm overflow-hidden divide-y divide-border"
-    >
+    <ul aria-hidden className="divide-y divide-rule overflow-hidden border border-rule bg-card">
       {[0, 1, 2, 3, 4].map((index) => (
         <li key={index} className="flex items-start gap-4 p-4">
-          <Skeleton className="size-10 rounded-2xl" />
+          <Skeleton className="size-10 rounded-sm" />
           <div className="flex-1 space-y-2">
-            <Skeleton className="h-3 w-1/3 rounded-md" />
-            <Skeleton className="h-3.5 w-3/4 rounded-md" />
-            <Skeleton className="h-3 w-1/2 rounded-md" />
+            <Skeleton className="h-3 w-1/3 rounded-sm" />
+            <Skeleton className="h-3.5 w-3/4 rounded-sm" />
+            <Skeleton className="h-3 w-1/2 rounded-sm" />
           </div>
         </li>
       ))}
@@ -1281,11 +1243,11 @@ function RepliesPane() {
         {[0, 1, 2].map((index) => (
           <li
             key={index}
-            className="p-5 bg-card rounded-[24px] border border-border shadow-sm space-y-3"
+            className="space-y-3 border border-rule bg-card p-5"
           >
-            <Skeleton className="h-3 w-1/3 rounded-md" />
-            <Skeleton className="h-4 w-2/3 rounded-md" />
-            <Skeleton className="h-3 w-4/5 rounded-md" />
+            <Skeleton className="h-3 w-1/3 rounded-sm" />
+            <Skeleton className="h-4 w-2/3 rounded-sm" />
+            <Skeleton className="h-3 w-4/5 rounded-sm" />
           </li>
         ))}
       </ul>
@@ -1297,7 +1259,7 @@ function RepliesPane() {
       <EmptyState
         icon={MessagesSquare}
         title="No course replies yet"
-        body="Start a thread in a course you are enrolled in, or reply to one, and it will show up here with the latest message."
+        description="Start a thread in a course you are enrolled in, or reply to one, and it will show up here with the latest message."
         action={
           <Button render={<Link href="/dashboard/courses" />}>
             Go to my lessons
@@ -1323,38 +1285,38 @@ function ReplyCard({ item }: { item: DiscussionActivityView }) {
   return (
     <Link
       href={`/dashboard/courses/${item.courseSlug}/discussions`}
-      className="block rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#945DA3]"
+      className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
-      <article className="p-5 bg-card rounded-[24px] border border-border shadow-sm hover:shadow-md transition-shadow">
+      <article className="border border-rule bg-card p-5 transition-colors hover:border-rule-strong">
         <div className="flex items-start gap-3">
           <IconTile icon={MessagesSquare} tint="text-sky-500 bg-sky-500/10" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {item.courseTitle}
-            </p>
-            <h3 className="mt-1 font-bold text-foreground leading-snug">{item.title}</h3>
+            <p className="eyebrow">{item.courseTitle}</p>
+            <h3 className="display-subheading mt-1 text-lg leading-snug text-foreground">
+              {item.title}
+            </h3>
             {item.lastMessagePreview ? (
-              <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+              <p className="mt-2 text-sm leading-body text-muted-foreground line-clamp-2">
                 <span className="font-semibold text-foreground">
                   {item.lastMessageAuthorName ?? "Someone"}:
                 </span>{" "}
                 {item.lastMessagePreview}
               </p>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground italic">
+              <p className="mt-2 text-sm leading-body italic text-muted-foreground">
                 No replies yet — be the first to answer.
               </p>
             )}
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-rule pt-4">
           <span className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
             <span
               className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-md",
+                "inline-flex items-center gap-1 rounded-sm border px-2 py-1",
                 item.createdByMe
-                  ? "text-[#945DA3] bg-[#945DA3]/10"
-                  : "text-sky-500 bg-sky-500/10",
+                  ? "border-brand/30 bg-brand/10 text-brand-ink"
+                  : "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
               )}
             >
               {item.createdByMe ? <PencilLine size={14} /> : <MessagesSquare size={14} />}
@@ -1364,7 +1326,7 @@ function ReplyCard({ item }: { item: DiscussionActivityView }) {
               <TimeAgo at={item.lastMessageAt} />
             ) : null}
           </span>
-          <span className="flex items-center gap-1 text-xs font-bold text-[#945DA3]">
+          <span className="flex items-center gap-1 text-xs font-bold text-brand-ink">
             Open discussion
             <ArrowRight size={14} />
           </span>
@@ -1427,7 +1389,7 @@ function NewMessageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold">New message</DialogTitle>
+          <DialogTitle className="display-subheading text-lg">New message</DialogTitle>
           <DialogDescription>
             Search for a learner, instructor or admin by name. Type at least two
             characters.
@@ -1466,8 +1428,8 @@ function NewMessageDialog({
                   <li key={index} className="flex items-center gap-3 p-2">
                     <Skeleton className="size-9 rounded-full" />
                     <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-1/2 rounded-md" />
-                      <Skeleton className="h-3 w-1/4 rounded-md" />
+                      <Skeleton className="h-3.5 w-1/2 rounded-sm" />
+                      <Skeleton className="h-3 w-1/4 rounded-sm" />
                     </div>
                   </li>
                 ))}
@@ -1484,7 +1446,7 @@ function NewMessageDialog({
                       type="button"
                       onClick={() => handlePick(person)}
                       disabled={openingId !== null}
-                      className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#945DA3] disabled:opacity-60"
+                      className="flex w-full items-center gap-3 rounded-sm p-2 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
                     >
                       <PersonAvatar
                         name={person.name}
@@ -1502,7 +1464,7 @@ function NewMessageDialog({
                       {openingId === person.id ? (
                         <Loader2 size={16} className="animate-spin text-muted-foreground" />
                       ) : (
-                        <span className="shrink-0 text-xs font-bold text-[#945DA3]">
+                        <span className="shrink-0 text-xs font-bold text-brand-ink">
                           {person.existingThreadId ? "Open" : "Message"}
                         </span>
                       )}
@@ -1534,39 +1496,42 @@ function InboxSkeleton() {
   return (
     <div className="flex flex-col gap-8 max-w-7xl w-full" aria-busy>
       <div className="flex flex-col gap-2">
-        <Skeleton className="h-9 w-40 rounded-xl" />
-        <Skeleton className="h-5 w-72 rounded-md" />
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-5 w-72" />
       </div>
-      <Skeleton className="h-11 w-64 rounded-2xl" />
+      <Skeleton className="h-11 w-64" />
       <div className="grid gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] items-start">
-        <div className="bg-card rounded-[24px] border border-border shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <Skeleton className="h-4 w-24 rounded-md" />
-            <Skeleton className="h-8 w-28 rounded-md" />
+        <div className="overflow-hidden border border-rule bg-card">
+          <div className="flex items-center justify-between border-b border-rule p-4">
+            <Skeleton className="h-4 w-24 rounded-sm" />
+            <Skeleton className="h-8 w-28 rounded-sm" />
           </div>
           <ul aria-hidden>
             {[0, 1, 2, 3].map((index) => (
-              <li key={index} className="flex items-center gap-3 p-4 border-b border-border">
+              <li
+                key={index}
+                className="flex items-center gap-3 border-b border-rule p-4 last:border-b-0"
+              >
                 <Skeleton className="size-8 rounded-full" />
                 <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3.5 w-1/2 rounded-md" />
-                  <Skeleton className="h-3 w-4/5 rounded-md" />
+                  <Skeleton className="h-3.5 w-1/2 rounded-sm" />
+                  <Skeleton className="h-3 w-4/5 rounded-sm" />
                 </div>
               </li>
             ))}
           </ul>
         </div>
-        <div className="bg-card rounded-[24px] border border-border shadow-sm overflow-hidden">
-          <div className="flex items-center gap-3 p-4 border-b border-border">
+        <div className="overflow-hidden border border-rule bg-card">
+          <div className="flex items-center gap-3 border-b border-rule p-4">
             <Skeleton className="size-8 rounded-full" />
-            <Skeleton className="h-4 w-32 rounded-md" />
+            <Skeleton className="h-4 w-32 rounded-sm" />
           </div>
           <div className="space-y-4 p-4">
-            <Skeleton className="h-14 w-52 rounded-2xl" />
+            <Skeleton className="h-14 w-52 rounded-sm" />
             <div className="flex justify-end">
-              <Skeleton className="h-14 w-40 rounded-2xl" />
+              <Skeleton className="h-14 w-40 rounded-sm" />
             </div>
-            <Skeleton className="h-11 w-full rounded-md" />
+            <Skeleton className="h-11 w-full" />
           </div>
         </div>
       </div>

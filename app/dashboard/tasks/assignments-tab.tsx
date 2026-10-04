@@ -22,6 +22,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Label,
   Skeleton,
   Textarea,
@@ -30,7 +31,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { StudentAssignmentView } from "@/convex/tasks";
 import { MAX_SUBMISSION_LENGTH, type StudentAssignmentFilter } from "@/lib/tasks";
 import { listAssignmentsForStudent, saveSubmission, submitAssignment } from "./api";
-import { DuePill, EmptyState, FilterPills, StatusPill } from "./primitives";
+import { DuePill, FilterPills, StatusPill } from "./primitives";
 
 const FILTERS: ReadonlyArray<{ value: StudentAssignmentFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -89,9 +90,9 @@ export function AssignmentsTab() {
 
       {result.groups.length === 0 ? (
         <EmptyState
-          icon={<BookOpen />}
+          icon={BookOpen}
           title={copy.title}
-          body={copy.body}
+          description={copy.body}
           action={
             <Button render={<Link href="/courses" />}>
               Browse the catalogue
@@ -102,12 +103,12 @@ export function AssignmentsTab() {
       ) : (
         result.groups.map((group) => (
           <section key={group.courseId} className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule pb-2">
+              <h2 className="display-subheading flex items-center gap-2 text-lg text-foreground">
                 <BookOpen className="h-4 w-4 text-brand-ink" aria-hidden />
                 {group.courseTitle}
               </h2>
-              <span className="text-sm font-semibold text-muted-foreground">
+              <span className="tabular text-sm font-semibold text-muted-foreground">
                 {group.assignments.length} assignment{group.assignments.length === 1 ? "" : "s"}
               </span>
             </div>
@@ -134,14 +135,18 @@ function AssignmentCard({ assignment }: { assignment: StudentAssignmentView }) {
   const graded = submission?.status === "graded";
 
   return (
-    <article className="flex h-full flex-col rounded-[24px] border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+    <article className="flex h-full flex-col border border-rule bg-card p-5 transition-colors hover:border-rule-strong">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-lg font-bold leading-snug text-foreground">{assignment.title}</h3>
+        <h3 className="display-subheading text-lg leading-snug text-foreground">
+          {assignment.title}
+        </h3>
         {assignment.isAuthor ? <StatusPill tone="neutral">Your draft</StatusPill> : null}
       </div>
 
       {assignment.instructions ? (
-        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{assignment.instructions}</p>
+        <p className="mt-2 line-clamp-3 text-sm leading-body text-muted-foreground">
+          {assignment.instructions}
+        </p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -161,7 +166,7 @@ function AssignmentCard({ assignment }: { assignment: StudentAssignmentView }) {
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
         <SubmissionStatePill assignment={assignment} />
         <Button size="sm" onClick={() => setOpen(true)}>
           {graded
@@ -286,11 +291,11 @@ function SubmissionDialog({
         </DialogHeader>
 
         {assignment.instructions ? (
-          <div className="rounded-2xl border border-border bg-muted/40 p-4">
-            <p className="mb-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Instructions
+          <div className="border border-rule bg-surface-sunken p-4">
+            <p className="eyebrow mb-1">Instructions</p>
+            <p className="whitespace-pre-line text-sm leading-body text-foreground">
+              {assignment.instructions}
             </p>
-            <p className="whitespace-pre-line text-sm text-foreground">{assignment.instructions}</p>
           </div>
         ) : null}
 
@@ -310,17 +315,15 @@ function SubmissionDialog({
               {submission.isLate ? " (late)" : ""}
               {submission.gradedAt ? ` · marked ${formatRelativeTime(submission.gradedAt)}` : ""}
             </p>
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Your answer
+            <div className="border border-rule bg-card p-4">
+              <p className="eyebrow mb-1">Your answer</p>
+              <p className="whitespace-pre-line text-sm leading-body text-foreground">
+                {submission.content}
               </p>
-              <p className="whitespace-pre-line text-sm text-foreground">{submission.content}</p>
             </div>
-            <div className="rounded-2xl border border-[#945DA3]/30 bg-brand/5 p-4">
-              <p className="mb-1 text-xs font-bold uppercase tracking-widest text-brand-ink">
-                Instructor feedback
-              </p>
-              <p className="whitespace-pre-line text-sm text-foreground">
+            <div className="border border-brand/30 bg-brand/5 p-4">
+              <p className="eyebrow mb-1 text-brand-ink">Instructor feedback</p>
+              <p className="whitespace-pre-line text-sm leading-body text-foreground">
                 {submission.feedback?.trim()
                   ? submission.feedback
                   : "No written feedback on this one — the score is the whole response."}
@@ -396,7 +399,7 @@ function AssignmentsSkeleton() {
     <div className="flex flex-col gap-6" aria-hidden>
       <div className="-mx-4 flex gap-2 overflow-hidden px-4 sm:mx-0 sm:px-0">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-10 w-24 rounded-full" />
+          <Skeleton key={i} className="h-10 w-24 rounded-sm" />
         ))}
       </div>
       <Skeleton className="h-5 w-40" />
@@ -410,17 +413,17 @@ function AssignmentsSkeleton() {
 
 function CardSkeleton() {
   return (
-    <div className="flex flex-col rounded-[24px] border border-border bg-card p-5 shadow-sm">
+    <div className="flex flex-col border border-rule bg-card p-5">
       <Skeleton className="h-5 w-3/4" />
       <Skeleton className="mt-3 h-4 w-full" />
       <Skeleton className="mt-2 h-4 w-2/3" />
       <div className="mt-4 flex gap-2">
-        <Skeleton className="h-6 w-28 rounded-md" />
-        <Skeleton className="h-6 w-24 rounded-md" />
+        <Skeleton className="h-6 w-28 rounded-sm" />
+        <Skeleton className="h-6 w-24 rounded-sm" />
       </div>
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-        <Skeleton className="h-6 w-24 rounded-md" />
-        <Skeleton className="h-9 w-32 rounded-md" />
+      <div className="mt-4 flex items-center justify-between border-t border-rule pt-4">
+        <Skeleton className="h-6 w-24 rounded-sm" />
+        <Skeleton className="h-9 w-32 rounded-sm" />
       </div>
     </div>
   );

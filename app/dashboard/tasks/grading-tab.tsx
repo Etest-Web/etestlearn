@@ -37,6 +37,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
   Select,
@@ -69,7 +70,7 @@ import {
   setAssignmentStatus,
   updateAssignment,
 } from "./api";
-import { EmptyState, SectionHeading, StatCard, StatusPill } from "./primitives";
+import { SectionHeading, StatCard, StatusPill } from "./primitives";
 import { dateToInputValue, formatHumanDate, inputValueToTimestamp } from "./dates";
 
 const NO_COURSE = "none";
@@ -143,15 +144,15 @@ export function GradingTab() {
 
         {!canAuthor ? (
           <EmptyState
-            icon={<Layers />}
+            icon={Layers}
             title="No courses to author into"
-            body="Assignments belong to a course, and you are not teaching one yet. Once you publish a course it shows up here and you can set work on it."
+            description="Assignments belong to a course, and you are not teaching one yet. Once you publish a course it shows up here and you can set work on it."
           />
         ) : groups.length === 0 ? (
           <EmptyState
-            icon={<ClipboardCheck />}
+            icon={ClipboardCheck}
             title={courseId ? "Nothing on this course" : "No assignments yet"}
-            body={
+            description={
               courseId
                 ? "This course has no assignments yet. Create one and it will appear here for marking."
                 : "Set work for your learners. Drafts stay private to you until you publish them, and submissions arrive here to be marked."
@@ -172,8 +173,8 @@ export function GradingTab() {
           <div className="flex flex-col gap-6">
             {groups.map((group) => (
               <div key={group.courseId} className="flex flex-col gap-3">
-                <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold uppercase tracking-widest text-muted-foreground">
-                  {group.courseTitle}
+                <h3 className="rule-heading eyebrow">
+                  <span className="shrink-0">{group.courseTitle}</span>
                   {!group.coursePublished ? (
                     <StatusPill tone="neutral">Course not published</StatusPill>
                   ) : null}
@@ -306,11 +307,13 @@ function AssignmentRow({
   }
 
   return (
-    <article className="rounded-[24px] border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+    <article className="border border-rule bg-card transition-colors hover:border-rule-strong">
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h4 className="text-lg font-bold leading-snug text-foreground">{assignment.title}</h4>
+            <h4 className="display-subheading text-lg leading-snug text-foreground">
+              {assignment.title}
+            </h4>
             <p className="mt-1 text-sm text-muted-foreground">
               Created {formatRelativeTime(assignment.createdAt)}
               {assignment.dueAt ? ` · due ${formatHumanDate(assignment.dueAt)}` : " · no deadline"}
@@ -331,7 +334,7 @@ function AssignmentRow({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-rule pt-4">
           <Button size="sm" variant={expanded ? "secondary" : "default"} onClick={onToggle}>
             <ClipboardCheck className="mr-2 h-4 w-4" aria-hidden />
             {expanded ? "Hide submissions" : `Mark submissions (${assignment.counts.submitted})`}
@@ -405,7 +408,7 @@ function AssignmentRow({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-[#FF4949] hover:bg-red-50 dark:hover:bg-red-500/10"
+                  className="text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="mr-2 h-4 w-4" aria-hidden />
                   Delete
@@ -454,19 +457,19 @@ function SubmissionQueue({ assignment }: { assignment: InstructorAssignmentView 
 
   if (queue === undefined) {
     return (
-      <div className="border-t border-border px-5 pb-5 pt-4">
-        <Skeleton className="h-24 w-full rounded-2xl" />
+      <div className="border-t border-rule px-5 pb-5 pt-4">
+        <Skeleton className="h-24 w-full" />
       </div>
     );
   }
 
   if (queue.submissions.length === 0) {
     return (
-      <div className="border-t border-border px-5 pb-5 pt-4">
+      <div className="border-t border-rule px-5 pb-5 pt-4">
         <EmptyState
-          icon={<ClipboardCheck />}
+          icon={ClipboardCheck}
           title="Nothing handed in yet"
-          body={
+          description={
             assignment.status === "draft"
               ? "Publish this assignment and submissions will appear here to mark."
               : "Nobody has handed this in yet. Learners still working on it keep their drafts private until they submit."
@@ -477,7 +480,7 @@ function SubmissionQueue({ assignment }: { assignment: InstructorAssignmentView 
   }
 
   return (
-    <div className="border-t border-border px-5 pb-5 pt-4">
+    <div className="border-t border-rule px-5 pb-5 pt-4">
       {/* The table scrolls inside its own wrapper: at 375px it must not widen
           the document. */}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
@@ -487,8 +490,8 @@ function SubmissionQueue({ assignment }: { assignment: InstructorAssignmentView 
           <TableCaption className="sr-only">
             Submissions for “{queue.assignment.title}” — {queue.assignment.courseTitle}
           </TableCaption>
-          <TableHeader>
-            <TableRow>
+          <TableHeader className="bg-surface-sunken">
+            <TableRow className="hover:bg-transparent">
               <TableHead className="min-w-[12rem]">Learner</TableHead>
               <TableHead className="min-w-[18rem]">Answer</TableHead>
               <TableHead>Handed in</TableHead>
@@ -574,7 +577,7 @@ function SubmissionRow({
               {submission.studentName}
             </p>
             {alreadyGraded ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="tabular text-xs text-muted-foreground">
                 {submission.score}
                 {maxPoints ? ` / ${maxPoints}` : ""}
                 {submission.scorePercent !== null ? ` · ${submission.scorePercent}%` : ""}
@@ -873,10 +876,10 @@ function AssignmentComposer({
           </div>
 
           {assignment === null ? (
-            <label className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3 text-sm">
+            <label className="flex items-center gap-3 border border-rule bg-surface-sunken p-3 text-sm">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded-[4px] accent-[#945DA3]"
+                className="h-4 w-4 rounded-[4px] accent-brand"
                 checked={publishNow}
                 disabled={pending || instructions.trim().length === 0}
                 onChange={(event) => setPublishNow(event.target.checked)}
@@ -916,12 +919,12 @@ function GradingSkeleton() {
     <div className="flex flex-col gap-8" aria-hidden>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-28 w-full rounded-[24px]" />
+          <Skeleton key={i} className="h-28 w-full" />
         ))}
       </div>
       <Skeleton className="h-6 w-56" />
-      <Skeleton className="h-40 w-full rounded-[24px]" />
-      <Skeleton className="h-40 w-full rounded-[24px]" />
+      <Skeleton className="h-40 w-full" />
+      <Skeleton className="h-40 w-full" />
     </div>
   );
 }

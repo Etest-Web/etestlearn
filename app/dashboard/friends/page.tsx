@@ -35,8 +35,10 @@ import {
   AvatarFallback,
   AvatarImage,
   Button,
+  EmptyState,
   Input,
   Label,
+  PageHeader,
   Skeleton,
   Tabs,
   TabsContent,
@@ -162,13 +164,10 @@ function FriendsView() {
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">Friends</h1>
-        <p className="text-muted-foreground font-medium">
-          Study alongside the people you know. A friend request needs approval, and
-          only accepted friends can see each other&apos;s progress.
-        </p>
-      </div>
+      <PageHeader
+        title="Friends"
+        description="Study alongside the people you know. A friend request needs approval, and only accepted friends can see each other's progress."
+      />
 
       <p aria-live="polite" className="sr-only">
         {announcement}
@@ -177,29 +176,19 @@ function FriendsView() {
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         {/* Three triggers need ~460px. Let them scroll horizontally instead of
             stretching the document at 375px; `touch-target` lifts them to 44px
-            on touch devices. */}
+            on touch devices. `rule` because these are three separate areas of
+            the social page rather than filters over one list. */}
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList className="bg-card border border-border shadow-sm p-1 rounded-2xl h-auto inline-flex gap-2 w-max touch-target">
-            <TabsTrigger
-              value="friends"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-            >
+          <TabsList variant="rule" className="touch-target">
+            <TabsTrigger value="friends">
               {`Friends${friends === undefined ? "" : ` (${friends.length})`}`}
             </TabsTrigger>
-            <TabsTrigger
-              value="requests"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-            >
+            <TabsTrigger value="requests">
               {`Requests${
                 requests === undefined ? "" : ` (${requests.incoming.length})`
               }`}
             </TabsTrigger>
-            <TabsTrigger
-              value="discover"
-              className="rounded-xl px-4 sm:px-6 py-2.5 text-sm font-semibold data-active:bg-[#945DA3] data-active:text-white transition-all text-muted-foreground"
-            >
-              Discover
-            </TabsTrigger>
+            <TabsTrigger value="discover">Discover</TabsTrigger>
           </TabsList>
         </div>
 
@@ -279,9 +268,9 @@ export default function FriendsPage() {
 function FriendsPageSkeleton() {
   return (
     <div className="flex flex-col gap-8 max-w-6xl w-full" aria-busy="true">
-      <Skeleton className="h-10 w-48 rounded-xl" />
-      <Skeleton className="h-5 w-full max-w-md rounded-lg" />
-      <Skeleton className="h-12 w-72 rounded-2xl" />
+      <Skeleton className="h-10 w-48" />
+      <Skeleton className="h-5 w-full max-w-md" />
+      <Skeleton className="h-12 w-72" />
       <FriendGridSkeleton />
     </div>
   );
@@ -292,7 +281,7 @@ function FriendGridSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {Array.from({ length: count }, (_, i) => (
-        <Skeleton key={i} className="h-56 rounded-[24px]" />
+        <Skeleton key={i} className="h-56" />
       ))}
     </div>
   );
@@ -302,7 +291,7 @@ function RowSkeleton({ count = 3, height = "h-20" }: { count?: number; height?: 
   return (
     <div className="flex flex-col gap-3" aria-busy="true">
       {Array.from({ length: count }, (_, i) => (
-        <Skeleton key={i} className={`${height} w-full rounded-2xl`} />
+        <Skeleton key={i} className={`${height} w-full rounded-sm`} />
       ))}
     </div>
   );
@@ -339,7 +328,7 @@ function PersonAvatar({
 function RolePill({ role }: { role: UserRole }) {
   const Icon = role === "student" ? BookOpen : role === "instructor" ? Award : Sparkles;
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-ink bg-brand/20 px-2 py-1 rounded-md">
+    <span className="inline-flex items-center gap-1 rounded-sm border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-bold text-brand-ink">
       <Icon size={14} aria-hidden />
       {roleLabel(role)}
     </span>
@@ -352,36 +341,6 @@ function Since({ at, prefix }: { at: number; prefix: string }) {
     <span className="text-xs text-muted-foreground" title={new Date(at).toISOString()}>
       {prefix} {formatRelativeTime(at)}
     </span>
-  );
-}
-
-function EmptyState({
-  icon: Icon,
-  title,
-  body,
-  action,
-}: {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-  action?: { label: string; onClick: () => void };
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 px-6 bg-card rounded-3xl border border-dashed border-border text-center">
-      <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 text-muted-foreground">
-        <Icon size={32} aria-hidden />
-      </div>
-      <h3 className="text-lg font-bold text-foreground mb-2">{title}</h3>
-      <p className="text-muted-foreground max-w-sm text-center text-sm">{body}</p>
-      {action && (
-        <Button
-          onClick={action.onClick}
-          className="mt-6 px-6 h-auto py-3 rounded-xl font-bold bg-[#945DA3] text-white hover:bg-[#7d4a8a]"
-        >
-          {action.label}
-        </Button>
-      )}
-    </div>
   );
 }
 
@@ -409,8 +368,8 @@ function FriendsTab({
       <EmptyState
         icon={Users}
         title="No friends yet"
-        body="Send your first friend request from Discover. Nothing is shared until they accept it."
-        action={{ label: "Find people", onClick: onGoToDiscover }}
+        description="Send your first friend request from Discover. Nothing is shared until they accept it."
+        action={<Button onClick={onGoToDiscover}>Find people</Button>}
       />
     );
   }
@@ -446,16 +405,16 @@ function FriendCard({
   const { activity } = friend;
 
   return (
-    <article className="flex h-full flex-col bg-card rounded-[24px] border border-border shadow-sm hover:shadow-md transition-shadow">
+    <article className="flex h-full flex-col border border-rule bg-card transition-colors hover:border-rule-strong">
       <div className="flex items-start gap-4 p-6">
         <PersonAvatar name={friend.name} imageUrl={friend.imageUrl} />
         <div className="min-w-0 flex-1">
-          <h3 className="font-bold text-lg text-foreground leading-snug break-words">
+          <h3 className="text-lg font-bold leading-snug text-foreground break-words">
             {friend.name}
           </h3>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <RolePill role={friend.role} />
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-ink bg-brand/20 px-2 py-1 rounded-md">
+            <span className="inline-flex items-center gap-1 rounded-sm border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-bold text-brand-ink">
               <Check size={14} aria-hidden />
               Friends
             </span>
@@ -486,7 +445,7 @@ function FriendCard({
         />
       </dl>
 
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border p-4">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-rule p-4">
         <span className="text-xs text-muted-foreground">
           {activity.lastActiveAt === null
             ? "No activity yet"
@@ -522,11 +481,7 @@ function FriendCard({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep friend</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={onRemove}
-                disabled={pending}
-                className="bg-[#FF4949] text-white hover:bg-[#FF4949]/90"
-              >
+              <AlertDialogAction variant="destructive" onClick={onRemove} disabled={pending}>
                 Remove friend
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -547,13 +502,9 @@ function ActivityStat({
   value: number;
 }) {
   return (
-    <div className="rounded-2xl bg-muted/60 px-2 py-3 text-center">
-      <Icon
-        size={16}
-        aria-hidden
-        className="mx-auto mb-1 text-[#945DA3] dark:text-[#C090CE]"
-      />
-      <dd className="text-lg font-bold text-foreground">{value}</dd>
+    <div className="border border-rule bg-surface-sunken px-2 py-3 text-center">
+      <Icon size={16} aria-hidden className="mx-auto mb-1 text-brand-ink" />
+      <dd className="display-subheading tabular text-lg text-foreground">{value}</dd>
       <dt className="text-[11px] leading-tight text-muted-foreground">{label}</dt>
     </div>
   );
@@ -574,7 +525,7 @@ function ActivityFeed({ items }: { items: FriendsActivityItem[] | undefined }) {
   if (items === undefined) {
     return (
       <section className="flex flex-col gap-4" aria-busy="true">
-        <Skeleton className="h-7 w-72 rounded-lg" />
+        <Skeleton className="h-7 w-72" />
         <RowSkeleton count={2} height="h-16" />
       </section>
     );
@@ -584,35 +535,31 @@ function ActivityFeed({ items }: { items: FriendsActivityItem[] | undefined }) {
     <section aria-labelledby="friends-activity-heading" className="flex flex-col gap-4">
       <h2
         id="friends-activity-heading"
-        className="text-xl font-bold text-foreground flex items-center gap-2"
+        className="rule-heading display-subheading text-xl text-foreground"
       >
-        <Sparkles size={18} className="text-[#945DA3] dark:text-[#C090CE]" aria-hidden />
-        Recent activity from your friends
+        <Sparkles size={18} className="shrink-0 text-brand-ink" aria-hidden />
+        <span className="shrink-0">Recent activity from your friends</span>
       </h2>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 px-6 bg-card rounded-3xl border border-dashed border-border text-center">
-          <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mb-3 text-muted-foreground">
-            <Clock size={28} aria-hidden />
-          </div>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Nothing yet. As your friends finish lessons and pass quizzes, their
-            progress shows up here.
-          </p>
-        </div>
+        <EmptyState
+          icon={Clock}
+          title="Nothing yet"
+          description="As your friends finish lessons and pass quizzes, their progress shows up here."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((item) => (
             <li
               key={item.activityId}
-              className="flex items-center gap-3 rounded-2xl bg-card border border-border shadow-sm px-4 py-3"
+              className="flex items-center gap-3 border border-rule bg-card px-4 py-3 transition-colors hover:border-rule-strong"
             >
               <PersonAvatar
                 name={item.name}
                 imageUrl={item.imageUrl}
                 size="default"
               />
-              <p className="min-w-0 flex-1 text-sm text-foreground">
+              <p className="min-w-0 flex-1 text-sm leading-body text-foreground">
                 <span className="font-bold">{item.name}</span>{" "}
                 {ACTIVITY_LABELS[item.type] ?? "made progress"}
                 {item.courseTitle && (
@@ -656,11 +603,11 @@ function RequestsTab({
     return (
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-7 w-40 rounded-lg" />
+          <Skeleton className="h-7 w-40" />
           <RowSkeleton count={2} height="h-24" />
         </div>
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-7 w-40 rounded-lg" />
+          <Skeleton className="h-7 w-40" />
           <RowSkeleton count={1} height="h-24" />
         </div>
       </div>
@@ -674,8 +621,8 @@ function RequestsTab({
       <EmptyState
         icon={Mail}
         title="No friend requests"
-        body="When somebody asks to connect, it lands here for you to accept or decline."
-        action={{ label: "Find people", onClick: onGoToDiscover }}
+        description="When somebody asks to connect, it lands here for you to accept or decline."
+        action={<Button onClick={onGoToDiscover}>Find people</Button>}
       />
     );
   }
@@ -688,6 +635,7 @@ function RequestsTab({
         description="These people want to connect with you."
         entries={incoming}
         busy={busy}
+        emptyTitle="No incoming requests"
         emptyBody="Nobody is waiting on you right now."
         pendingCount={pendingCount}
       >
@@ -697,7 +645,7 @@ function RequestsTab({
               size="sm"
               disabled={disabled}
               onClick={() => onAccept(entry)}
-              className="flex-1 sm:flex-none bg-[#945DA3] text-white hover:bg-[#7d4a8a]"
+              className="flex-1 sm:flex-none"
             >
               {busy === `accept:${entry.friendshipId}` ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -730,6 +678,7 @@ function RequestsTab({
         description="Waiting for these people to respond."
         entries={outgoing}
         busy={busy}
+        emptyTitle="No requests sent"
         emptyBody="You have not asked anybody to connect."
       >
         {(entry, disabled) => (
@@ -759,6 +708,7 @@ function RequestGroup({
   description,
   entries,
   busy,
+  emptyTitle,
   emptyBody,
   pendingCount,
   children,
@@ -768,42 +718,38 @@ function RequestGroup({
   description: string;
   entries: RequestEntry[];
   busy: string | null;
+  emptyTitle: string;
   emptyBody: string;
   pendingCount?: number;
   children: (entry: RequestEntry, disabled: boolean) => ReactNode;
 }) {
   return (
     <section aria-labelledby={`${id}-heading`} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 border-b border-rule pb-2">
         <h2
           id={`${id}-heading`}
-          className="text-xl font-bold text-foreground flex flex-wrap items-center gap-2"
+          className="display-subheading flex flex-wrap items-center gap-2 text-xl text-foreground"
         >
           {heading}
           {pendingCount !== undefined && pendingCount > 0 && (
             // Word plus badge, not a bare coloured dot.
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-ink bg-brand/20 px-2 py-1 rounded-md">
+            <span className="tabular inline-flex items-center gap-1 rounded-sm border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-bold text-brand-ink">
               <Mail size={14} aria-hidden />
               {pendingCount >= 200 ? "99+ waiting" : `${pendingCount} waiting`}
             </span>
           )}
         </h2>
-        <p className="text-sm text-muted-foreground font-medium">{description}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
 
       {entries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 px-6 bg-card rounded-3xl border border-dashed border-border text-center">
-          <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mb-3 text-muted-foreground">
-            <Mail size={28} aria-hidden />
-          </div>
-          <p className="text-sm text-muted-foreground max-w-sm">{emptyBody}</p>
-        </div>
+        <EmptyState icon={Mail} title={emptyTitle} description={emptyBody} />
       ) : (
         <ul className="flex flex-col gap-3">
           {entries.map((entry) => (
             <li
               key={entry.friendshipId}
-              className="flex flex-col gap-4 rounded-2xl bg-card border border-border shadow-sm p-4 sm:flex-row sm:items-center"
+              className="flex flex-col gap-4 border border-rule bg-card p-4 transition-colors hover:border-rule-strong sm:flex-row sm:items-center"
             >
               <PersonAvatar name={entry.name} imageUrl={entry.imageUrl} />
               <div className="min-w-0 flex-1">
@@ -812,7 +758,7 @@ function RequestGroup({
                 </h3>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <RolePill role={entry.role} />
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground bg-muted px-2 py-1 rounded-md">
+                  <span className="inline-flex items-center gap-1 rounded-sm border border-rule bg-surface-sunken px-2 py-1 text-xs font-bold text-muted-foreground">
                     <Clock size={14} aria-hidden />
                     Request {formatRelativeTime(entry.createdAt)}
                   </span>
@@ -870,7 +816,7 @@ function DiscoverTab({
             placeholder="Search by name or email"
             autoComplete="off"
             aria-describedby="friend-search-hint"
-            className="pl-11 h-12 rounded-full border-0 bg-card shadow-sm ring-1 ring-border text-[15px] focus-visible:ring-[#945DA3]/20"
+            className="h-12 border-rule bg-card pl-11 text-[15px]"
           />
         </div>
         <p id="friend-search-hint" className="text-xs text-muted-foreground">
@@ -883,13 +829,13 @@ function DiscoverTab({
         <EmptyState
           icon={SearchIcon}
           title="Find your study people"
-          body="Search the directory by name or email address to send somebody a friend request."
+          description="Search the directory by name or email address to send somebody a friend request."
         />
       ) : !searchable ? (
         <EmptyState
           icon={SearchIcon}
           title="Keep typing"
-          body={`Enter at least ${MIN_SEARCH_LENGTH} characters so the results are useful.`}
+          description={`Enter at least ${MIN_SEARCH_LENGTH} characters so the results are useful.`}
         />
       ) : results === undefined ? (
         <RowSkeleton />
@@ -897,14 +843,14 @@ function DiscoverTab({
         <EmptyState
           icon={SearchIcon}
           title="Nobody found"
-          body={`No account matches “${normalized}”. Check the spelling, or try part of an email address.`}
+          description={`No account matches “${normalized}”. Check the spelling, or try part of an email address.`}
         />
       ) : (
         <ul className="flex flex-col gap-3">
           {results.map((candidate) => (
             <li
               key={candidate._id}
-              className="flex flex-col gap-4 rounded-2xl bg-card border border-border shadow-sm p-4 sm:flex-row sm:items-center"
+              className="flex flex-col gap-4 border border-rule bg-card p-4 transition-colors hover:border-rule-strong sm:flex-row sm:items-center"
             >
               <PersonAvatar name={candidate.name} imageUrl={candidate.imageUrl} />
               <div className="min-w-0 flex-1">
@@ -914,7 +860,7 @@ function DiscoverTab({
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <RolePill role={candidate.role} />
                   {candidate.email && (
-                    <span className="text-xs text-muted-foreground truncate">
+                    <span className="truncate text-xs text-muted-foreground">
                       {candidate.email}
                     </span>
                   )}
@@ -925,7 +871,7 @@ function DiscoverTab({
                 disabled={busy !== null}
                 onClick={() => onSend(candidate)}
                 aria-label={`Send a friend request to ${candidate.name}`}
-                className="flex-1 sm:flex-none bg-[#945DA3] text-white hover:bg-[#7d4a8a]"
+                className="flex-1 sm:flex-none"
               >
                 {busy === `send:${candidate._id}` ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

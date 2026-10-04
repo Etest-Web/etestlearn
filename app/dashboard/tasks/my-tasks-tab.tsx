@@ -31,6 +31,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Input,
   Label,
   Select,
@@ -58,7 +59,7 @@ import {
   toggleStudyTaskComplete,
   updateStudyTask,
 } from "./api";
-import { DuePill, EmptyState, FilterPills, SectionHeading, StatCard, StatusPill } from "./primitives";
+import { DuePill, FilterPills, SectionHeading, StatCard, StatusPill } from "./primitives";
 import { dateToInputValue, inputValueToTimestamp } from "./dates";
 
 const NO_COURSE = "none";
@@ -177,7 +178,7 @@ export function MyTasksTab() {
 
         {resolved.length === 0 ? (
           <EmptyState
-            icon={<ListTodo />}
+            icon={ListTodo}
             title={
               status === "completed"
                 ? "Nothing completed yet"
@@ -185,7 +186,7 @@ export function MyTasksTab() {
                   ? "No tasks at this priority"
                   : "No tasks yet"
             }
-            body={
+            description={
               status === "completed"
                 ? "Tick something off in the outstanding list and it lands here."
                 : priority !== "all"
@@ -269,8 +270,10 @@ function TaskList({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-        {heading} ({tasks.length})
+      <h3 className="rule-heading eyebrow">
+        <span className="tabular shrink-0">
+          {heading} ({tasks.length})
+        </span>
       </h3>
       <ul className="flex flex-col gap-3">
         {tasks.map((task) => (
@@ -316,7 +319,7 @@ function TaskRow({
   }
 
   return (
-    <li className="rounded-[24px] border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+    <li className="border border-rule bg-card p-4 transition-colors hover:border-rule-strong">
       <div className="flex items-start gap-3">
         <div className="pt-1">
           <Checkbox
@@ -341,7 +344,9 @@ function TaskRow({
           </p>
 
           {task.notes ? (
-            <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{task.notes}</p>
+            <p className="mt-1 whitespace-pre-line text-sm leading-body text-muted-foreground">
+              {task.notes}
+            </p>
           ) : null}
 
           {task.courseTitle ? (
@@ -380,7 +385,7 @@ function TaskRow({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="text-[#FF4949] hover:bg-red-50 dark:hover:bg-red-500/10"
+                  className="text-destructive hover:bg-destructive/10"
                   aria-label={`Delete "${task.title}"`}
                 >
                   <Trash2 className="h-4 w-4" aria-hidden />
@@ -460,8 +465,8 @@ function TaskComposer() {
   }
 
   return (
-    <section className="rounded-[24px] border border-border bg-card p-5 shadow-sm">
-      <h2 className="mb-4 text-lg font-bold text-foreground">Add a task</h2>
+    <section className="border border-rule bg-card p-5">
+      <h2 className="display-subheading mb-4 text-lg text-foreground">Add a task</h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="task-title">What do you need to do?</Label>
@@ -724,13 +729,13 @@ function MyTasksSkeleton() {
     <div className="flex flex-col gap-8" aria-hidden>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-28 w-full rounded-[24px]" />
+          <Skeleton key={i} className="h-28 w-full" />
         ))}
       </div>
-      <Skeleton className="h-64 w-full rounded-[24px]" />
+      <Skeleton className="h-64 w-full" />
       <div className="flex flex-col gap-3">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-[24px]" />
+          <Skeleton key={i} className="h-24 w-full" />
         ))}
       </div>
     </div>

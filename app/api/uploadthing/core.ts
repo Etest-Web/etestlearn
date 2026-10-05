@@ -22,7 +22,7 @@ export const uploadRouter = {
       const { userId, getToken } = await auth();
       if (!userId) throw new UploadThingError("Unauthorized");
       const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-      const token = await getToken();
+      const token = await getToken({ template: "convex" });
       if (!convexUrl || !token) throw new UploadThingError("Unauthorized");
       const convex = new ConvexHttpClient(convexUrl);
       convex.setAuth(token);

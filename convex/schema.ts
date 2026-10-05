@@ -206,10 +206,12 @@ export default defineSchema({
     .index("by_quiz", ["quizId"])
     .index("by_user", ["userId"]),
 
-  // Admin-uploaded certificate backgrounds. Certificates are rendered by
-  // stamping the learner's data onto page 1 of the active template, so the
-  // template owns the design and we only own the text. At most one template is
-  // active at a time (enforced in convex/certificateTemplates.ts).
+  // The one certificate design. Certificates are rendered by stamping the
+  // learner's data onto page 1 of this template, so it owns the artwork and we
+  // only own the text. It is a table rather than a settings document because a
+  // file in Convex storage is referenced by id, and that id is snapshotted onto
+  // each certificate at issuance. `active` is vestigial but load-bearing for
+  // existing rows — see convex/helpers/certificateTemplate.ts.
   certificateTemplates: defineTable({
     name: v.string(),
     pdfStorageId: v.id("_storage"),
@@ -217,6 +219,9 @@ export default defineSchema({
     // fractions of the page and stay correct if the template is re-uploaded.
     pageWidth: v.number(),
     pageHeight: v.number(),
+    // Always true on the installed template. A row that predates the
+    // single-template rule may still carry `false`, which is why readers go
+    // through getInstalledTemplate() instead of assuming the newest row wins.
     active: v.optional(v.boolean()),
     // Per-field text placement as fractions of page width/height. A field
     // omitted uses the built-in default; set to null to keep it off the

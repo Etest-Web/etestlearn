@@ -52,9 +52,9 @@ components/
   *.tsx              shared components (navbar, guards, providers…) — kebab-case
 convex/              backend: one module per domain + http.ts + schema.ts + helpers/
   _generated/        codegen output — NEVER hand-edit (refresh with `npx convex dev`)
-  helpers/           auth.ts, completion.ts, audit.ts, rateLimit.ts (server-side shared code)
+  helpers/           auth.ts, completion.ts, audit.ts, rateLimit.ts, certificateTemplate.ts (server-side shared code)
 hooks/               use-mobile.ts
-lib/                 shared helpers usable by BOTH Next and Convex (certificates, quiz, progress, mail, slug, site, utils, durable-rate-limit, csp)
+lib/                 shared helpers usable by BOTH Next and Convex (certificates, certificate-layout, quiz, progress, mail, slug, site, utils, durable-rate-limit, csp)
 tests/               integration tests (convex-test + route-handler tests)
 docs/                CERTIFICATES.md — the one real technical doc
 public/              static assets
@@ -109,8 +109,9 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    - `logAudit` call sites — privileged actions only; learner self-service issuance and webhook
      syncs are deliberately unlogged because `auditLogs.actorId` is required: `users.setUserRole`,
      `instructorApplications.reviewApplication`, `certificates.revokeCertificate` /
-     `reinstateCertificate` / `issueCertificateForLearner` (the override path), all five
-     `certificateTemplates` admin mutations, `courses.unpublishCourse` (only when the course is
+     `reinstateCertificate` / `issueCertificateForLearner` (the override path), the three
+     `certificateTemplates` admin mutations (`saveTemplate`, `updateTemplateLayout`,
+     `deleteTemplate`), `courses.unpublishCourse` (only when the course is
      paid *and* sold — unpublishing a free course is ordinary self-service and logging every draft
      toggle would bury the rows that matter), and `courses.reviewUnpublishRequest`.
    - Read back via `auditLogs.listAuditLogs` (admin-only query).
@@ -120,6 +121,16 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    `internal.certificates.issueIfEligible` is scheduled (idempotent) from
    `enrollments.completeLesson` and `quizzes.submitQuizAttempt`. Read `docs/CERTIFICATES.md`
    before touching this subsystem.
+   **There is exactly one certificate template**, not a collection: the admin
+   uploads a background PDF and it becomes the design for every new certificate.
+   So there is no gallery, no activate/deactivate, and no separate admin page —
+   `saveTemplate` patches the one row in place (keeping its id stable, because
+   certificates snapshot it at issuance), and the editor is the "Certificate
+   design" card on `/dashboard/admin/certificates`. Field positions are fractions
+   of the page and live with both default sets in `lib/certificate-layout.ts`,
+   which has no pdf-lib import so the renderer and the admin editor read the same
+   numbers. Every reader of the installed row goes through `getInstalledTemplate`
+   in `convex/helpers/certificateTemplate.ts`.
 8. **CSP is per-request; the rest of the security headers are static.** `lib/csp.ts` builds the
    Content-Security-Policy from a fresh nonce per request and `proxy.ts` writes it to both the
    response header (what the browser enforces) and the request header `X-Nonce` (what Next.js and

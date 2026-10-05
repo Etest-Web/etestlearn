@@ -8,7 +8,6 @@ import {
     Bell,
     BookOpen,
     ClipboardList,
-    FileStack,
     Gauge,
     GraduationCap,
     Inbox,
@@ -408,15 +407,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         >
                             <Award size={20} />
                             Certificates
-                        </Link>
-                    )}
-                    {isAdmin && (
-                        <Link
-                            href="/dashboard/admin/certificate-templates"
-                            className={FOOTER_LINK}
-                        >
-                            <FileStack size={20} />
-                            Templates
                         </Link>
                     )}
                     {isAdmin && (

@@ -262,12 +262,12 @@ describe("certificate issuance", () => {
     expect(afterRepeats).toHaveLength(1);
   });
 
-  test("records the active template on the certificate", async () => {
+  test("records the installed template on the certificate", async () => {
     const t = convexTest(testSchema, modules);
     const ids = await seedWorld(t);
     const student = await completeAllLessons(t, ids.articleCourseId);
 
-    // No template active yet.
+    // No template installed yet.
     await student.mutation(api.certificates.issueCertificate, {
       courseId: ids.articleCourseId,
     });
@@ -276,9 +276,9 @@ describe("certificate issuance", () => {
     );
     expect(plain?.templateId).toBeUndefined();
 
-    // With one active, a later certificate records it.
+    // With one installed, a later certificate records it.
     const templateId = await as(t, "clerk_admin").mutation(
-      api.certificateTemplates.createTemplate,
+      api.certificateTemplates.saveTemplate,
       {
         name: "Brand",
         pdfStorageId: await t.run((ctx) =>
@@ -286,7 +286,6 @@ describe("certificate issuance", () => {
         ),
         pageWidth: 841.89,
         pageHeight: 595.28,
-        activate: true,
       },
     );
 

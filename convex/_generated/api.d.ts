@@ -25,6 +25,7 @@ import type * as goals from "../goals.js";
 import type * as groups from "../groups.js";
 import type * as helpers_audit from "../helpers/audit.js";
 import type * as helpers_auth from "../helpers/auth.js";
+import type * as helpers_certificateTemplate from "../helpers/certificateTemplate.js";
 import type * as helpers_completion from "../helpers/completion.js";
 import type * as helpers_rateLimit from "../helpers/rateLimit.js";
 import type * as http from "../http.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   groups: typeof groups;
   "helpers/audit": typeof helpers_audit;
   "helpers/auth": typeof helpers_auth;
+  "helpers/certificateTemplate": typeof helpers_certificateTemplate;
   "helpers/completion": typeof helpers_completion;
   "helpers/rateLimit": typeof helpers_rateLimit;
   http: typeof http;

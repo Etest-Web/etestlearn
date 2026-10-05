@@ -11,23 +11,12 @@
  * template size, and an admin can nudge individual fields in the template UI.
  */
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage, rgb } from "pdf-lib";
-
-export interface FieldAnchor {
-  /** 0–1 across the page width. */
-  x: number;
-  /** 0–1 down the page height. */
-  y: number;
-  size?: number;
-}
-
-export interface CertificateLayout {
-  heading?: FieldAnchor | null;
-  recipient?: FieldAnchor | null;
-  course?: FieldAnchor | null;
-  issuedOn?: FieldAnchor | null;
-  issuer?: FieldAnchor | null;
-  serial?: FieldAnchor | null;
-}
+import {
+  DEFAULT_LAYOUT,
+  TEMPLATE_DEFAULTS,
+  type CertificateLayout,
+  type FieldAnchor,
+} from "./certificate-layout";
 
 export interface CertificatePdfInput {
   serial: string;
@@ -44,37 +33,6 @@ const PURPLE = rgb(148 / 255, 93 / 255, 163 / 255);
 const INK = rgb(31 / 255, 27 / 255, 29 / 255);
 const MUTED = rgb(107 / 255, 101 / 255, 112 / 255);
 const DANGER = rgb(0.75, 0.25, 0.25);
-
-/**
- * Fallback placement for a certificate drawn with **no** template, where we own
- * the whole page and must supply a title ourselves.
- */
-export const DEFAULT_LAYOUT: Required<CertificateLayout> = {
-  heading: { x: 0.5, y: 0.14, size: 30 },
-  recipient: { x: 0.5, y: 0.42, size: 40 },
-  course: { x: 0.5, y: 0.58, size: 22 },
-  issuedOn: { x: 0.5, y: 0.72, size: 12 },
-  issuer: { x: 0.5, y: 0.85, size: 14 },
-  serial: { x: 0.5, y: 0.95, size: 9 },
-};
-
-/**
- * Fallback placement when a **template** is in play.
- *
- * A designed background usually already contains the title, the "this certifies
- * that" line, and the signature rules — drawing our own heading on top of that
- * artwork is what produces overlapping text. So the heading is suppressed by
- * default and the template owns it. An admin can still opt back in by setting
- * an explicit position for any field.
- */
-export const TEMPLATE_DEFAULTS: Required<CertificateLayout> = {
-  heading: null,
-  recipient: { x: 0.5, y: 0.38, size: 40 },
-  course: { x: 0.5, y: 0.54, size: 22 },
-  issuedOn: { x: 0.5, y: 0.68, size: 12 },
-  issuer: { x: 0.5, y: 0.82, size: 14 },
-  serial: { x: 0.5, y: 0.93, size: 9 },
-};
 
 /** Wraps text to a character budget so long course titles stay inside the page. */
 function wrap(text: string, maxChars: number): string[] {

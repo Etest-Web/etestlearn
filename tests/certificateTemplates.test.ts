@@ -29,7 +29,7 @@ async function seedWorld(t: TestWorld) {
       createdAt: now,
     }),
   );
-  const instructorId = await t.run((ctx: TestCtx) =>
+  await t.run((ctx: TestCtx) =>
     ctx.db.insert("users", {
       clerkId: "clerk_instructor",
       email: "instructor@test.com",
@@ -38,7 +38,6 @@ async function seedWorld(t: TestWorld) {
       createdAt: now,
     }),
   );
-  return { instructorId };
 }
 
 /**
@@ -53,34 +52,38 @@ async function seedTemplateFile(t: TestWorld, name = "artwork") {
   );
 }
 
+async function installTemplate(t: TestWorld, name: string) {
+  return await as(t, "clerk_admin").mutation(api.certificateTemplates.saveTemplate, {
+    name,
+    pdfStorageId: await seedTemplateFile(t, name),
+    pageWidth: 841.89,
+    pageHeight: 595.28,
+  });
+}
+
+const templateRows = (t: TestWorld) =>
+  t.run((ctx: TestCtx) => ctx.db.query("certificateTemplates").collect());
+
 describe("certificate template access control", () => {
-  test("non-admins cannot list templates", async () => {
+  test("non-admins cannot read the template", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
+    await installTemplate(t, "Brand");
 
     await expect(
-      as(t, "clerk_instructor").query(api.certificateTemplates.listTemplates, {}),
+      as(t, "clerk_instructor").query(api.certificateTemplates.getTemplate, {}),
     ).rejects.toThrow(/Not authorized/);
   });
 
-  test("non-admins cannot create, activate, or delete templates", async () => {
+  test("non-admins cannot save, reposition, or delete the template", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
-    const admin = as(t, "clerk_admin");
+    await installTemplate(t, "Brand");
+
     const instructor = as(t, "clerk_instructor");
 
-    const existing = await admin.mutation(
-      api.certificateTemplates.createTemplate,
-      {
-        name: "Existing",
-        pdfStorageId: await seedTemplateFile(t),
-        pageWidth: 841.89,
-        pageHeight: 595.28,
-      },
-    );
-
     await expect(
-      instructor.mutation(api.certificateTemplates.createTemplate, {
+      instructor.mutation(api.certificateTemplates.saveTemplate, {
         name: "Sneaky",
         pdfStorageId: await seedTemplateFile(t),
         pageWidth: 841.89,
@@ -89,105 +92,102 @@ describe("certificate template access control", () => {
     ).rejects.toThrow(/Not authorized/);
 
     await expect(
-      instructor.mutation(api.certificateTemplates.activateTemplate, {
-        templateId: existing,
-      }),
-    ).rejects.toThrow(/Not authorized/);
-
-    await expect(
       instructor.mutation(api.certificateTemplates.updateTemplateLayout, {
-        templateId: existing,
         layout: { recipient: { x: 0.5, y: 0.5 } },
       }),
     ).rejects.toThrow(/Not authorized/);
 
     await expect(
-      instructor.mutation(api.certificateTemplates.deleteTemplate, {
-        templateId: existing,
-      }),
+      instructor.mutation(api.certificateTemplates.deleteTemplate, {}),
     ).rejects.toThrow(/Not authorized/);
   });
 });
 
 describe("certificate template management", () => {
-  test("admins can upload and activate a template", async () => {
+  test("an admin can install a template and read it back", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
-    const storageId = await seedTemplateFile(t);
+    const id = await installTemplate(t, "Brand v1");
 
-    const id = await as(t, "clerk_admin").mutation(
-      api.certificateTemplates.createTemplate,
-      {
-        name: "Brand v1",
-        pdfStorageId: storageId,
-        pageWidth: 841.89,
-        pageHeight: 595.28,
-        activate: true,
-      },
-    );
-
-    const list = await as(t, "clerk_admin").query(
-      api.certificateTemplates.listTemplates,
+    const template = await as(t, "clerk_admin").query(
+      api.certificateTemplates.getTemplate,
       {},
     );
-    expect(list).toHaveLength(1);
-    expect(list[0].active).toBe(true);
-    expect(list[0].name).toBe("Brand v1");
-    expect(list[0]._id).toBe(id);
+    expect(template?._id).toBe(id);
+    expect(template?.name).toBe("Brand v1");
+    expect(template?.previewUrl).toBeTruthy();
   });
 
-  test("only one template is active at a time", async () => {
+  test("getTemplate is null before anything is uploaded", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    expect(
+      await as(t, "clerk_admin").query(api.certificateTemplates.getTemplate, {}),
+    ).toBeNull();
+  });
+
+  test("uploading again replaces the design instead of adding a second one", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
     const admin = as(t, "clerk_admin");
 
-    const first = await admin.mutation(api.certificateTemplates.createTemplate, {
+    const firstFile = await seedTemplateFile(t, "first");
+    await admin.mutation(api.certificateTemplates.saveTemplate, {
       name: "First",
-      pdfStorageId: await seedTemplateFile(t, "a"),
+      pdfStorageId: firstFile,
       pageWidth: 841.89,
       pageHeight: 595.28,
-      activate: true,
     });
 
-    const second = await admin.mutation(api.certificateTemplates.createTemplate, {
+    const secondFile = await seedTemplateFile(t, "second");
+    const secondId = await admin.mutation(api.certificateTemplates.saveTemplate, {
       name: "Second",
-      pdfStorageId: await seedTemplateFile(t, "b"),
-      pageWidth: 841.89,
-      pageHeight: 595.28,
-      activate: true,
+      pdfStorageId: secondFile,
+      pageWidth: 1000,
+      pageHeight: 700,
     });
 
-    const list = await admin.query(api.certificateTemplates.listTemplates, {});
-    const active = list.filter((tpl) => tpl.active);
-    expect(active).toHaveLength(1);
-    expect(active[0]._id).toBe(second);
-    expect(list.find((tpl) => tpl._id === first)?.active).toBe(false);
+    const rows = await templateRows(t);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]._id).toBe(secondId);
+    expect(rows[0].name).toBe("Second");
+    expect(rows[0].pageWidth).toBe(1000);
+    expect(rows[0].active).toBe(true);
+
+    // The superseded artwork would otherwise sit in storage forever.
+    expect(await t.run((ctx: TestCtx) => ctx.db.system.get(firstFile))).toBeNull();
   });
 
-  test("deactivating leaves no active template, so plain artwork is used", async () => {
+  test("the template id is stable across replacements", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
     const admin = as(t, "clerk_admin");
 
-    const id = await admin.mutation(api.certificateTemplates.createTemplate, {
-      name: "Only",
-      pdfStorageId: await seedTemplateFile(t),
+    const first = await installTemplate(t, "First");
+    const second = await admin.mutation(api.certificateTemplates.saveTemplate, {
+      name: "Second",
+      pdfStorageId: await seedTemplateFile(t, "second"),
       pageWidth: 841.89,
       pageHeight: 595.28,
-      activate: true,
     });
 
-    await admin.mutation(api.certificateTemplates.deactivateTemplate, {
-      templateId: id,
-    });
+    // Certificates record the id at issuance; churning it would orphan them.
+    expect(second).toBe(first);
+  });
 
-    const active = await t.run((ctx: TestCtx) =>
-      ctx.db
-        .query("certificateTemplates")
-        .withIndex("by_active", (q) => q.eq("active", true))
-        .collect(),
-    );
-    expect(active).toHaveLength(0);
+  test("removing the template leaves none, so plain artwork is used", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    const admin = as(t, "clerk_admin");
+
+    await installTemplate(t, "Only");
+    await admin.mutation(api.certificateTemplates.deleteTemplate, {});
+
+    expect(await templateRows(t)).toHaveLength(0);
+    expect(
+      await admin.query(api.certificateTemplates.getTemplate, {}),
+    ).toBeNull();
   });
 
   test("layout positions are validated", async () => {
@@ -195,22 +195,15 @@ describe("certificate template management", () => {
     await seedWorld(t);
     const admin = as(t, "clerk_admin");
 
-    const id = await admin.mutation(api.certificateTemplates.createTemplate, {
-      name: "Layout",
-      pdfStorageId: await seedTemplateFile(t),
-      pageWidth: 841.89,
-      pageHeight: 595.28,
-    });
+    const id = await installTemplate(t, "Layout");
 
     await expect(
       admin.mutation(api.certificateTemplates.updateTemplateLayout, {
-        templateId: id,
         layout: { recipient: { x: 1.4, y: 0.5 } },
       }),
     ).rejects.toThrow(/between 0 and 1/);
 
     await admin.mutation(api.certificateTemplates.updateTemplateLayout, {
-      templateId: id,
       layout: {
         recipient: { x: 0.5, y: 0.4, size: 28 },
         // A field the template already prints can be kept off entirely.
@@ -223,22 +216,32 @@ describe("certificate template management", () => {
     expect(stored?.layout?.heading).toBeNull();
   });
 
+  test("saving positions with no template installed is refused", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    await expect(
+      as(t, "clerk_admin").mutation(
+        api.certificateTemplates.updateTemplateLayout,
+        { layout: { recipient: { x: 0.5, y: 0.4 } } },
+      ),
+    ).rejects.toThrow(/No certificate template/);
+  });
+
   test("deleting a template removes it and its stored file", async () => {
     const t = convexTest(testSchema, modules);
     await seedWorld(t);
     const admin = as(t, "clerk_admin");
 
     const storageId = await seedTemplateFile(t, "doomed");
-    const id = await admin.mutation(api.certificateTemplates.createTemplate, {
+    const id = await admin.mutation(api.certificateTemplates.saveTemplate, {
       name: "Doomed",
       pdfStorageId: storageId,
       pageWidth: 841.89,
       pageHeight: 595.28,
     });
 
-    await admin.mutation(api.certificateTemplates.deleteTemplate, {
-      templateId: id,
-    });
+    await admin.mutation(api.certificateTemplates.deleteTemplate, {});
 
     expect(await t.run((ctx: TestCtx) => ctx.db.get(id))).toBeNull();
     expect(await t.run((ctx: TestCtx) => ctx.db.system.get(storageId))).toBeNull();
@@ -249,7 +252,7 @@ describe("certificate template management", () => {
     await seedWorld(t);
 
     await expect(
-      as(t, "clerk_admin").mutation(api.certificateTemplates.createTemplate, {
+      as(t, "clerk_admin").mutation(api.certificateTemplates.saveTemplate, {
         name: "   ",
         pdfStorageId: await seedTemplateFile(t),
         pageWidth: 841.89,

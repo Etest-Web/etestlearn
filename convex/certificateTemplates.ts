@@ -1,9 +1,12 @@
 /**
- * Admin-managed certificate templates (queries and mutations).
+ * The certificate template (queries and mutations).
  *
- * An admin uploads a designed background PDF; certificates are rendered by
- * stamping learner data onto page 1 of the active template. Upload validation
- * and previews need the node runtime and live in
+ * There is exactly one. It is the background PDF an admin uploads and every new
+ * certificate is stamped onto, and there is no gallery to choose from — so
+ * nothing here activates, deactivates, or renames anything. Uploading again
+ * *replaces* the design, which is what an admin means by "I fixed the border".
+ *
+ * Upload validation and previews need the node runtime and live in
  * `convex/certificateTemplateActions.ts` — a `"use node"` module cannot also
  * export mutations.
  */
@@ -14,8 +17,8 @@ import {
   requireUser,
   type AnyCtx,
   type Id,
-  type WriteCtx,
 } from "./helpers/auth";
+import { getInstalledTemplate } from "./helpers/certificateTemplate";
 import { logAudit } from "./helpers/audit";
 
 /**
@@ -48,14 +51,15 @@ async function requireAdmin(ctx: AnyCtx) {
   return user;
 }
 
-/** The template certificates currently render onto, if any. */
+/**
+ * The installed template with its bytes location, for the node actions that
+ * render or preview a certificate. Null when nothing is installed, which is the
+ * signal to draw the built-in artwork instead.
+ */
 export const getActiveTemplate = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const active = await ctx.db
-      .query("certificateTemplates")
-      .withIndex("by_active", (q) => q.eq("active", true))
-      .unique();
+    const active = await getInstalledTemplate(ctx);
 
     if (!active) return null;
 
@@ -83,28 +87,23 @@ export const getCallerRole = internalQuery({
   },
 });
 
-export const getTemplateForPreview = internalQuery({
-  args: { templateId: v.id("certificateTemplates") },
-  handler: async (ctx, args) => {
-    const template = await ctx.db.get(args.templateId);
-    if (!template) return null;
-    return {
-      storageId: template.pdfStorageId,
-      layout: template.layout ?? null,
-      pageWidth: template.pageWidth,
-      pageHeight: template.pageHeight,
-    };
-  },
-});
-
-/** Saves a validated template. Passing `activate: true` makes it the live one. */
-export const createTemplate = mutation({
+/**
+ * Installs a validated template over whatever was there.
+ *
+ * Called only after `certificateTemplateActions.prepareTemplateUpload` has
+ * verified the bytes. The existing row is patched rather than a second one
+ * inserted, so the template id stays stable — certificates record it at
+ * issuance, and a new id per upload would orphan that history for no benefit.
+ * Field positions survive the swap, since they are fractions of the page and
+ * usually still describe the same artwork; the editor tells the admin to check
+ * them.
+ */
+export const saveTemplate = mutation({
   args: {
     name: v.string(),
     pdfStorageId: v.id("_storage"),
     pageWidth: v.number(),
     pageHeight: v.number(),
-    activate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
@@ -116,82 +115,41 @@ export const createTemplate = mutation({
       throw new Error("Invalid template page size");
     }
 
-    const id = await ctx.db.insert("certificateTemplates", {
-      name,
-      pdfStorageId: args.pdfStorageId,
-      pageWidth: args.pageWidth,
-      pageHeight: args.pageHeight,
-      active: args.activate === true ? true : false,
-      createdAt: Date.now(),
-      createdBy: admin._id,
-    });
+    const existing = await getInstalledTemplate(ctx);
 
-    if (args.activate === true) {
-      await deactivateOthers(ctx, id);
+    let id: Id<"certificateTemplates">;
+    if (existing) {
+      id = existing._id;
+      await ctx.db.patch(existing._id, {
+        name,
+        pdfStorageId: args.pdfStorageId,
+        pageWidth: args.pageWidth,
+        pageHeight: args.pageHeight,
+        active: true,
+      });
+      // The superseded artwork would otherwise sit in storage forever.
+      await ctx.storage.delete(existing.pdfStorageId);
+    } else {
+      id = await ctx.db.insert("certificateTemplates", {
+        name,
+        pdfStorageId: args.pdfStorageId,
+        pageWidth: args.pageWidth,
+        pageHeight: args.pageHeight,
+        active: true,
+        createdAt: Date.now(),
+        createdBy: admin._id,
+      });
     }
 
     await logAudit(ctx, {
       actorId: admin._id,
-      action: "certificate_template.create",
+      action: "certificate_template.save",
       targetType: "certificateTemplate",
       targetId: id,
-      details: { name, activated: args.activate === true },
+      details: { name, replaced: existing !== null },
     });
 
     return id;
-  },
-});
-
-/** Exactly one template renders certificates, so activating one clears the rest. */
-async function deactivateOthers(ctx: WriteCtx, keepId: Id<"certificateTemplates">) {
-  const others = await ctx.db
-    .query("certificateTemplates")
-    .withIndex("by_active", (q) => q.eq("active", true))
-    .collect();
-
-  for (const other of others) {
-    if (other._id !== keepId) {
-      await ctx.db.patch(other._id, { active: false });
-    }
-  }
-}
-
-export const activateTemplate = mutation({
-  args: { templateId: v.id("certificateTemplates") },
-  handler: async (ctx, args) => {
-    const admin = await requireAdmin(ctx);
-
-    const template = await ctx.db.get(args.templateId);
-    if (!template) throw new Error("Template not found");
-
-    await deactivateOthers(ctx, args.templateId);
-    await ctx.db.patch(args.templateId, { active: true });
-
-    await logAudit(ctx, {
-      actorId: admin._id,
-      action: "certificate_template.activate",
-      targetType: "certificateTemplate",
-      targetId: args.templateId,
-      details: { name: template.name },
-    });
-  },
-});
-
-export const deactivateTemplate = mutation({
-  args: { templateId: v.id("certificateTemplates") },
-  handler: async (ctx, args) => {
-    const admin = await requireAdmin(ctx);
-    const template = await ctx.db.get(args.templateId);
-    if (!template) throw new Error("Template not found");
-    await ctx.db.patch(args.templateId, { active: false });
-
-    await logAudit(ctx, {
-      actorId: admin._id,
-      action: "certificate_template.deactivate",
-      targetType: "certificateTemplate",
-      targetId: args.templateId,
-      details: { name: template.name },
-    });
   },
 });
 
@@ -201,15 +159,12 @@ export const deactivateTemplate = mutation({
  * its own title avoids getting a second one.
  */
 export const updateTemplateLayout = mutation({
-  args: {
-    templateId: v.id("certificateTemplates"),
-    layout: layoutValidator,
-  },
+  args: { layout: layoutValidator },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
 
-    const template = await ctx.db.get(args.templateId);
-    if (!template) throw new Error("Template not found");
+    const template = await getInstalledTemplate(ctx);
+    if (!template) throw new Error("No certificate template uploaded");
 
     for (const anchor of Object.values(args.layout)) {
       if (anchor && (anchor.x < 0 || anchor.x > 1 || anchor.y < 0 || anchor.y > 1)) {
@@ -217,7 +172,7 @@ export const updateTemplateLayout = mutation({
       }
     }
 
-    await ctx.db.patch(args.templateId, { layout: args.layout });
+    await ctx.db.patch(template._id, { layout: args.layout });
 
     // Layout changes steer where learner names land on every future
     // certificate, so a template quietly repointed at a different recipient
@@ -226,21 +181,25 @@ export const updateTemplateLayout = mutation({
       actorId: admin._id,
       action: "certificate_template.layout_update",
       targetType: "certificateTemplate",
-      targetId: args.templateId,
+      targetId: template._id,
       details: { name: template.name },
     });
   },
 });
 
+/**
+ * Removes the template. New certificates fall back to the built-in artwork;
+ * already-issued ones keep the PDF they were rendered with.
+ */
 export const deleteTemplate = mutation({
-  args: { templateId: v.id("certificateTemplates") },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     const admin = await requireAdmin(ctx);
 
-    const template = await ctx.db.get(args.templateId);
-    if (!template) throw new Error("Template not found");
+    const template = await getInstalledTemplate(ctx);
+    if (!template) throw new Error("No certificate template uploaded");
 
-    await ctx.db.delete(args.templateId);
+    await ctx.db.delete(template._id);
     // Orphaned PDFs would otherwise sit in storage forever.
     await ctx.storage.delete(template.pdfStorageId);
 
@@ -248,35 +207,30 @@ export const deleteTemplate = mutation({
       actorId: admin._id,
       action: "certificate_template.delete",
       targetType: "certificateTemplate",
-      targetId: args.templateId,
+      targetId: template._id,
       // The row is gone, so the name lives on only here — keep it in details.
       details: { name: template.name },
     });
   },
 });
 
-/** Templates for the admin UI. Admin only. */
-export const listTemplates = query({
+/** The installed template, for the admin UI. Admin only. */
+export const getTemplate = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
 
-    const templates = await ctx.db
-      .query("certificateTemplates")
-      .order("desc")
-      .collect();
+    const template = await getInstalledTemplate(ctx);
+    if (!template) return null;
 
-    return await Promise.all(
-      templates.map(async (template) => ({
-        _id: template._id,
-        name: template.name,
-        active: template.active === true,
-        pageWidth: template.pageWidth,
-        pageHeight: template.pageHeight,
-        layout: template.layout ?? null,
-        createdAt: template.createdAt,
-        previewUrl: await ctx.storage.getUrl(template.pdfStorageId),
-      })),
-    );
+    return {
+      _id: template._id,
+      name: template.name,
+      pageWidth: template.pageWidth,
+      pageHeight: template.pageHeight,
+      layout: template.layout ?? null,
+      createdAt: template.createdAt,
+      previewUrl: await ctx.storage.getUrl(template.pdfStorageId),
+    };
   },
 });

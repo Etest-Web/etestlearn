@@ -13,6 +13,7 @@ import {
   type WriteCtx,
 } from "./helpers/auth";
 import { evaluateForLearner } from "./helpers/completion";
+import { getInstalledTemplate } from "./helpers/certificateTemplate";
 import { logAudit } from "./helpers/audit";
 
 /**
@@ -104,16 +105,13 @@ async function issueForUser(
 
   const issuedAt = Date.now();
 
-  // Resolve the active template at issuance time. Recorded on the certificate so
-  // a later template swap cannot retroactively change what was issued. Callers
-  // that pass an explicit id (including null to force plain artwork) opt out of
-  // this lookup entirely.
+  // Resolve the installed template at issuance time. Recorded on the certificate
+  // so a later template swap cannot retroactively change what was issued.
+  // Callers that pass an explicit id (including null to force plain artwork)
+  // opt out of this lookup entirely.
   let templateId = opts.templateId;
   if (templateId === undefined) {
-    const active = await ctx.db
-      .query("certificateTemplates")
-      .withIndex("by_active", (q) => q.eq("active", true))
-      .unique();
+    const active = await getInstalledTemplate(ctx);
     templateId = active?._id ?? null;
   }
 
@@ -197,8 +195,8 @@ async function issueForUser(
       courseTitle: course.title,
       issuerName,
       issuedAt,
-      // Snapshot the template in use so the PDF matches what the admin had
-      // active at issuance, even if they swap templates later.
+      // Snapshot the design in use so the PDF matches what the admin had
+      // installed at issuance, even if they swap it later.
       templateId: templateId ?? undefined,
     },
   );

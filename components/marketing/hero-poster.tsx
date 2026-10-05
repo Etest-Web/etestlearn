@@ -45,7 +45,26 @@ export function HeroPoster() {
         <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden blur">
           {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
               would hand the parent ~15px of over-wide canvas to clip. */}
-          <div className="w-full">
+          <div className="w-full flex flex-col justify-between">
+            <TextLoop
+              text="Glypha"
+              shape="wave"
+              speed={55}
+              path=""
+              direction="forward"
+              separator="✦"
+              curviness={48}
+              fontSize={46}
+              fontWeight={800}
+              letterSpacing={8}
+              uppercase
+              color="#ffffff"
+              ribbon
+              ribbonColor="#d046f6"
+              ribbonWidth={86}
+              className="hidden sm:block"
+              pauseOnHover={false}
+            />
             <TextLoop
               text="Glypha"
               shape="wave"

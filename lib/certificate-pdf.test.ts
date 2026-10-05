@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PDFArray, PDFDocument, PDFRawStream, StandardFonts, rgb } from "pdf-lib";
 import zlib from "node:zlib";
-import {
-  DEFAULT_LAYOUT,
-  renderCertificatePdf,
-  type CertificatePdfInput,
-} from "./certificate-pdf";
+import { DEFAULT_LAYOUT } from "./certificate-layout";
+import { renderCertificatePdf, type CertificatePdfInput } from "./certificate-pdf";
 
 /**
  * Text drawn on a page, decoded from the content stream.

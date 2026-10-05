@@ -35,9 +35,10 @@ export const issueCertificateArtifacts = internalAction({
     const verifyUrl = `${siteUrl()}/verify/${encodeURIComponent(args.serial)}`;
 
     try {
-      // The certificate records which template was active at issuance, so the
-      // PDF matches the design the learner was awarded rather than whatever is
-      // active now.
+      // The certificate records the template it was issued against. Template
+      // ids are stable (uploads patch the one row in place), so the only way
+      // this check fails is the design being removed in the moment between
+      // issuance and render — and plain artwork is the honest answer there.
       let templateBytes: Uint8Array | undefined;
       let layout = undefined;
 
@@ -46,8 +47,6 @@ export const issueCertificateArtifacts = internalAction({
           internal.certificateTemplates.getActiveTemplate,
           {},
         );
-        // Only use the template if it is still the one recorded; otherwise fall
-        // back to built-in artwork rather than stamping a different design.
         if (template && template._id === args.templateId) {
           layout = template.layout ?? undefined;
           const blob = await ctx.storage.get(template.storageId);

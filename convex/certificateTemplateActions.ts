@@ -1,7 +1,8 @@
 "use node";
 
 /**
- * Node-runtime half of certificate templates: upload validation and previews.
+ * Node-runtime half of the certificate template: upload validation and
+ * previews.
  *
  * Both need to parse a PDF, which the default Convex runtime cannot do. They
  * live apart from `convex/certificateTemplates.ts` because a `"use node"` module
@@ -164,24 +165,25 @@ export const prepareTemplateUpload = action({
 });
 
 /**
- * Renders a throwaway sample against a template with sample data, so an admin
- * can check placement before it goes live. Nothing is persisted.
+ * Renders a throwaway sample with sample data, so an admin can check placement
+ * before it goes live. Nothing is persisted. Works with or without a template
+ * installed — with none, it previews the built-in artwork.
  */
 export const previewTemplate = action({
-  args: {
-    templateId: v.id("certificateTemplates"),
-    layout: v.optional(layoutValidator),
-  },
+  args: { layout: v.optional(layoutValidator) },
   handler: async (ctx, args) => {
     await requireAdminAction(ctx);
 
     const template = await ctx.runQuery(
-      internal.certificateTemplates.getTemplateForPreview,
-      { templateId: args.templateId },
+      internal.certificateTemplates.getActiveTemplate,
+      {},
     );
-    if (!template) throw new Error("Template not found");
 
-    const blob = await ctx.storage.get(template.storageId);
+    // No template installed yet — preview the built-in artwork, which is what
+    // certificates would actually be stamped onto today.
+    const blob = template
+      ? await ctx.storage.get(template.storageId)
+      : null;
     const templateBytes = blob
       ? new Uint8Array(await blob.arrayBuffer())
       : undefined;

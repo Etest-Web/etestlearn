@@ -94,9 +94,9 @@ async function seedApplication(t: TestWorld, userId: Id<"users">) {
   );
 }
 
-async function seedTemplateFile(t: TestWorld) {
+async function seedTemplateFile(t: TestWorld, name = "audit") {
   return await t.run((ctx) =>
-    ctx.storage.store(new Blob(["%PDF-1.7 audit"], { type: "application/pdf" })),
+    ctx.storage.store(new Blob([`%PDF-1.7 ${name}`], { type: "application/pdf" })),
   );
 }
 
@@ -200,46 +200,46 @@ describe("privileged actions write audit rows", () => {
     expect(applicant?.role).toBe("student");
   });
 
-  test("the template lifecycle writes one row per operation", async () => {
+  test("template changes are logged, including replacements", async () => {
     const t = convexTest(testSchema, modules);
     const { adminId } = await seedWorld(t);
     const admin = as(t, "clerk_admin");
 
-    const templateId = await admin.mutation(api.certificateTemplates.createTemplate, {
+    const templateId = await admin.mutation(api.certificateTemplates.saveTemplate, {
       name: "Audit v1",
       pdfStorageId: await seedTemplateFile(t),
       pageWidth: 841.89,
       pageHeight: 595.28,
-      activate: true,
     });
     await admin.mutation(api.certificateTemplates.updateTemplateLayout, {
-      templateId,
       layout: { recipient: { x: 0.5, y: 0.4 } },
     });
-    await admin.mutation(api.certificateTemplates.deactivateTemplate, {
-      templateId,
+    // Same row, new artwork: the id is stable so issuance history survives.
+    await admin.mutation(api.certificateTemplates.saveTemplate, {
+      name: "Audit v2",
+      pdfStorageId: await seedTemplateFile(t, "second"),
+      pageWidth: 841.89,
+      pageHeight: 595.28,
     });
-    await admin.mutation(api.certificateTemplates.activateTemplate, {
-      templateId,
-    });
-    await admin.mutation(api.certificateTemplates.deleteTemplate, {
-      templateId,
-    });
+    await admin.mutation(api.certificateTemplates.deleteTemplate, {});
 
     const rows = await auditRows(t);
     expect(rows.map((row) => row.action)).toEqual([
-      "certificate_template.create",
+      "certificate_template.save",
       "certificate_template.layout_update",
-      "certificate_template.deactivate",
-      "certificate_template.activate",
+      "certificate_template.save",
       "certificate_template.delete",
     ]);
     expect(rows.every((row) => row.actorId === adminId)).toBe(true);
     expect(rows.every((row) => row.targetId === templateId)).toBe(true);
 
+    // The first save installed a design, the second replaced one.
+    expect(JSON.parse(rows[0].details!).replaced).toBe(false);
+    expect(JSON.parse(rows[2].details!).replaced).toBe(true);
+
     // The template row is gone, so its name survives only in the log.
     const deleteDetails = JSON.parse(rows[rows.length - 1].details!);
-    expect(deleteDetails.name).toBe("Audit v1");
+    expect(deleteDetails.name).toBe("Audit v2");
   });
 });
 
@@ -290,7 +290,7 @@ describe("listAuditLogs", () => {
       userId: studentId,
       role: "instructor",
     });
-    await admin.mutation(api.certificateTemplates.createTemplate, {
+    await admin.mutation(api.certificateTemplates.saveTemplate, {
       name: "Filtered",
       pdfStorageId: await seedTemplateFile(t),
       pageWidth: 841.89,

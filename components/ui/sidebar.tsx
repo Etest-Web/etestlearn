@@ -4,6 +4,7 @@ import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
+import { usePathname } from "next/navigation"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -92,6 +93,17 @@ function SidebarProvider({
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
+
+  // On mobile the sidebar is a Sheet overlay. Tapping a link navigates but
+  // leaves the Sheet mounted on top of the new page, so dismiss it whenever the
+  // route changes. Desktop state is untouched — a collapsed rail should survive
+  // navigation. This is the shared-provider fix, so it covers every consumer
+  // (overview nav, friends, footer links) instead of each link needing a
+  // `setOpenMobile(false)` click handler.
+  const pathname = usePathname()
+  React.useEffect(() => {
+    setOpenMobile(false)
+  }, [pathname, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -187,7 +199,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) max-w-[85vw] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+          className="w-(--sidebar-width) max-w-[85vw] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground max-h-dvh"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -199,7 +211,24 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          {/* One scroll container for the whole drawer, so a short viewport
+              scrolls the menu instead of clipping it. On desktop the nav list
+              scrolls on its own and the footer stays pinned, which is why
+              SidebarContent is neutralised here: a flex child with
+              `flex-1 min-h-0` inside a scrolling flex column would be
+              squeezed to zero height by flex shrinking, leaving an empty gap
+              and hiding the links behind the drawer's scroll. The footer keeps
+              `shrink-0` so it is never compressed either. */}
+          <div
+            className={cn(
+              "flex h-full w-full flex-col overflow-y-auto overscroll-contain",
+              "[&_[data-slot=sidebar-content]]:flex-none",
+              "[&_[data-slot=sidebar-content]]:overflow-visible",
+              "[&_[data-slot=sidebar-footer]]:shrink-0"
+            )}
+          >
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     )

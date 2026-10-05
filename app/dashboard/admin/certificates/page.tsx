@@ -20,6 +20,7 @@ import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
+import { CertificateTemplateEditor } from "@/components/certificate-template-editor";
 
 export default function AdminCertificatesPage() {
   const currentUser = useQuery(api.users.getCurrentUser);
@@ -79,20 +80,10 @@ export default function AdminCertificatesPage() {
     <div className="max-w-5xl mx-auto w-full space-y-8">
       <PageHeader
         title="Certificates"
-        description={
-          <>
-            Every certificate issued on the platform. Revoking keeps the audit
-            record but makes the public verification page report it as withdrawn.{" "}
-            <a
-              href="/dashboard/admin/certificate-templates"
-              className="link-quiet text-primary"
-            >
-              Certificate templates
-            </a>{" "}
-            are managed separately.
-          </>
-        }
+        description="Every certificate issued on the platform, plus the single background design they are stamped onto. Revoking keeps the audit record but makes the public verification page report it as withdrawn."
       />
+
+      <CertificateTemplateEditor />
 
       <Card className="gap-0 p-0">
         <CardHeader className="border-b border-rule p-5">

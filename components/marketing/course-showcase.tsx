@@ -45,7 +45,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
           />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <span className="font-display text-4xl tracking-wide text-muted-foreground/40">
+            <span className="display-subheading text-4xl text-muted-foreground/40">
               {course.title.slice(0, 24)}
             </span>
           </div>
@@ -62,7 +62,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
           {course.category ? (
-            <span className="text-[11px] font-semibold uppercase tracking-editorial text-primary">
+            <span className="text-[11px] font-semibold uppercase tracking-label text-primary">
               {course.category}
             </span>
           ) : (

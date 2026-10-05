@@ -102,6 +102,9 @@ export function buildContentSecurityPolicy(nonce: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
+    // Safari plays AES-128 HLS natively through <video src>, which is a
+    // media-src fetch (hls.js/MSE path uses connect-src instead).
+    "media-src 'self' https://*.convex.site",
     // Convex, Clerk and Paystack all speak over connect-src.
     [
       "connect-src",

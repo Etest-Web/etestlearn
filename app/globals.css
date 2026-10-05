@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-bebas-neue);
+  --font-display: var(--font-archivo);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-ink: var(--brand-ink);
@@ -80,14 +80,25 @@
   --radius-4xl: calc(var(--radius) * 1.5);
 
   /* ── Typographic scale ──────────────────────────────────────────────────
-     Display type is condensed (Bebas Neue) and needs positive tracking plus
-     leading well below 1 to sit tight without the caps colliding. Body copy
-     wants the opposite. Both are tokens so a heading is never re-specified by
-     hand at a call site. */
-  --tracking-editorial: 0.16em;
+     Display type is a normal-width grotesque (Archivo), so it wants *negative*
+     tracking. This scale used to lean positive because the display face was a
+     condensed all-caps (Bebas Neue) — but positive tracking on a narrow face
+     cancels its condensation and pushes the letters apart, which is what made
+     every heading read as stretched. Wide positive tracking now belongs to
+     `label` / `editorial-wide` alone: those carry short uppercase micro-copy
+     where the open setting is the signal, and they are never a sentence.
+
+     The three tracking tokens are named for what they are *for*, because the
+     previous single `--tracking-editorial` was doing double duty (headings AND
+     micro-labels) and no call site could tell which one it was overriding. */
+  --tracking-display: -0.02em;
+  --tracking-label: 0.16em;
   --tracking-editorial-wide: 0.28em;
-  --leading-display: 0.86;
-  --leading-display-tight: 0.94;
+  /* Archivo carries real lowercase and tall ascenders, so display leading can
+     no longer sit at the old 0.86 — descenders clipped on every multi-line
+     heading. */
+  --leading-display: 0.98;
+  --leading-display-tight: 1.12;
   --leading-body: 1.6;
 
   /* ── Elevation ──────────────────────────────────────────────────────────
@@ -260,11 +271,13 @@
      into looking assembled rather than designed. */
 
   /* Small uppercase label that sits above a heading or a group of fields.
-     The condensed face plus wide tracking is the single strongest signal that
-     this is a printed layout rather than a dashboard. */
+     The display face plus wide tracking is the single strongest signal that
+     this is a printed layout rather than a dashboard. The weight is explicit
+     because Archivo at 11px sits too light to hold its own as a label. */
   .eyebrow {
     font-family: var(--font-display);
     font-size: 0.6875rem;
+    font-weight: 600;
     line-height: 1;
     letter-spacing: var(--tracking-editorial-wide);
     text-transform: uppercase;
@@ -273,18 +286,26 @@
 
   /* Display heading. `text-balance` keeps a two-line headline from ragging
      badly, which is most of what separates a considered headline from a long
-     unbroken grey bar. */
+     unbroken grey bar.
+
+     Weight is stated here rather than left to the family default: the previous
+     display face shipped a single weight, so headings had no bold to lean on
+     and the only lever left was size. Archivo is variable, so 700 is free. */
   .display-heading {
     font-family: var(--font-display);
+    font-weight: 700;
     line-height: var(--leading-display);
-    letter-spacing: var(--tracking-editorial);
+    letter-spacing: var(--tracking-display);
     text-wrap: balance;
   }
 
+  /* Section and card headings — the same voice one step down. 600 rather than
+     700 so a card title does not compete with the page title above it. */
   .display-subheading {
     font-family: var(--font-display);
+    font-weight: 600;
     line-height: var(--leading-display-tight);
-    letter-spacing: var(--tracking-editorial);
+    letter-spacing: var(--tracking-display);
   }
 
   /* Section rule. In an editorial layout a full-width hairline with a label

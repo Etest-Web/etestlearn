@@ -17,7 +17,7 @@ export function ClosingCta() {
                         No better time
                         <span className="h-px w-8 bg-brand" aria-hidden="true" />
                     </p>
-                    <h2 className="mx-auto mt-5 max-w-3xl font-display text-5xl leading-[0.9] tracking-wide text-balance sm:text-6xl md:text-7xl">
+                    <h2 className="display-heading mx-auto mt-5 max-w-3xl text-5xl text-balance sm:text-6xl md:text-7xl">
                         The skill you learn today is the edge you have tomorrow.
                     </h2>
                     <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

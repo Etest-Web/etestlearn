@@ -120,7 +120,7 @@ export default function BecomeInstructorPage() {
                                 <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-brand/10 text-brand">
                                     <Clock className="h-6 w-6" />
                                 </div>
-                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                <CardTitle className="display-subheading text-center text-2xl">
                                     Application Under Review
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">
@@ -134,7 +134,7 @@ export default function BecomeInstructorPage() {
                                 <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-success/10 text-success">
                                     <CheckCircle2 className="h-6 w-6" />
                                 </div>
-                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                <CardTitle className="display-subheading text-center text-2xl">
                                     Application Approved! 🎉
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">
@@ -148,7 +148,7 @@ export default function BecomeInstructorPage() {
                                 <div aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
                                     <XCircle className="h-6 w-6" />
                                 </div>
-                                <CardTitle className="display-subheading text-center text-2xl tracking-editorial">
+                                <CardTitle className="display-subheading text-center text-2xl">
                                     Application Not Approved
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">

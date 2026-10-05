@@ -25,7 +25,7 @@ export default function VerifyCertificatePage() {
       <div className="w-full max-w-lg">
         <div className="mb-8 flex items-center justify-center gap-2">
           <GraduationCap aria-hidden className="h-5 w-5 text-brand" />
-          <span className="display-subheading text-lg tracking-editorial">
+          <span className="display-subheading text-lg">
             Glypha Learn
           </span>
         </div>

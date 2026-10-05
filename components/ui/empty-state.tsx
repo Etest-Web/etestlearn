@@ -63,7 +63,7 @@ function EmptyState({
       <div className="flex flex-col gap-1.5">
         <h3
           data-slot="empty-state-title"
-          className="display-subheading text-lg tracking-editorial text-foreground"
+          className="display-subheading text-lg text-foreground"
         >
           {title}
         </h3>

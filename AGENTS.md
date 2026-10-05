@@ -219,13 +219,16 @@ Set Next-side vars in `.env` / `.env.local` (gitignored). Set Convex-side vars w
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | `lib/mail.ts` |
 | `INSTRUCTOR_APPLICATION_EMAIL` | notify route |
 | `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_SITE_URL` | `convex dev` CLI / Convex site URL |
+| `VIDEO_PLAYBACK_SECRET` | `lib/video-playback-token.ts` (token HMAC, fail-closed), `convex/http.ts` playback gate |
+| `APP_ORIGIN` | `convex/http.ts` playback CORS allowlist (fail-closed) |
+| `UPLOADTHING_TOKEN` | `app/api/uploadthing/*` (upload route), `convex/videoTranscode.ts` source cleanup (Convex-side env) |
 
 **Never print, echo, or commit values from `.env` / `.env.local` — they contain live-looking
 `pk_live_`/`sk_live_` keys.** Both files are gitignored (so is `/.clerk/`).
 
 Missing-from-env-but-required-by-code checklist: `PAYSTACK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`,
 `CLERK_SYNC_TOKEN`, `NOTIFY_RATE_LIMIT_TOKEN`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`,
-`NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`.
+`NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`, `VIDEO_PLAYBACK_SECRET`, `APP_ORIGIN`, `UPLOADTHING_TOKEN`.
 
 ---
 

@@ -18,7 +18,7 @@ function Row({ hidden }: { hidden?: boolean }) {
     <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
       {TOPICS.map((topic) => (
         <span key={topic} className="flex items-center">
-          <span className="px-6 font-display text-xl tracking-editorial text-muted-foreground sm:text-2xl">
+          <span className="px-6 display-subheading text-xl text-muted-foreground sm:text-2xl">
             {topic.toUpperCase()}
           </span>
           <svg viewBox="0 0 24 24" className="h-3 w-3 text-primary" fill="currentColor">

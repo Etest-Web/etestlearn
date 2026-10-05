@@ -66,7 +66,7 @@ export default function PaymentCallbackPage() {
             {state === "success" && <CheckCircle2 className="h-10 w-10 text-success" />}
             {(state === "failed" || state === "error") && <XCircle className="h-10 w-10 text-destructive" />}
           </div>
-          <CardTitle className="display-subheading text-2xl tracking-editorial text-center">
+          <CardTitle className="display-subheading text-2xl text-center">
             {state === "verifying" && "Verifying your payment..."}
             {state === "success" && "Payment successful!"}
             {state === "failed" && "Payment not completed"}

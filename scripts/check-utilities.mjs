@@ -24,7 +24,7 @@ const present = [
   "shadow-raised", "shadow-overlay",
   "text-rule", "bg-rule", "border-rule", "border-rule-strong",
   "bg-surface-sunken", "bg-surface-raised",
-  "tracking-editorial", "tracking-editorial-wide",
+  "tracking-display", "tracking-label", "tracking-editorial-wide",
   "leading-display", "leading-display-tight", "leading-body",
   "text-brand", "bg-brand", "text-brand-ink", "border-brand",
 ];
@@ -34,6 +34,11 @@ const absent = [
   // nothing, because `--elevation-*` is not a Tailwind namespace and
   // `--success` was never mapped into `--color-*`.
   "shadow-elevation-raised", "shadow-elevation-overlay",
+  // Retired when the display face changed: the single `--tracking-editorial`
+  // was split into `tracking-display` (tight, for headings) and `tracking-label`
+  // (loose, for short uppercase micro-copy). A call site still asking for the
+  // old one would render with whatever tracking it inherits — no error, no CSS.
+  "tracking-editorial",
 ];
 
 writeFileSync(join(dir, "probe.html"), `<div class="${[...present, ...absent].join(" ")}"></div>`);

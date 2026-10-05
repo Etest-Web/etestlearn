@@ -2,6 +2,8 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Webhook } from "svix";
+import { decodePlaybackToken, verifyPlaybackToken } from "../lib/video-playback-token";
+import { decorateMasterPlaylist, decorateMediaPlaylist } from "../lib/video-playlists";
 
 type ClerkUserEvent = {
   type: "user.created" | "user.updated" | "user.deleted" | string;
@@ -254,6 +256,135 @@ http.route({
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  }),
+});
+
+/**
+ * Self-hosted video playback: GET /video/:assetId/<file>?t=<token>
+ *
+ * Unlike the webhooks above, these ARE browser-facing: hls.js fetches the
+ * manifest, key and segments cross-origin from the Convex site URL. Three
+ * consequences are deliberate:
+ *
+ * 1. Authentication is the signed `t` token (HMAC, expiry, asset+user
+ *    binding), verified before anything is read — there is no cookie or JWT
+ *    on these requests. Enrollment is re-checked server-side per request, so
+ *    revoking access takes effect immediately even with a live token.
+ * 2. CORS allows exactly one origin, `APP_ORIGIN` (fail closed). No wildcard:
+ *    the token travels in the URL and must not be readable from any page.
+ *    Only simple GETs are used, so no preflight handling is needed.
+ * 3. Nothing is cacheable (`no-store` everywhere) and storage URLs are never
+ *    exposed — every byte flows through this gate.
+ */
+http.route({
+  pathPrefix: "/video/",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const appOrigin = process.env.APP_ORIGIN;
+    if (!appOrigin) {
+      return new Response("Playback not configured", { status: 500 });
+    }
+    const cors = { "Access-Control-Allow-Origin": appOrigin, "Vary": "Origin" };
+
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+    const parts = url.pathname.replace(/^\/video\//, "").split("/").filter(Boolean);
+    const [assetId, file, extra] = parts;
+    const token = url.searchParams.get("t");
+    if (!assetId || !file || !token) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+
+    // Decode first to learn the claimed user, then verify against the URL.
+    let claimed: { a: string; u: string };
+    try {
+      claimed = decodePlaybackToken(token);
+    } catch {
+      return new Response("Forbidden", { status: 403, headers: cors });
+    }
+    if (claimed.a !== assetId) {
+      return new Response("Forbidden", { status: 403, headers: cors });
+    }
+    try {
+      await verifyPlaybackToken(token, { assetId, userId: claimed.u });
+      const ok = await ctx.runQuery(internal.videoAssets.checkPlaybackAccess, {
+        assetId: assetId as never,
+        userId: claimed.u as never,
+      });
+      if (!ok) return new Response("Forbidden", { status: 403, headers: cors });
+    } catch {
+      return new Response("Forbidden", { status: 403, headers: cors });
+    }
+
+    const asset = await ctx.runQuery(internal.videoAssets.getAssetForWorker, {
+      assetId: assetId as never,
+    });
+    if (!asset || asset.status !== "ready") {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+
+    const noStore = { ...cors, "Cache-Control": "no-store" };
+    const tokenParam = `t=${token}`;
+
+    if (file === "master.m3u8") {
+      if (!asset.masterManifestStorageId) return new Response("Not found", { status: 404, headers: cors });
+      const blob = await ctx.storage.get(asset.masterManifestStorageId);
+      if (!blob) return new Response("Not found", { status: 404, headers: cors });
+      const body = decorateMasterPlaylist(await blob.text(), tokenParam);
+      return new Response(body, {
+        headers: { ...noStore, "Content-Type": "application/x-mpegURL" },
+      });
+    }
+
+    const variantMatch = /^v(\d+)\.m3u8$/.exec(file);
+    if (variantMatch) {
+      const i = Number(variantMatch[1]);
+      const manifestId = asset.variantManifestStorageIds?.[i];
+      if (manifestId === undefined || !asset.ivHex) {
+        return new Response("Not found", { status: 404, headers: cors });
+      }
+      const blob = await ctx.storage.get(manifestId);
+      if (!blob) return new Response("Not found", { status: 404, headers: cors });
+      // Segment names resolve relative to /video/:id/, so they are prefixed
+      // with `seg/` BEFORE decoration appends the token query.
+      const stored = (await blob.text())
+        .split("\n")
+        .map((line) => (line.trim().endsWith(".ts") ? `seg/${line.trim()}` : line))
+        .join("\n");
+      const body = decorateMediaPlaylist(stored, {
+        keyUri: `key?${tokenParam}`,
+        ivHex: asset.ivHex,
+        tokenParam,
+      });
+      return new Response(body, {
+        headers: { ...noStore, "Content-Type": "application/x-mpegURL" },
+      });
+    }
+
+    if (file === "key") {
+      if (!asset.keyStorageId) return new Response("Not found", { status: 404, headers: cors });
+      const blob = await ctx.storage.get(asset.keyStorageId);
+      if (!blob) return new Response("Not found", { status: 404, headers: cors });
+      return new Response(blob, {
+        headers: { ...noStore, "Content-Type": "application/octet-stream" },
+      });
+    }
+
+    if (file === "seg" && extra) {
+      const seg = (asset.segments ?? []).find((s) => s.name === extra);
+      if (!seg) return new Response("Not found", { status: 404, headers: cors });
+      const blob = await ctx.storage.get(seg.storageId);
+      if (!blob) return new Response("Not found", { status: 404, headers: cors });
+      return new Response(blob, {
+        headers: { ...noStore, "Content-Type": "video/mp2t" },
+      });
+    }
+
+    return new Response("Not found", { status: 404, headers: cors });
   }),
 });
 

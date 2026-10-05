@@ -75,10 +75,14 @@ export function HeroPoster() {
               Learn skills that move you forward
             </p>
 
-            {/* Fluid until sm, then the 7xl step. At 320px the clamp floors at
-                2rem, which keeps the nowrap'd "HANDS ON" (~176px) inside the
-                288px content box — text-6xl put it at ~330px and clipped. */}
-            <h1 className="font-display text-[clamp(2rem,10vw,3rem)] leading-[0.9] tracking-wide text-balance sm:text-7xl">
+            {/* Fluid until sm, then the 7xl step. The 7vw coefficient is set
+                against the nowrap'd "HANDS ON": at 320px the clamp floors at
+                1.5rem and the run lands near 130px, comfortably inside the
+                288px content box. The previous 10vw/2rem pair was sized for a
+                condensed face and this one is not — 10vw put the run at ~280px
+                against that same 288px box, one rounding difference from
+                clipping. */}
+            <h1 className="display-heading text-[clamp(1.5rem,7vw,3rem)] text-balance sm:text-7xl">
               A Digital Hub
               <br />
               for{" "}

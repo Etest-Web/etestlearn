@@ -37,6 +37,8 @@ import type * as rateLimit from "../rateLimit.js";
 import type * as statistics from "../statistics.js";
 import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
+import type * as videoAssets from "../videoAssets.js";
+import type * as videoTranscode from "../videoTranscode.js";
 
 import type {
   ApiFromModules,
@@ -74,6 +76,8 @@ declare const fullApi: ApiFromModules<{
   statistics: typeof statistics;
   tasks: typeof tasks;
   users: typeof users;
+  videoAssets: typeof videoAssets;
+  videoTranscode: typeof videoTranscode;
 }>;
 
 /**

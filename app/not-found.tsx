@@ -8,7 +8,7 @@ export default function NotFound() {
             <div className="w-full max-w-lg">
                 <div className="flex items-center justify-center gap-2">
                     <GraduationCap aria-hidden className="h-5 w-5 text-brand" />
-                    <span className="display-subheading text-lg tracking-editorial">
+                    <span className="display-subheading text-lg">
                         Glypha Learning
                     </span>
                 </div>

@@ -81,8 +81,88 @@ export default defineSchema({
     order: v.number(),
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
+    // Optional video asset. `content` stays the legacy free URL field
+    // (YouTube/Vimeo/direct) for lessons authored before this feature; when
+    // `videoAssetId` is set the lesson plays from the encrypted HLS ladder
+    // served through `videoAssets` and `content` is ignored by the player.
+    videoAssetId: v.optional(v.id("videoAssets")),
     createdAt: v.number(),
-  }).index("by_course_order", ["courseId", "order"]),
+  }).index("by_course_order", ["courseId", "order"])
+    .index("by_video_asset", ["videoAssetId"]),
+
+  /**
+   * A transcoded, AES-128-encrypted HLS ladder for a lesson video.
+   *
+   * Why this is a separate table rather than a column on `lessons`: the asset
+   * outlives the lesson it was attached to (an instructor re-uploads and the
+   * old ladder must stay retrievable for cleanup), and it carries a lot of
+   * metadata the lesson does not need to re-read on every page load.
+   *
+   * Encryption is our own, applied in `lib/video-encode.ts` after ffmpeg
+   * produces the ladder: every `.m4s` segment is CBC-encrypted with a
+   * per-asset key, and `keyStorageId` points at the blob holding that key. The key
+   * never ships to the browser in a static file — it is handed out by an
+   * auth-gated route, one time-limited session at a time. Raw segments on
+   * storage are therefore ciphertext to anyone who lacks that token.
+   */
+  videoAssets: defineTable({
+    lessonId: v.id("lessons"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    // Raw instructor upload on UploadThing. The ladder output stays in Convex
+    // storage; only these capability URLs leave the platform, and only the
+    // transcode worker ever fetches them (host-allowlisted).
+    sourceFileUrl: v.string(),
+    sourceFileKey: v.string(),
+    // Master playlist plus one media playlist per ladder variant; segments are
+    // per-variant ciphertext blobs. All are served only through tokenized routes.
+    // These stay unset until the transcode completes (`status === "ready"`).
+    masterManifestStorageId: v.optional(v.id("_storage")),
+    variantManifestStorageIds: v.optional(v.array(v.id("_storage"))),
+    segments: v.optional(
+      v.array(
+        v.object({
+          variant: v.number(),
+          name: v.string(),
+          storageId: v.id("_storage"),
+        }),
+      ),
+    ),
+    // Blob holding the 16-byte AES key. Read by the auth-gated route, never
+    // exposed as a URL.
+    keyStorageId: v.optional(v.id("_storage")),
+    // 16-byte IV as hex, published in `#EXT-X-KEY` at serve time.
+    ivHex: v.optional(v.string()),
+    // Resolution ladder: { label, height, bitrate, bandwidth }.
+    variants: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          height: v.number(),
+          bitrate: v.number(),
+          bandwidth: v.number(),
+        }),
+      ),
+    ),
+    // Total source duration in seconds, probed after transcode.
+    durationSeconds: v.optional(v.number()),
+    // Previous asset this upload replaces. Its blobs are deleted once the new
+    // ladder is ready, so in-flight viewers keep working until the swap.
+    replacesAssetId: v.optional(v.id("videoAssets")),
+    // Time-limited playback token minted per student session.
+    activeToken: v.optional(v.string()),
+    tokenExpiresAt: v.optional(v.number()),
+    // ffmpeg exit / error message when status === "failed".
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_lesson", ["lessonId"])
+    .index("by_status", ["status"]),
 
   enrollments: defineTable({
     userId: v.id("users"),

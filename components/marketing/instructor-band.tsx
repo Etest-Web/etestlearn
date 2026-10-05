@@ -18,7 +18,7 @@ export function InstructorBand() {
                             <span className="h-px w-8 bg-current opacity-40" aria-hidden="true" />
                             For instructors
                         </p>
-                        <h2 className="font-display text-4xl leading-[0.95] tracking-wide text-balance sm:text-5xl">
+                        <h2 className="display-heading text-4xl text-balance sm:text-5xl">
                             You know the craft.
                             <br />
                             We handle everything else.

@@ -1,13 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Montserrat,
-  Bebas_Neue,
-  Poppins,
-  Inter,
-  Outfit,
-} from "next/font/google";
+import { Archivo, Geist_Mono, Inter, Outfit } from "next/font/google";
 import { headers } from "next/headers";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
@@ -19,6 +11,17 @@ import { EnsureCurrentUser } from "@/components/ensure-current-user";
 import { Toaster } from "sonner";
 import { siteConfig } from "@/lib/site";
 
+// Four faces, each load-bearing. The sans pair sets body copy, Geist_Mono backs
+// `--font-mono` for the marketing kickers, and Archivo is the display face.
+// Montserrat, Poppins and Geist sans used to load here too and were referenced
+// by nothing in the tree — three fonts of render-blocking CSS for no type.
+//
+// Archivo is a normal-width grotesque with a real lowercase and a full variable
+// weight axis (100–900), which is what a display role needs: the face it
+// replaces was a condensed all-caps face with a single weight, so every heading
+// had to be letter-spaced wide to compensate and read as stretched. No `weight`
+// is passed on purpose — that is what requests the variable font rather than a
+// cut of static instances.
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const outfit = Outfit({
@@ -26,31 +29,14 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 
-const mont = Montserrat({
-  variable: "--font-mont",
-  subsets: ["latin"],
-});
-
-const bebasNeue = Bebas_Neue({
-  weight: "400",
-  variable: "--font-bebas-neue",
-  subsets: ["latin"],
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
-const poppins = Poppins({
-  weight: "800",
-  variable: "--font-poppins",
+const archivo = Archivo({
   subsets: ["latin"],
+  variable: "--font-archivo",
 });
 
 export const viewport: Viewport = {
@@ -114,7 +100,7 @@ export default async function RootLayout({
       className={cn("font-outfit", outfit.variable, inter.variable)}
     >
       <body
-        className={`${geistSans.variable} ${bebasNeue.variable} ${poppins.variable} ${mont.variable} ${geistMono.variable} ${outfit.className} antialiased`}
+        className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
       >
         <ThemeProvider
           nonce={nonce}

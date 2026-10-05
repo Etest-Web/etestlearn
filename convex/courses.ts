@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { slugify } from "../lib/slug";
 import {
@@ -387,6 +388,28 @@ export const deleteLesson = mutation({
     const course = await ctx.db.get(lesson.courseId);
     if (!course || (course.instructorId !== user._id && user.role !== "admin")) {
       throw new Error("Not authorized to delete lessons in this course");
+    }
+
+    // Retire an attached video asset with the lesson: its ladder blobs and key
+    // must not linger in storage once the lesson is gone. The UploadThing
+    // source goes through the node deleter; the ladder blobs delete inline.
+    if (lesson.videoAssetId) {
+      const asset = await ctx.db.get(lesson.videoAssetId);
+      if (asset) {
+        const blobs = [
+          asset.masterManifestStorageId,
+          ...(asset.variantManifestStorageIds ?? []),
+          ...(asset.segments ?? []).map((s) => s.storageId),
+          asset.keyStorageId,
+        ];
+        for (const id of blobs) {
+          if (id) await ctx.storage.delete(id).catch(() => {});
+        }
+        await ctx.scheduler.runAfter(0, internal.videoTranscode.deleteUploadthingFiles, {
+          fileKeys: [asset.sourceFileKey],
+        });
+        await ctx.db.delete(asset._id);
+      }
     }
 
     // TODO: cleanup related quizzes, attempts

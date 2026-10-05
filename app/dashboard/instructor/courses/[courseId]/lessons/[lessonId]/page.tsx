@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX } from "lucide-react";
 import { toast } from "sonner";
+import { VideoUpload } from "@/components/video-upload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ReactMarkdown from "react-markdown";
@@ -281,16 +282,19 @@ export default function LessonEditPage() {
             </div>
 
             {formData.contentType === "video" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="content">Video URL</Label>
-                <Input
-                  id="content"
-                  name="content"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  value={formData.content}
-                  onChange={handleChange}
-                />
-                <p className="text-xs leading-[1.5] text-muted-foreground">Enter a link to YouTube, Vimeo, or a direct MP4 file.</p>
+              <div className="space-y-4">
+                <VideoUpload lessonId={lessonId as Id<"lessons">} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="content">External video URL (fallback)</Label>
+                  <Input
+                    id="content"
+                    name="content"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={formData.content}
+                    onChange={handleChange}
+                  />
+                  <p className="text-xs leading-[1.5] text-muted-foreground">Used only when no uploaded video is attached — YouTube, Vimeo, or a direct MP4 file.</p>
+                </div>
               </div>
             )}
 
@@ -350,7 +354,7 @@ export default function LessonEditPage() {
                 ) : (
                   <div className="space-y-6 border-t border-rule pt-6 mt-6">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="display-subheading text-lg tracking-editorial text-foreground">Quiz Questions</h3>
+                      <h3 className="display-subheading text-lg text-foreground">Quiz Questions</h3>
                       <Dialog>
                         <DialogTrigger render={
                           <Button size="sm" type="button">

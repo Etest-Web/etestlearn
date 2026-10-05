@@ -14,11 +14,11 @@ const SigninPage = () => {
                 <h1 className="display-heading mb-4 text-center text-3xl text-balance sm:text-5xl">
                     Welcome to Glypha Learning
                 </h1>
-                {/* The tagline was already in the display face; `tracking-wide`
-                    kept rather than `tracking-editorial` because the looser
-                    editorial tracking is for short uppercase labels, not a
-                    sentence. */}
-                <p className="mb-8 text-center font-display text-lg tracking-wide text-muted-foreground sm:text-2xl">
+                {/* The tagline stays in the display face but not at heading
+                    weight or scale — it is a sentence, so it takes the
+                    display face's tight tracking at medium weight instead of
+                    the loose tracking a short uppercase label would want. */}
+                <p className="mb-8 text-center font-display text-lg font-medium tracking-display text-muted-foreground sm:text-2xl">
                     Creating the Best in the World...
                 </p>
                 <SignIn />

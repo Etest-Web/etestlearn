@@ -16,6 +16,7 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { VideoPlayer } from "@/components/video-player";
+import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -29,12 +30,67 @@ import {
   Video as VideoIcon,
 } from "lucide-react";
 
-function LessonContent({ contentType, content }: { contentType: string; content?: string }) {
+function LessonContent({
+  contentType,
+  content,
+  lessonId,
+  isCompleted,
+  onWatchedEnough,
+}: {
+  contentType: string;
+  content?: string;
+  lessonId: Id<"lessons">;
+  isCompleted: boolean;
+  onWatchedEnough: () => void;
+}) {
+  const assetState = useQuery(
+    api.videoAssets.getAssetStatus,
+    contentType === "video" ? { lessonId } : "skip",
+  );
+
   if (contentType === "quiz") {
     return null;
   }
 
   if (contentType === "video") {
+    if (assetState === undefined) {
+      return <p className="text-sm text-muted-foreground">Loading video...</p>;
+    }
+    if (assetState && assetState.asset.status === "ready") {
+      // Managers preview through the same encrypted player; only students
+      // accrue the 90%-watched auto-complete.
+      const isStudent = assetState.role === "student";
+      return (
+        <EncryptedVideoPlayer
+          assetId={assetState.asset._id}
+          title="Lesson video"
+          onProgress={(p) => {
+            if (isStudent && p.percent >= 90 && !isCompleted) onWatchedEnough();
+          }}
+        />
+      );
+    }
+    if (assetState && assetState.role === "manager") {
+      const status = assetState.asset.status;
+      if (status === "pending" || status === "processing") {
+        return (
+          <EmptyState
+            icon={VideoIcon}
+            title="Video is being prepared"
+            description="The upload is being transcoded into streamable quality levels. Check back soon."
+          />
+        );
+      }
+      if (status === "failed") {
+        return (
+          <EmptyState
+            icon={VideoIcon}
+            title="Video failed to process"
+            description={assetState.asset.errorMessage ?? "The upload could not be transcoded. Try re-uploading."}
+          />
+        );
+      }
+    }
     if (!content) {
       return (
         <EmptyState
@@ -206,7 +262,19 @@ export default function LessonPage() {
               }
             />
           ) : (
-            <LessonContent contentType={lesson.contentType} content={lesson.content ?? undefined} />
+            <LessonContent
+              contentType={lesson.contentType}
+              content={lesson.content ?? undefined}
+              lessonId={lesson._id}
+              isCompleted={isCompleted}
+              onWatchedEnough={() => {
+                // 90% watched counts as done — no navigation, just the toast + progress.
+                completeLesson({ courseId: course._id, lessonId: lesson._id }).then(
+                  () => toast.success("Lesson completed"),
+                  (err) => toast.error(err instanceof Error ? err.message : "Failed to update progress"),
+                );
+              }}
+            />
           )}
 
           {/* Prev + CTA + Next needs ~411px. Stack below sm so the primary action is

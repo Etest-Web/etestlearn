@@ -23,7 +23,7 @@ export function StarFeature() {
                                 <span className="h-px w-8 bg-brand" aria-hidden="true" />
                                 Only on Glypha
                             </p>
-                            <h2 className="font-display text-4xl leading-[0.95] tracking-wide text-balance sm:text-5xl">
+                            <h2 className="display-heading text-4xl text-balance sm:text-5xl">
                                 Finish a course.
                                 <br />
                                 Earn your <span className="text-primary">preference star.</span>

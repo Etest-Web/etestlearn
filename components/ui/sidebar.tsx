@@ -199,7 +199,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) max-w-[85vw] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground max-h-dvh"
+          className="w-[min(18rem,85vw)] max-w-[85vw] bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground h-dvh max-h-dvh overflow-hidden"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -211,20 +211,24 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          {/* One scroll container for the whole drawer, so a short viewport
-              scrolls the menu instead of clipping it. On desktop the nav list
-              scrolls on its own and the footer stays pinned, which is why
-              SidebarContent is neutralised here: a flex child with
-              `flex-1 min-h-0` inside a scrolling flex column would be
-              squeezed to zero height by flex shrinking, leaving an empty gap
-              and hiding the links behind the drawer's scroll. The footer keeps
-              `shrink-0` so it is never compressed either. */}
+          {/* Unified mobile scroll container. On small/short devices, the entire
+              menu (header, content, and footer) lives in one smooth touch scroll
+              view rather than trapping scroll in a tiny middle box. Event delegation
+              on click closes the drawer immediately when any navigation link is tapped,
+              even if tapping the current route. */}
           <div
+            onClick={(event) => {
+              const target = event.target as HTMLElement | null
+              if (target?.closest("a")) {
+                setOpenMobile(false)
+              }
+            }}
             className={cn(
-              "flex h-full w-full flex-col overflow-y-auto overscroll-contain",
-              "[&_[data-slot=sidebar-content]]:flex-none",
-              "[&_[data-slot=sidebar-content]]:overflow-visible",
-              "[&_[data-slot=sidebar-footer]]:shrink-0"
+              "flex h-full w-full flex-col overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]",
+              "pb-[max(1.25rem,env(safe-area-inset-bottom))]",
+              "[&_[data-slot=sidebar-header]]:sticky [&_[data-slot=sidebar-header]]:top-0 [&_[data-slot=sidebar-header]]:z-10 [&_[data-slot=sidebar-header]]:bg-sidebar [&_[data-slot=sidebar-header]]:border-b [&_[data-slot=sidebar-header]]:border-sidebar-border/60",
+              "[&_[data-slot=sidebar-content]]:flex-none [&_[data-slot=sidebar-content]]:overflow-visible",
+              "[&_[data-slot=sidebar-footer]]:mt-auto [&_[data-slot=sidebar-footer]]:shrink-0"
             )}
           >
             {children}
@@ -292,15 +296,15 @@ function SidebarTrigger({
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon-sm"
-      className={cn(className)}
+      size="icon"
+      className={cn("min-h-[44px] min-w-[44px]", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      <PanelLeftIcon className="size-5" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )

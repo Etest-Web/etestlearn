@@ -45,7 +45,7 @@ export function HeroPoster() {
         <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden blur">
           {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
               would hand the parent ~15px of over-wide canvas to clip. */}
-          <div className="w-full flex flex-col justify-between">
+          <div className="w-full min-h-screen flex flex-col justify-between">
             <TextLoop
               text="Glypha"
               shape="wave"

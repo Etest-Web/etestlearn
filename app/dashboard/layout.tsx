@@ -85,7 +85,7 @@ const OVERVIEW_NAV = [
  * hover, brand bar reserved for the section nav above.
  */
 const FOOTER_LINK =
-    "flex items-center gap-3 rounded-sm px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-ring";
+    "flex items-center gap-3 rounded-sm px-4 py-3 min-h-[44px] text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-ring";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const { user } = useUser();

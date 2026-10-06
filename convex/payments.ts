@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { logAudit } from "./helpers/audit";
+import { createNotification } from "./helpers/notifications";
 
 // ─── Step 1: create a pending purchase record and return its reference ────
 export const createPendingPurchase = mutation({
@@ -128,6 +129,29 @@ export const markPurchasePaid = internalMutation({
         createdAt: now,
         updatedAt: now,
       });
+    }
+
+    const course = await ctx.db.get(purchase.courseId);
+    const buyer = await ctx.db.get(purchase.userId);
+    if (course) {
+      await createNotification(ctx, {
+        userId: purchase.userId,
+        type: "course_purchased",
+        title: `Course purchased: ${course.title}`,
+        body: "You're enrolled and ready to begin learning.",
+        href: `/courses/${course.slug}`,
+      });
+
+      if (course.instructorId && course.instructorId !== purchase.userId) {
+        await createNotification(ctx, {
+          userId: course.instructorId,
+          type: "course_purchased",
+          title: `New student in ${course.title}`,
+          body: `${buyer?.name?.trim() || "A learner"} just enrolled in your course.`,
+          href: "/dashboard/instructor/courses",
+          actorId: purchase.userId,
+        });
+      }
     }
   },
 });

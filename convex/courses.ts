@@ -1034,7 +1034,7 @@ export const requestPublishReview = mutation({
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new Error("Course not found");
-    if (!(await canManageCourse(ctx, user, course))) {
+    if (user.role !== "instructor" || user._id !== course.instructorId) {
       throw new Error("Not authorized to request review for this course");
     }
     if (course.published) {

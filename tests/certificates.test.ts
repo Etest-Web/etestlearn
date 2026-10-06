@@ -242,12 +242,14 @@ describe("certificate issuance", () => {
     const student = await completeAllLessons(t, ids.articleCourseId);
 
     // One auto-issuance fires from completeLesson, which scheduled it.
-    const afterIssue = await student.query(inboxApi.listNotifications, {});
-    expect(afterIssue).toHaveLength(1);
-    expect(afterIssue[0].type).toBe("certificate_earned");
-    expect(afterIssue[0].href).toBe("/dashboard/certificates");
+    const certNotifs = (await student.query(inboxApi.listNotifications, {})).filter(
+      (n: any) => n.type === "certificate_earned",
+    );
+    expect(certNotifs).toHaveLength(1);
+    expect(certNotifs[0].type).toBe("certificate_earned");
+    expect(certNotifs[0].href).toBe("/dashboard/certificates");
     // The view normalises read state to a boolean rather than exposing `readAt`.
-    expect(afterIssue[0].isRead).toBe(false);
+    expect(certNotifs[0].isRead).toBe(false);
 
     // Re-issuing is a no-op and must not produce a second notification: the
     // idempotency check returns before the notify call is ever reached.
@@ -258,7 +260,9 @@ describe("certificate issuance", () => {
       courseId: ids.articleCourseId,
     });
 
-    const afterRepeats = await student.query(inboxApi.listNotifications, {});
+    const afterRepeats = (await student.query(inboxApi.listNotifications, {})).filter(
+      (n: any) => n.type === "certificate_earned",
+    );
     expect(afterRepeats).toHaveLength(1);
   });
 

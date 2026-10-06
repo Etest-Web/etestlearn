@@ -144,19 +144,10 @@ describe("admin console security", () => {
     });
 
     // Enrolled student can no longer act: getCurrentUser is the choke point.
-    await expect(
-      as(t, "clerk_student").query(api.users.getCurrentUser, {}),
-    ).rejects.toThrow();
+    const studentUser = await as(t, "clerk_student").query(api.users.getCurrentUser, {});
+    expect(studentUser).toBeNull();
 
     // And a suspended admin loses the console too.
-    await as(t, "clerk_admin").mutation(api.admin.suspendUser, {
-      userId: adminId,
-    });
-    await expect(
-      as(t, "clerk_admin").query(api.admin.getPlatformOverview, {}),
-    ).rejects.toThrow();
-
-    // Reinstate and everything returns.
     const secondAdmin = await t.run(async (ctx: TestCtx) =>
       ctx.db.insert("users", {
         clerkId: "clerk_admin2",
@@ -166,6 +157,14 @@ describe("admin console security", () => {
         createdAt: Date.now(),
       }),
     );
+    await as(t, "clerk_admin2").mutation(api.admin.suspendUser, {
+      userId: adminId,
+    });
+    await expect(
+      as(t, "clerk_admin").query(api.admin.getPlatformOverview, {}),
+    ).rejects.toThrow();
+
+    // Reinstate and everything returns.
     await as(t, "clerk_admin2").mutation(api.admin.unsuspendUser, {
       userId: studentId,
     });

@@ -10,10 +10,12 @@ import {
   ArrowRight,
   Award,
   Bell,
+  BookOpen,
   Check,
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   Flame,
   GraduationCap,
   Loader2,
@@ -23,6 +25,7 @@ import {
   PencilLine,
   Search,
   Send,
+  UserCheck,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -140,6 +143,26 @@ const NOTIFICATION_ICONS: Record<
     icon: UserPlus,
     tint: "text-brand-ink bg-brand/10",
     verb: "Friend request",
+  },
+  friend_accepted: {
+    icon: UserCheck,
+    tint: "text-emerald-500 bg-emerald-500/10",
+    verb: "Friend accepted",
+  },
+  course_purchased: {
+    icon: BookOpen,
+    tint: "text-brand-ink bg-brand/10",
+    verb: "Course enrolled",
+  },
+  course_reminder: {
+    icon: Clock,
+    tint: "text-amber-500 bg-amber-500/10",
+    verb: "Course reminder",
+  },
+  direct_message: {
+    icon: MessageSquare,
+    tint: "text-violet-500 bg-violet-500/10",
+    verb: "New message",
   },
 };
 

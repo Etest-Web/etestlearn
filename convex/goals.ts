@@ -2,6 +2,7 @@ import { mutation, query, internalMutation, internalQuery } from "./_generated/s
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireUser, type Id, type WriteCtx, type ReadCtx } from "./helpers/auth";
+import { createNotification } from "./helpers/notifications";
 
 export const createGoal = mutation({
   args: {
@@ -250,6 +251,20 @@ export const incrementGoalProgress = internalMutation({
         updates.isActive = false; // Auto-complete the goal
       }
       await ctx.db.patch(goal._id, updates);
+    }
+
+    if (args.type === "study_streak_days") {
+      const streak = await calculateCurrentStreak(ctx, args.userId, 0, now);
+      const milestones = [3, 7, 14, 30, 60, 100, 365];
+      if (milestones.includes(streak)) {
+        await createNotification(ctx, {
+          userId: args.userId,
+          type: "streak_milestone",
+          title: `${streak}-Day Study Streak!`,
+          body: "Keep the momentum going — you're on fire!",
+          href: "/dashboard",
+        });
+      }
     }
   },
 });

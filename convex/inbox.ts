@@ -2,6 +2,7 @@ import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireUser } from "./helpers/auth";
 import { requireRateLimit } from "./helpers/rateLimit";
+import { createNotification } from "./helpers/notifications";
 import type { Doc, Id, ReadCtx, UserDoc, WriteCtx } from "./helpers/auth";
 import { buildMessagePreview, countUnreadMessages } from "../lib/inbox";
 
@@ -178,11 +179,15 @@ export const NOTIFICATION_TYPES = [
   "task_graded",
   "group_invite",
   "friend_request",
+  "friend_accepted",
+  "course_purchased",
+  "course_reminder",
+  "direct_message",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-const notificationTypeValidator = v.union(
+export const notificationTypeValidator = v.union(
   v.literal("certificate_earned"),
   v.literal("course_completed"),
   v.literal("quiz_graded"),
@@ -192,6 +197,10 @@ const notificationTypeValidator = v.union(
   v.literal("task_graded"),
   v.literal("group_invite"),
   v.literal("friend_request"),
+  v.literal("friend_accepted"),
+  v.literal("course_purchased"),
+  v.literal("course_reminder"),
+  v.literal("direct_message"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
@@ -886,7 +895,7 @@ export const sendMessage = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    await requireParticipant(ctx, user, args.threadId);
+    const thread = await requireParticipant(ctx, user, args.threadId);
 
     const body = args.body.trim();
     if (body.length === 0) {
@@ -937,6 +946,16 @@ export const sendMessage = mutation({
     // The sender has implicitly read what they just wrote.
     await advanceReadMarker(ctx, user._id, args.threadId, now);
 
+    const recipientId = otherParticipantId(thread, user._id);
+    await createNotification(ctx, {
+      userId: recipientId,
+      type: "direct_message",
+      title: `New message from ${user.name?.trim() || "A learner"}`,
+      body: buildMessagePreview(body),
+      href: `/dashboard/inbox?tab=messages&threadId=${args.threadId}`,
+      actorId: user._id,
+    });
+
     return { messageId, sentAt: now };
   },
 });
@@ -955,6 +974,21 @@ export const markThreadRead = mutation({
     await requireParticipant(ctx, user, args.threadId);
     const lastReadAt = Date.now();
     await advanceReadMarker(ctx, user._id, args.threadId, lastReadAt);
+
+    const unreadDmNotifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread", (q) =>
+        q.eq("userId", user._id).eq("readAt", undefined),
+      )
+      .filter((q) => q.eq(q.field("type"), "direct_message"))
+      .collect();
+
+    for (const notif of unreadDmNotifications) {
+      if (notif.href?.includes(args.threadId)) {
+        await ctx.db.patch(notif._id, { readAt: lastReadAt });
+      }
+    }
+
     return { threadId: args.threadId, lastReadAt };
   },
 });

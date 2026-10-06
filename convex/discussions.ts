@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { logAudit } from "./helpers/audit";
+import { createNotification } from "./helpers/notifications";
 import type { AnyCtx, Id, ReadCtx, UserDoc } from "./helpers/auth";
 
 export const listThreadsForCourse = query({
@@ -142,12 +143,27 @@ export const postMessage = mutation({
     }
 
     const now = Date.now();
-    return await ctx.db.insert("discussionMessages", {
+    const messageId = await ctx.db.insert("discussionMessages", {
       threadId: args.threadId,
       userId: user._id,
       body: args.body,
       createdAt: now,
     });
+
+    if (thread.createdBy !== user._id) {
+      const course = await ctx.db.get(thread.courseId);
+      const href = course ? `/courses/${course.slug}` : "/dashboard";
+      await createNotification(ctx, {
+        userId: thread.createdBy,
+        type: "discussion_reply",
+        title: `New reply on: ${thread.title}`,
+        body: `${user.name?.trim() || "A learner"}: ${args.body.slice(0, 80)}`,
+        href,
+        actorId: user._id,
+      });
+    }
+
+    return messageId;
   },
 });
 

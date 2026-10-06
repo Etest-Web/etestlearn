@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRateLimit } from "./helpers/rateLimit";
+import { createNotification } from "./helpers/notifications";
 import {
   requireUser,
   type Doc,
@@ -659,15 +660,34 @@ export const sendRequest = mutation({
         createdAt: now,
         respondedAt: undefined,
       });
+      await createNotification(ctx, {
+        userId: args.userId,
+        type: "friend_request",
+        title: `Friend request from ${displayName(user)}`,
+        body: "Wants to connect with you on Glypha",
+        href: "/dashboard/friends",
+        actorId: user._id,
+      });
       return forward._id;
     }
 
-    return await ctx.db.insert("friendships", {
+    const friendshipId = await ctx.db.insert("friendships", {
       requesterId: user._id,
       addresseeId: args.userId,
       status: "pending",
       createdAt: now,
     });
+
+    await createNotification(ctx, {
+      userId: args.userId,
+      type: "friend_request",
+      title: `Friend request from ${displayName(user)}`,
+      body: "Wants to connect with you on Glypha",
+      href: "/dashboard/friends",
+      actorId: user._id,
+    });
+
+    return friendshipId;
   },
 });
 
@@ -711,6 +731,14 @@ export const acceptRequest = mutation({
       RESPOND_WINDOW,
     );
     await ctx.db.patch(row._id, { status: "accepted", respondedAt: Date.now() });
+    await createNotification(ctx, {
+      userId: row.requesterId,
+      type: "friend_accepted",
+      title: `${displayName(user)} accepted your friend request`,
+      body: "You are now learning together!",
+      href: "/dashboard/friends",
+      actorId: user._id,
+    });
     return row._id;
   },
 });

@@ -505,7 +505,7 @@ describe("sendMessage", () => {
     ).toEqual({ messages: 0, notifications: 0 });
     expect(
       await as(t, "clerk_other").query(getUnreadCounts, {}),
-    ).toEqual({ messages: 1, notifications: 0 });
+    ).toEqual({ messages: 1, notifications: 1 });
   });
 
   test("rejects an empty or whitespace-only body", async () => {

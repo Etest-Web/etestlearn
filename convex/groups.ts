@@ -4,6 +4,7 @@ import { requireUser } from "./helpers/auth";
 import type { Doc, Id, ReadCtx, UserDoc } from "./helpers/auth";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { logAudit } from "./helpers/audit";
+import { createNotification } from "./helpers/notifications";
 import {
   ACCESSIBLE_COURSES_LIMIT,
   ACCESSIBLE_COURSES_SCAN_LIMIT,
@@ -868,6 +869,16 @@ export const joinGroup = mutation({
         status: "pending",
         createdAt: now,
       });
+      if (group.createdBy !== user._id) {
+        await createNotification(ctx, {
+          userId: group.createdBy,
+          type: "group_invite",
+          title: `Join request: ${group.name}`,
+          body: `${user.name?.trim() || "A learner"} requested to join your study group.`,
+          href: "/dashboard/groups",
+          actorId: user._id,
+        });
+      }
       return { outcome: "request_created", requestId: requestId as string };
     }
 
@@ -931,6 +942,15 @@ export const reviewJoinRequest = mutation({
       status: "approved" as const,
       reviewedAt: now,
       reviewedBy: user._id,
+    });
+
+    await createNotification(ctx, {
+      userId: request.userId,
+      type: "group_invite",
+      title: `Accepted into ${group.name}`,
+      body: "Your request to join the study group was approved.",
+      href: "/dashboard/groups",
+      actorId: user._id,
     });
 
     // Not audited on purpose: approving somebody into a study group is ordinary

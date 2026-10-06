@@ -1,7 +1,9 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { computeProgress } from "../lib/progress";
+import { createNotification } from "./helpers/notifications";
 
 export const enrollInCourse = mutation({
   args: { courseId: v.id("courses") },
@@ -76,6 +78,25 @@ export const enrollInCourse = mutation({
       amount: 1,
       date: now,
     });
+
+    await createNotification(ctx, {
+      userId: user._id,
+      type: "course_purchased",
+      title: `Enrolled in ${course.title}`,
+      body: "Start your first lesson today!",
+      href: `/courses/${course.slug}`,
+    });
+
+    if (course.instructorId && course.instructorId !== user._id) {
+      await createNotification(ctx, {
+        userId: course.instructorId,
+        type: "course_purchased",
+        title: `New student in ${course.title}`,
+        body: `${user.name?.trim() || "A learner"} just enrolled in your course.`,
+        href: "/dashboard/instructor/courses",
+        actorId: user._id,
+      });
+    }
 
     return id;
   },
@@ -201,7 +222,102 @@ export const completeLesson = mutation({
       courseId: args.courseId,
     });
 
+    if (isNewCompletion && progressPercent === 100) {
+      const course = await ctx.db.get(args.courseId);
+      if (course) {
+        await createNotification(ctx, {
+          userId: user._id,
+          type: "course_completed",
+          title: `Course completed: ${course.title}`,
+          body: "Congratulations on finishing all lessons! Check your certificate.",
+          href: "/dashboard/certificates",
+        });
+
+        if (course.instructorId && course.instructorId !== user._id) {
+          await createNotification(ctx, {
+            userId: course.instructorId,
+            type: "course_completed",
+            title: `Student completed ${course.title}`,
+            body: `${user.name?.trim() || "A learner"} just finished all lessons.`,
+            href: "/dashboard/instructor/courses",
+            actorId: user._id,
+          });
+        }
+      }
+    }
+
     return progressPercent;
+  },
+});
+
+export async function checkUserInactivityReminders(
+  ctx: { db: any },
+  userId: Id<"users">,
+) {
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const enrollments = await ctx.db
+    .query("enrollments")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+
+  for (const enrollment of enrollments) {
+    if (
+      enrollment.progressPercent > 0 &&
+      enrollment.progressPercent < 100 &&
+      enrollment.updatedAt <= sevenDaysAgo
+    ) {
+      const course = await ctx.db.get(enrollment.courseId);
+      if (course && course.published) {
+        await createNotification(ctx, {
+          userId,
+          type: "course_reminder",
+          title: `Continue learning: ${course.title}`,
+          body: `You're ${enrollment.progressPercent}% through! Pick up where you left off.`,
+          href: `/courses/${course.slug}`,
+        });
+      }
+    }
+  }
+}
+
+export const checkInactivityReminders = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return;
+    await checkUserInactivityReminders(ctx, user._id);
+  },
+});
+
+export const checkAllInactivityReminders = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const enrollments = await ctx.db.query("enrollments").take(500);
+
+    for (const enrollment of enrollments) {
+      if (
+        enrollment.progressPercent > 0 &&
+        enrollment.progressPercent < 100 &&
+        enrollment.updatedAt <= sevenDaysAgo
+      ) {
+        const course = await ctx.db.get(enrollment.courseId);
+        if (course && course.published) {
+          await createNotification(ctx, {
+            userId: enrollment.userId,
+            type: "course_reminder",
+            title: `Continue learning: ${course.title}`,
+            body: `You're ${enrollment.progressPercent}% through! Pick up where you left off.`,
+            href: `/courses/${course.slug}`,
+          });
+        }
+      }
+    }
   },
 });
 

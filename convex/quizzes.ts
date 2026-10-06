@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { gradeQuiz } from "../lib/quiz";
 import { requireRateLimit } from "./helpers/rateLimit";
+import { createNotification } from "./helpers/notifications";
 
 /**
  * Convex has no range validator — `v.number()` exposes only `.optional()`,
@@ -298,6 +299,14 @@ export const submitQuizAttempt = mutation({
     await ctx.runMutation(internal.certificates.issueIfEligible, {
       userId: user._id,
       courseId: course._id,
+    });
+
+    await createNotification(ctx, {
+      userId: user._id,
+      type: "quiz_graded",
+      title: passed ? `Quiz passed: ${quiz.title}` : `Quiz graded: ${quiz.title}`,
+      body: `Score: ${percent}% (${score}/${maxScore})`,
+      href: `/courses/${course.slug}/lessons/${lesson._id}`,
     });
 
     return { score, maxScore, percent, passed };

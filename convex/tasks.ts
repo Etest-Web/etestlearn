@@ -8,6 +8,7 @@ import {
   type UserDoc,
 } from "./helpers/auth";
 import { requireRateLimit } from "./helpers/rateLimit";
+import { createNotification } from "./helpers/notifications";
 import {
   aggregateGradingCounts,
   assertAssignmentStatusTransition,
@@ -878,6 +879,26 @@ export const createAssignment = mutation({
       updatedAt: now,
     });
 
+    if (status === "open") {
+      const course = await ctx.db.get(args.courseId);
+      const enrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_course", (q) => q.eq("courseId", args.courseId))
+        .take(100);
+      for (const enrollment of enrollments) {
+        if (enrollment.userId !== user._id) {
+          await createNotification(ctx, {
+            userId: enrollment.userId,
+            type: "task_assigned",
+            title: `New assignment: ${title}`,
+            body: course?.title,
+            href: "/dashboard/tasks",
+            actorId: user._id,
+          });
+        }
+      }
+    }
+
     return id;
   },
 });
@@ -1003,6 +1024,26 @@ export const setAssignmentStatus = mutation({
       status: args.status,
       updatedAt: Date.now(),
     });
+
+    if (args.status === "open" && assignment.status !== "open") {
+      const course = await ctx.db.get(assignment.courseId);
+      const enrollments = await ctx.db
+        .query("enrollments")
+        .withIndex("by_course", (q) => q.eq("courseId", assignment.courseId))
+        .take(100);
+      for (const enrollment of enrollments) {
+        if (enrollment.userId !== user._id) {
+          await createNotification(ctx, {
+            userId: enrollment.userId,
+            type: "task_assigned",
+            title: `New assignment: ${assignment.title}`,
+            body: course?.title,
+            href: "/dashboard/tasks",
+            actorId: user._id,
+          });
+        }
+      }
+    }
 
     return assignment._id;
   },
@@ -1147,6 +1188,15 @@ export const gradeSubmission = mutation({
       gradedBy: user._id,
       gradedAt: now,
       updatedAt: now,
+    });
+
+    await createNotification(ctx, {
+      userId: submission.userId,
+      type: "task_graded",
+      title: `Assignment graded: ${assignment.title}`,
+      body: `Score: ${args.score}${assignment.maxPoints !== undefined ? `/${assignment.maxPoints}` : ""}`,
+      href: "/dashboard/tasks",
+      actorId: user._id,
     });
 
     return submission._id;

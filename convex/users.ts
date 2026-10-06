@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { logAudit } from "./helpers/audit";
+import { checkUserInactivityReminders } from "./enrollments";
 
 /**
  * Constant-time string compare. A plain `!==` on a shared secret leaks its
@@ -188,6 +189,7 @@ export const ensureCurrentUser = mutation({
     const now = Date.now();
 
     if (existing) {
+      await checkUserInactivityReminders(ctx, existing._id);
       return existing._id;
     }
 

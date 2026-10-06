@@ -95,7 +95,7 @@ export function buildContentSecurityPolicy(nonce: string): string {
 
   return [
     "default-src 'self'",
-    ["script-src", "'self'", `'nonce-${nonce}'`, "'unsafe-eval'", ...SCRIPT_HOSTS].join(" "),
+    ["script-src", "'self'", `'nonce-${nonce}'`, "'unsafe-eval'", "blob:", ...SCRIPT_HOSTS].join(" "),
     // 'unsafe-inline' for styles is a scoped concession: next/font and the
     // styled-jsx runtime inject <style> tags, and App Router has no nonce
     // plumbing for them without per-request nonces on the render itself.

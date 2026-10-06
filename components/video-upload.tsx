@@ -20,7 +20,6 @@ import { toast } from "sonner";
 
 export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
   const updateLesson = useMutation(api.courses.updateLesson);
-  const lesson = useQuery(api.courses.getCourseById, { courseId: undefined as any }); 
   const [uploading, setUploading] = useState(false);
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState("");

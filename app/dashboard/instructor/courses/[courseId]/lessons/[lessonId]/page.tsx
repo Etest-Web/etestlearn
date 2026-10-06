@@ -285,15 +285,15 @@ export default function LessonEditPage() {
               <div className="space-y-4">
                 <VideoUpload lessonId={lessonId as Id<"lessons">} />
                 <div className="space-y-1.5">
-                  <Label htmlFor="content">External video URL (fallback)</Label>
+                  <Label htmlFor="content">Video URL</Label>
                   <Input
                     id="content"
                     name="content"
-                    placeholder="https://www.youtube.com/watch?v=..."
+                    placeholder="Publit.io URL, YouTube, Vimeo, or direct MP4..."
                     value={formData.content}
                     onChange={handleChange}
                   />
-                  <p className="text-xs leading-[1.5] text-muted-foreground">Used only when no uploaded video is attached — YouTube, Vimeo, or a direct MP4 file.</p>
+                  <p className="text-xs leading-[1.5] text-muted-foreground">Automatically filled when uploading with Publit.io above, or paste an external video link.</p>
                 </div>
               </div>
             )}

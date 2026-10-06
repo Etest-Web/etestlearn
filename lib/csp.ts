@@ -50,6 +50,9 @@ const SCRIPT_HOSTS = [
   "https://clerk.glypha.com.ng",
   // Clerk's staging/dev host, for local work against a dev instance.
   "https://*.clerk.accounts.dev",
+  // Cloudflare Turnstile — Clerk's bot sign-up protection renders a CAPTCHA
+  // widget from this origin.
+  "https://challenges.cloudflare.com",
 ];
 
 /**

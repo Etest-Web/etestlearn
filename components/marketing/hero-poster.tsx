@@ -26,7 +26,7 @@ function CertificateMock() {
       />
       <div
         aria-hidden="true"
-        className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-sm border border-rule bg-surface-sunken"
+        className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-sm border border-rule bg-surface-sunken blur-3xl"
       />
     </div>
   );

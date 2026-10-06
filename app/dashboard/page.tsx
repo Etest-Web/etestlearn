@@ -57,14 +57,24 @@ function AnnouncementBanner() {
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const dbUser = useQuery(api.users.getCurrentUser);
   const enrollments = useQuery(api.enrollments.getUserEnrollments);
   const courses = useQuery(api.courses.listPublishedCourses);
-  const statistics = useQuery(api.statistics.getUserStatistics);
-  const weeklyChart = useQuery(api.statistics.getWeeklyActivityChart, { weeks: 8 });
-  const userGoals = useQuery(api.goals.getUserGoals, { activeOnly: true });
+  const statistics = useQuery(
+    api.statistics.getUserStatistics,
+    dbUser ? {} : "skip",
+  );
+  const weeklyChart = useQuery(
+    api.statistics.getWeeklyActivityChart,
+    dbUser ? { weeks: 8 } : "skip",
+  );
+  const userGoals = useQuery(
+    api.goals.getUserGoals,
+    dbUser ? { activeOnly: true } : "skip",
+  );
 
   // Loading state
-  if (enrollments === undefined || courses === undefined || statistics === undefined) {
+  if (!dbUser || enrollments === undefined || courses === undefined || statistics === undefined) {
     return (
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-8">

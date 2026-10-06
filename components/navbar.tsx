@@ -16,6 +16,7 @@ import { BookOpen, LayoutDashboard, Menu, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const NAV_LINKS = [
   { href: "/courses", label: "Browse Courses", icon: BookOpen },
@@ -26,6 +27,12 @@ export function Navbar() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close sheet on navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   if (pathname.startsWith("/dashboard")) {
     return null;
@@ -94,7 +101,7 @@ export function Navbar() {
 
           {/* Mobile nav — below md the links live in here; above it the inline nav
               takes over and this trigger would be redundant. */}
-          <Sheet>
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
               render={
                 <Button
@@ -118,6 +125,7 @@ export function Navbar() {
                 {links.map(({ href, label, icon: Icon }) => (
                   <SheetClose
                     key={href}
+                    onClick={() => setMobileOpen(false)}
                     render={
                       <Link
                         href={href}
@@ -138,7 +146,10 @@ export function Navbar() {
                   ) : (
                     <Button
                       size="sm"
-                      onClick={() => router.push("/sign-in")}
+                      onClick={() => {
+                        setMobileOpen(false);
+                        router.push("/sign-in");
+                      }}
                       className="w-full"
                     >
                       Sign in

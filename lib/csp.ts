@@ -53,6 +53,8 @@ const SCRIPT_HOSTS = [
   // Cloudflare Turnstile — Clerk's bot sign-up protection renders a CAPTCHA
   // widget from this origin.
   "https://challenges.cloudflare.com",
+  // Clerk bot protection and fraud prevention
+  "https://*.protect.clerk.com",
 ];
 
 /**
@@ -127,6 +129,8 @@ export function buildContentSecurityPolicy(nonce: string): string {
       "https://media.publit.io",
       // Cloudflare Turnstile verification API calls.
       "https://challenges.cloudflare.com",
+      // Clerk bot / abuse protection API calls (requires wildcard port per Clerk docs)
+      "https://*.protect.clerk.com:*",
     ].join(" "),
     [
       "frame-src",

@@ -15,8 +15,8 @@ function extractYouTubeId(url: URL): string | null {
 
 /**
  * Renders a lesson video from a URL: YouTube and Vimeo links become embedded
- * players, anything else is treated as a direct video file (MP4/WebM) —
- * including Convex storage URLs.
+ * players, anything else is treated as a direct video file (MP4/WebM).
+ * Disables context menus and download controls to prevent easy downloads.
  */
 export function VideoPlayer({ src, title }: { src: string; title: string }) {
   const embed = useMemo(() => {
@@ -66,8 +66,11 @@ export function VideoPlayer({ src, title }: { src: string; title: string }) {
   return (
     <video
       controls
+      controlsList="nodownload noremoteplayback"
+      disablePictureInPicture
+      onContextMenu={(e) => e.preventDefault()}
       preload="metadata"
-      className="w-full rounded-sm bg-black"
+      className="w-full rounded-sm bg-black select-none"
       style={{ aspectRatio: "16 / 9" }}
       src={src}
     >

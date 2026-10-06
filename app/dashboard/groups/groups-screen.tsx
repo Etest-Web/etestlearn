@@ -593,7 +593,7 @@ function BrowseGroupCard({
                 "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-xs font-bold",
                 group.relationship === "moderator"
                   ? "border-brand/30 bg-brand/10 text-brand-ink"
-                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500/90",
               )}
             >
               {action.label}

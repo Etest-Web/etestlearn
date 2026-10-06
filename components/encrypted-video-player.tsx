@@ -132,14 +132,14 @@ export function EncryptedVideoPlayer({
 
   if (error) {
     return (
-      <div className="flex w-full items-center justify-center rounded-sm bg-black p-8" style={{ aspectRatio: "16 / 9" }}>
-        <p className="text-sm text-white/80">{error}</p>
+      <div className="flex w-full items-center justify-center rounded-sm bg-surface-sunken p-8" style={{ aspectRatio: "16 / 9" }}>
+        <p className="text-sm text-foreground/80">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="group relative w-full overflow-hidden rounded-sm bg-black" style={{ aspectRatio: "16 / 9" }}>
+    <div className="group relative w-full overflow-hidden rounded-sm bg-surface-sunken" style={{ aspectRatio: "16 / 9" }}>
       <video
         ref={videoRef}
         title={title}
@@ -187,8 +187,8 @@ export function EncryptedVideoPlayer({
             background: `linear-gradient(to right, white ${(duration ? (currentTime / duration) * 100 : 0).toFixed(1)}%, rgba(255,255,255,0.25) ${(duration ? (currentTime / duration) * 100 : 0).toFixed(1)}%)`,
           }}
         />
-        <div className="flex items-center gap-2 text-white">
-          <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="rounded p-1 hover:bg-white/20">
+        <div className="flex items-center gap-2 text-foreground">
+          <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="rounded p-1 hover:bg-input/40">
             {playing ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
             ) : (
@@ -199,7 +199,7 @@ export function EncryptedVideoPlayer({
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
           {bufferedEnd > 0 && duration > 0 && (
-            <span className="text-[11px] text-white/60 tabular-nums">buffered {formatTime(bufferedEnd)}</span>
+            <span className="text-[11px] text-foreground/60 tabular-nums">buffered {formatTime(bufferedEnd)}</span>
           )}
           <span className="flex-1" />
           <button
@@ -211,7 +211,7 @@ export function EncryptedVideoPlayer({
               setMuted(v.muted);
             }}
             aria-label={muted ? "Unmute" : "Mute"}
-            className="rounded p-1 hover:bg-white/20"
+            className="rounded p-1 hover:bg-input/40"
           >
             {muted ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 8.5l5 7m0-7l-5 7" stroke="currentColor" strokeWidth="2" fill="none" /></svg>
@@ -222,7 +222,7 @@ export function EncryptedVideoPlayer({
           <button type="button" onClick={enterPiP} aria-label="Picture in picture" className="rounded p-1 hover:bg-white/20">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2" /><rect x="12" y="11" width="6" height="4" rx="1" fill="currentColor" stroke="none" /></svg>
           </button>
-          <button type="button" onClick={enterFullscreen} aria-label="Fullscreen" className="rounded p-1 hover:bg-white/20">
+          <button type="button" onClick={enterFullscreen} aria-label="Fullscreen" className="rounded p-1 hover:bg-input/40">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
           </button>
         </div>

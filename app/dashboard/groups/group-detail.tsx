@@ -103,7 +103,7 @@ export function GroupDetail({
             {detail.myRole ? (
               <MemberRoleBadge role={detail.myRole} />
             ) : detail.hasPendingRequest ? (
-              <span className="inline-flex items-center gap-1 rounded-sm border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-800 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 rounded-sm border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-500/90">
                 <Clock size={14} aria-hidden />
                 Request pending
               </span>

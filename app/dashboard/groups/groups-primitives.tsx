@@ -31,9 +31,9 @@ const PILL_BASE =
 
 const MODERATOR_PILL = "border-brand/30 bg-brand/10 text-brand-ink";
 const JOINED_PILL =
-  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+  "border-emerald-500/30 bg-emerald-500/10 text-emerald-500/90";
 const PENDING_PILL =
-  "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-400";
+  "border-amber-500/35 bg-amber-500/10 text-amber-500/90";
 const NEUTRAL_PILL = "border-rule bg-surface-sunken text-muted-foreground";
 
 /**

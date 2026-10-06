@@ -31,9 +31,9 @@ export type PillTone = "brand" | "danger" | "warning" | "success" | "neutral";
 const TONE_CLASS: Record<PillTone, string> = {
   brand: "border-brand/30 bg-brand/10 text-brand-ink",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  warning: "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-400",
+  warning: "border-amber-500/35 bg-amber-500/10 text-amber-500/90",
   success:
-    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-500/90",
   neutral: "border-rule bg-surface-sunken text-muted-foreground",
 };
 

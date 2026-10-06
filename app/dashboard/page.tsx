@@ -191,7 +191,7 @@ export default function DashboardPage() {
                       alt="" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
-                    <button aria-label={`Add ${item.course.title} to favourites`} className="absolute top-3 right-3 text-white bg-black/20 p-2 rounded-sm hover:bg-destructive transition-colors"><Heart size={16} /></button>
+                    <button aria-label={`Add ${item.course.title} to favourites`} className="absolute top-3 right-3 bg-card/20 p-2 rounded-sm hover:bg-destructive transition-colors"><Heart size={16} /></button>
                   </div >
                   <div className="p-4 flex flex-col gap-2 relative">
                     {item.course.category && (

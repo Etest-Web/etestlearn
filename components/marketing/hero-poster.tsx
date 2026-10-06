@@ -58,9 +58,9 @@ export function HeroPoster() {
               fontWeight={800}
               letterSpacing={8}
               uppercase
-              color="#ffffff"
+              color="currentColor"
               ribbon
-              ribbonColor="#CACACA"
+              ribbonColor="currentColor"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}
@@ -77,9 +77,9 @@ export function HeroPoster() {
               fontWeight={800}
               letterSpacing={8}
               uppercase
-              color="#ffffff"
+              color="currentColor"
               ribbon
-              ribbonColor="#CACACA"
+              ribbonColor="currentColor"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}

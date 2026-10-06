@@ -1324,7 +1324,7 @@ function ReplyCard({ item }: { item: DiscussionActivityView }) {
                 "inline-flex items-center gap-1 rounded-sm border px-2 py-1",
                 item.createdByMe
                   ? "border-brand/30 bg-brand/10 text-brand-ink"
-                  : "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+                  : "border-sky-500/30 bg-sky-500/10 text-sky-500/90",
               )}
             >
               {item.createdByMe ? <PencilLine size={14} /> : <MessagesSquare size={14} />}

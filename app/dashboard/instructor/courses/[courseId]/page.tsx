@@ -532,7 +532,7 @@ export default function CourseEditPage() {
                   {publishing?.policy === "needs_approval" && (
                     /* No `warning` colour token is registered, so the stock amber
                        stays here; the sentence carries the meaning, not the hue. */
-                    <p className="text-xs leading-[1.5] text-amber-700 dark:text-amber-400">
+                    <p className="text-xs leading-[1.5] text-warning">
                       <span className="tabular">{publishing.paidSales}</span>{" "}
                       learner{publishing.paidSales === 1 ? "" : "s"} already paid
                       for this course. From now on, taking it off sale needs admin approval.
@@ -805,14 +805,14 @@ function PublishingPanel({
             <>
               {/* No `warning` colour token is registered, so the amber plate stays — it is a
                   caution, not a status, and the wording carries the meaning. */}
-              <div className="border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="border border-warning/40 bg-warning/10 p-4">
               <div className="flex items-start gap-3">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                  <p className="text-sm font-semibold text-warning">
                     Unpublish request awaiting admin review
                   </p>
-                  <p className="text-sm leading-[1.6] text-amber-900/80 dark:text-amber-300/80">
+                  <p className="text-sm leading-[1.6] text-warning/80">
                     <span className="tabular">{state.paidSales}</span>{" "}
                     learner{state.paidSales === 1 ? "" : "s"} already paid for
                     this course, so taking it off sale needs an admin. The course stays live and
@@ -823,7 +823,7 @@ function PublishingPanel({
                       &ldquo;{state.pendingRequest.reason}&rdquo;
                     </p>
                   )}
-                  <p className="text-xs text-amber-900/70 dark:text-amber-300/70">
+                  <p className="text-xs text-warning/70">
                     Submitted{" "}
                     {new Date(state.pendingRequest!.createdAt).toLocaleDateString("en-US", {
                       year: "numeric",

@@ -69,6 +69,7 @@ function withContentSecurityPolicy(request: NextRequest) {
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/sso-callback(.*)',
   '/',
   '/courses(.*)',
   '/verify(.*)',

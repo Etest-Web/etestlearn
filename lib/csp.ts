@@ -125,6 +125,8 @@ export function buildContentSecurityPolicy(nonce: string): string {
       "https://api.publit.io",
       "https://*.publit.io",
       "https://media.publit.io",
+      // Cloudflare Turnstile verification API calls.
+      "https://challenges.cloudflare.com",
     ].join(" "),
     [
       "frame-src",

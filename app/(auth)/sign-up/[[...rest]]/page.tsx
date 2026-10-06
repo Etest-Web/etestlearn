@@ -16,6 +16,7 @@ import {
   Label,
 } from "@/components/ui"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
+import { AuthBackground } from "@/components/auth-background"
 
 export default function SignUpPage() {
   const { signUp, errors, fetchStatus } = useSignUp()
@@ -62,7 +63,7 @@ export default function SignUpPage() {
     await signUp.sso({
       strategy,
       redirectUrl: "/dashboard",
-      redirectCallbackUrl: "/sign-up/sso-callback",
+      redirectCallbackUrl: "/sso-callback",
     })
   }
 
@@ -248,7 +249,8 @@ export default function SignUpPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
+      <AuthBackground />
       {children}
     </main>
   )

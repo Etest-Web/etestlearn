@@ -91,7 +91,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       const ivHex = arrayBufferToHex(rawIv);
 
       const keyStorageId = await uploadBlobToConvex(
-        new Blob([rawKey.buffer], { type: "application/octet-stream" })
+        new Blob([new Uint8Array(rawKey)], { type: "application/octet-stream" })
       );
 
       // Read output directory files
@@ -114,7 +114,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         const ciphertext = await encryptSegment(rawTs, rawKey, rawIv);
 
         const storageId = await uploadBlobToConvex(
-          new Blob([ciphertext.buffer], { type: "video/mp2t" })
+          new Blob([new Uint8Array(ciphertext)], { type: "video/mp2t" })
         );
         uploadedSegments.push({ variant: 0, name: seg.name, storageId });
         await ffmpeg.deleteFile(seg.name);
@@ -123,7 +123,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       setStatusMessage("Saving playlist manifests…");
       const manifestBytes = (await ffmpeg.readFile("out_0.m3u8")) as Uint8Array;
       const variantManifestStorageId = await uploadBlobToConvex(
-        new Blob([manifestBytes.buffer], { type: "application/x-mpegURL" })
+        new Blob([new Uint8Array(manifestBytes)], { type: "application/x-mpegURL" })
       );
       await ffmpeg.deleteFile("out_0.m3u8");
       await ffmpeg.deleteFile("input.mp4");

@@ -42,20 +42,20 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       const urlRes = await fetch("/api/publitio/upload-url", { method: "POST" });
       if (!urlRes.ok) {
         const errorData = await urlRes.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to initialize Publit.io upload");
+        throw new Error(errorData.error || "Failed to initialize video upload");
       }
       const { uploadUrl } = await urlRes.json();
 
       setProgressPercent(10);
-      setStatusMessage("Uploading file to Publit.io…");
+      setStatusMessage("Uploading video…");
 
       const formData = new FormData();
       formData.append("file", file);
       formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
       formData.append("privacy", "1"); // Public/unlisted for streaming
 
-      // Upload directly to Publit.io with XMLHttpRequest to track upload progress
-      const publitioResult = await new Promise<any>((resolve, reject) => {
+      // Upload directly with XMLHttpRequest to track upload progress
+      const uploadResult = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", uploadUrl);
 
@@ -72,31 +72,29 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
             try {
               const res = JSON.parse(xhr.responseText);
               if (res.success === false) {
-                reject(new Error(res.error?.message || "Publit.io upload failed"));
+                reject(new Error(res.error?.message || "Video upload failed"));
               } else {
                 resolve(res);
               }
             } catch {
-              reject(new Error("Invalid response from Publit.io"));
+              reject(new Error("Invalid upload response"));
             }
           } else {
-            reject(new Error(`Publit.io upload error (${xhr.status}): ${xhr.statusText}`));
+            reject(new Error(`Upload error (${xhr.status}): ${xhr.statusText}`));
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error during Publit.io upload"));
+        xhr.onerror = () => reject(new Error("Network error during video upload"));
         xhr.send(formData);
       });
 
       setProgressPercent(90);
-      setStatusMessage("Cloud transcoding started on Publit.io…");
+      setStatusMessage("Cloud transcoding in progress…");
 
-      // Publit.io returns url_preview or url_download
-      // The direct streaming URL is typically publitioResult.url_download or .url_preview
-      const streamUrl = publitioResult.url_download || publitioResult.url_preview;
+      const streamUrl = uploadResult.url_download || uploadResult.url_preview;
 
       if (!streamUrl) {
-        throw new Error("Publit.io did not return a valid video URL");
+        throw new Error("Did not receive a valid video stream URL");
       }
 
       setStatusMessage("Saving video URL to lesson…");
@@ -107,7 +105,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       });
 
       setProgressPercent(100);
-      toast.success("Video uploaded to Publit.io successfully!");
+      toast.success("Video uploaded and processed successfully!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Video upload failed";
       setErrorModal({ open: true, message: msg });
@@ -130,7 +128,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         <div>
           <Label>Lesson video file</Label>
           <p className="text-xs leading-[1.5] text-muted-foreground">
-            Videos are uploaded and automatically transcoded to adaptive quality levels by Publit.io.
+            Videos are uploaded and automatically transcoded to adaptive quality levels in the cloud.
           </p>
         </div>
       </div>
@@ -153,7 +151,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
           className="flex items-center gap-2"
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-          {uploading ? "Uploading to Publit.io…" : "Upload Video to Publit.io"}
+          {uploading ? "Uploading video…" : "Upload Video"}
         </Button>
       </div>
 
@@ -178,10 +176,10 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
           <DialogHeader>
             <div className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <DialogTitle>Publit.io Upload Failed</DialogTitle>
+              <DialogTitle>Video Upload Failed</DialogTitle>
             </div>
             <DialogDescription className="pt-2 text-sm text-muted-foreground">
-              Failed to upload or transcode the video on Publit.io. Check your network connection and retry.
+              Failed to upload or process the video. Check your network connection and retry.
             </DialogDescription>
           </DialogHeader>
 

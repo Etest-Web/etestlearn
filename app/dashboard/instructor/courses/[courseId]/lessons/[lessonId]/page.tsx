@@ -292,11 +292,11 @@ export default function LessonEditPage() {
                   <Input
                     id="content"
                     name="content"
-                    placeholder="Publit.io URL, YouTube, Vimeo, or direct MP4..."
+                    placeholder="https://... (or YouTube, Vimeo, direct MP4)"
                     value={formData.content}
                     onChange={handleChange}
                   />
-                  <p className="text-xs leading-[1.5] text-muted-foreground">Automatically filled when uploading with Publit.io above, or paste an external video link.</p>
+                  <p className="text-xs leading-[1.5] text-muted-foreground">Automatically filled when uploading above, or paste an external video link.</p>
                 </div>
               </div>
             )}

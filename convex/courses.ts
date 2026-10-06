@@ -361,7 +361,14 @@ export const updateLesson = mutation({
     if (args.contentType !== undefined) updates.contentType = args.contentType;
     if (args.order !== undefined) updates.order = args.order;
     if (args.durationMinutes !== undefined) updates.durationMinutes = args.durationMinutes;
-    if (args.content !== undefined) updates.content = args.content;
+    if (args.content !== undefined) {
+      updates.content = args.content;
+      // When a direct/cloud video URL is provided, clear any legacy pending
+      // videoAssetId on the lesson so the player immediately serves the URL.
+      if (args.content && lesson.videoAssetId) {
+        updates.videoAssetId = undefined;
+      }
+    }
 
     await ctx.db.patch(args.lessonId, updates);
   },

@@ -17,7 +17,7 @@ function CertificateMock() {
   return (
     <div className="group/cert relative mx-auto max-w-sm md:max-w-none">
       <Image
-        src="/IMG-20260925-WA0018.jpg"
+        src="/certf.jpeg"
         alt="Certificate preview"
         width={1600}
         height={1140}
@@ -59,8 +59,8 @@ export function HeroPoster() {
               letterSpacing={8}
               uppercase
               color="#ffffff"
-              
-              ribbonColor="#d046f6"
+              ribbon
+              ribbonColor="#CACACA"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}
@@ -78,8 +78,8 @@ export function HeroPoster() {
               letterSpacing={8}
               uppercase
               color="#ffffff"
-              
-              ribbonColor="#d046f6"
+              ribbon
+              ribbonColor="#CACACA"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}

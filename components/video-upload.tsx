@@ -91,7 +91,8 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       setProgressPercent(90);
       setStatusMessage("Cloud transcoding in progress…");
 
-      const streamUrl = uploadResult.url_download || uploadResult.url_preview;
+      // Prefer the embed player URL if provided, or url_preview / url_download
+      const streamUrl = uploadResult.url_embed || uploadResult.url_download || uploadResult.url_preview;
 
       if (!streamUrl) {
         throw new Error("Did not receive a valid video stream URL");

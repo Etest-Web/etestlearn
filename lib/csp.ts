@@ -129,6 +129,9 @@ export function buildContentSecurityPolicy(nonce: string): string {
       ...SCRIPT_HOSTS,
       "https://hooks.stripe.com",
       "https://checkout.paystack.com",
+      "https://*.publit.io",
+      "https://media.publit.io",
+      "https://publit.io",
     ].join(" "),
     // Clerk's own reference policy allows blob: workers; same-origin blob
     // workers are not an escalation (they inherit this origin, and reaching

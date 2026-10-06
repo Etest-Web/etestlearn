@@ -14,12 +14,19 @@ export default function DashboardCoursePage() {
   const params = useParams();
   const slug = params.slug as string;
   const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
+  // `getUserEnrollments` answers [] when there is no Convex `users` row, so it
+  // needs no gate. `getCourseCertificateStatus` `requireUser`s, and that throws
+  // "Not authenticated" until the row exists — it is created by the Clerk
+  // webhook, or by `EnsureCurrentUser` a beat after first paint — so gating on
+  // `dbUser` is what keeps a first load from logging that error. Skipping is
+  // also correct for a suspended account, which reads as signed out everywhere.
+  const dbUser = useQuery(api.users.getCurrentUser);
   const enrollments = useQuery(api.enrollments.getUserEnrollments) ?? [];
   const enrollMutation = useMutation(api.enrollments.enrollInCourse);
   const issueCertificate = useMutation(api.certificates.issueCertificate);
   const certStatus = useQuery(
     api.certificates.getCourseCertificateStatus,
-    data?.course._id ? { courseId: data.course._id as any } : "skip",
+    dbUser && data?.course._id ? { courseId: data.course._id as any } : "skip",
   );
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);

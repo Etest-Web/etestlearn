@@ -4,8 +4,18 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Label } from "@/components/ui";
-import { Loader2, UploadCloud, Video } from "lucide-react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Label,
+  Progress,
+} from "@/components/ui";
+import { AlertCircle, Loader2, RotateCcw, UploadCloud, Video } from "lucide-react";
 import { toast } from "sonner";
 import { fetchFile } from "@ffmpeg/util";
 import {
@@ -23,7 +33,18 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
 
   const [processing, setProcessing] = useState(false);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState("");
+  const [errorModal, setErrorModal] = useState<{
+    open: boolean;
+    stage: "transcode" | "upload" | "init";
+    message: string;
+  }>({
+    open: false,
+    stage: "transcode",
+    message: "",
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const asset = assetState?.role === "manager" ? assetState.asset : null;
@@ -35,7 +56,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       headers: { "Content-Type": blob.type || "application/octet-stream" },
       body: blob,
     });
-    if (!res.ok) throw new Error("Failed to upload file chunk");
+    if (!res.ok) throw new Error("Failed to upload file chunk to storage");
     const { storageId } = await res.json();
     return storageId;
   }
@@ -45,27 +66,31 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
     if (!file) return;
 
     setProcessing(true);
+    setProgressPercent(5);
     let createdAssetId: Id<"videoAssets"> | null = null;
+    let currentStage: "init" | "transcode" | "upload" = "init";
 
     try {
       setStatusMessage("Initializing transcode session…");
       const { assetId } = await initClientTranscode({ lessonId });
       createdAssetId = assetId;
+      setProgressPercent(10);
 
+      currentStage = "transcode";
       setStatusMessage("Loading WebAssembly FFmpeg…");
       const ffmpeg = await getFFmpeg((msg) => {
-        // Filter out noisy debug lines
         if (msg.includes("frame=") || msg.includes("fps=")) {
           setStatusMessage(`Transcoding: ${msg.trim()}`);
         }
       });
+      setProgressPercent(20);
 
       setStatusMessage("Reading video into memory…");
       const videoData = await fetchFile(file);
       await ffmpeg.writeFile("input.mp4", videoData);
+      setProgressPercent(30);
 
-      setStatusMessage("Transcoding to HLS (this may take a few minutes)…");
-      // Produce standard HLS stream (720p cap for client performance)
+      setStatusMessage("Transcoding to HLS…");
       await ffmpeg.exec([
         "-i", "input.mp4",
         "-vf", "scale=-2:min(720\\,ih)",
@@ -84,7 +109,18 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         "-f", "hls",
         "out_0.m3u8",
       ]);
+      setProgressPercent(55);
 
+      const dirList = (await ffmpeg.listDir(".")) as Array<{ name: string; isDir: boolean }>;
+      const segmentFiles = dirList
+        .filter((entry) => entry.name.startsWith("seg_0_") && entry.name.endsWith(".ts"))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (segmentFiles.length === 0) {
+        throw new Error("Transcode yielded no video segments. Format may be unsupported.");
+      }
+
+      currentStage = "upload";
       setStatusMessage("Encrypting segments with AES-128…");
       const rawKey = window.crypto.getRandomValues(new Uint8Array(16));
       const rawIv = window.crypto.getRandomValues(new Uint8Array(16));
@@ -93,23 +129,17 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       const keyStorageId = await uploadBlobToConvex(
         new Blob([new Uint8Array(rawKey)], { type: "application/octet-stream" })
       );
-
-      // Read output directory files
-      const dirList = (await ffmpeg.listDir(".")) as Array<{ name: string; isDir: boolean }>;
-      const segmentFiles = dirList
-        .filter((entry) => entry.name.startsWith("seg_0_") && entry.name.endsWith(".ts"))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      if (segmentFiles.length === 0) {
-        throw new Error("Transcode yielded no video segments");
-      }
+      setProgressPercent(60);
 
       const uploadedSegments: Array<{ variant: number; name: string; storageId: Id<"_storage"> }> = [];
       let segIndex = 0;
 
       for (const seg of segmentFiles) {
         segIndex++;
-        setStatusMessage(`Encrypting and uploading segment ${segIndex}/${segmentFiles.length}…`);
+        const uploadProgress = 60 + Math.round((segIndex / segmentFiles.length) * 30);
+        setProgressPercent(uploadProgress);
+        setStatusMessage(`Encrypting & uploading chunk ${segIndex}/${segmentFiles.length}…`);
+
         const rawTs = (await ffmpeg.readFile(seg.name)) as Uint8Array;
         const ciphertext = await encryptSegment(rawTs, rawKey, rawIv);
 
@@ -121,6 +151,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
       }
 
       setStatusMessage("Saving playlist manifests…");
+      setProgressPercent(93);
       const manifestBytes = (await ffmpeg.readFile("out_0.m3u8")) as Uint8Array;
       const variantManifestStorageId = await uploadBlobToConvex(
         new Blob([new Uint8Array(manifestBytes)], { type: "application/x-mpegURL" })
@@ -136,7 +167,8 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         new Blob([masterManifest], { type: "application/x-mpegURL" })
       );
 
-      setStatusMessage("Completing video asset…");
+      setStatusMessage("Finalizing video asset…");
+      setProgressPercent(98);
       await completeClientTranscode({
         assetId: createdAssetId,
         masterManifestStorageId,
@@ -145,25 +177,36 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         keyStorageId,
         ivHex,
         variants: ladder,
-        durationSeconds: 0, // In browser HLS duration probed by player
+        durationSeconds: 0,
       });
 
-      toast.success("Video transcoded, encrypted, and ready!");
+      setProgressPercent(100);
+      toast.success("Video processed and ready for playback!");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Video transcode failed";
-      toast.error(msg);
+      const msg = err instanceof Error ? err.message : "Video processing failed";
       if (createdAssetId) {
         await failClientTranscode({ assetId: createdAssetId, errorMessage: msg }).catch(() => {});
       }
+      setErrorModal({
+        open: true,
+        stage: currentStage,
+        message: msg,
+      });
     } finally {
       setProcessing(false);
+      setProgressPercent(0);
       setStatusMessage("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
+  function handleRetry() {
+    setErrorModal((prev) => ({ ...prev, open: false }));
+    fileInputRef.current?.click();
+  }
+
   return (
-    <div className="space-y-3 rounded-md border border-rule bg-surface-sunken p-4">
+    <div className="space-y-4 rounded-md border border-rule bg-surface-sunken p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Label>Lesson video file</Label>
@@ -200,16 +243,24 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
           className="flex items-center gap-2"
         >
           {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-          {processing ? "Transcoding…" : "Select Video File"}
+          {processing ? "Processing Video…" : "Select Video File"}
         </Button>
-
-        {processing && (
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {statusMessage}
-          </span>
-        )}
       </div>
+
+      {processing && (
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-2 font-medium">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              {statusMessage}
+            </span>
+            <span className="tabular-nums font-semibold text-foreground">
+              {progressPercent}%
+            </span>
+          </div>
+          <Progress value={progressPercent} className="w-full" />
+        </div>
+      )}
 
       {asset?.status === "processing" && !processing ? (
         <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -217,6 +268,55 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
           Transcoding in progress…
         </p>
       ) : null}
+
+      {/* Error Retry Dialog */}
+      <Dialog open={errorModal.open} onOpenChange={(open) => setErrorModal((prev) => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <DialogTitle>
+                {errorModal.stage === "transcode"
+                  ? "Transcoding Failed"
+                  : errorModal.stage === "upload"
+                    ? "Upload / Storage Failed"
+                    : "Initialization Failed"}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="pt-2 text-sm text-muted-foreground">
+              {errorModal.stage === "transcode" && (
+                <>The video file could not be transcoded in your browser. The codec may not be supported or memory limits were reached.</>
+              )}
+              {errorModal.stage === "upload" && (
+                <>Transcoding succeeded, but uploading the encrypted video segments to cloud storage failed. Please check network connectivity.</>
+              )}
+              {errorModal.stage === "init" && (
+                <>Could not start transcode session. Ensure you have instructor permissions to manage this course.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {errorModal.message && (
+            <div className="rounded-md bg-destructive/10 p-3 text-xs font-mono text-destructive">
+              {errorModal.message}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setErrorModal((prev) => ({ ...prev, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleRetry} className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

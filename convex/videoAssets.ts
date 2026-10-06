@@ -186,8 +186,7 @@ export const completeAsset = internalMutation({
     if (!asset) throw new Error("Asset not found");
     await ctx.db.patch(assetId, { ...rest, status: "ready", updatedAt: Date.now() });
     // Swap complete: retire the ladder this upload replaced. Convex blobs go
-    // now; the UploadThing source is deleted by a node action (SDK needs the
-    // secret server-side, and isolates must never see it used raw).
+    // now; the UploadThing source is deleted if present.
     if (asset.replacesAssetId) {
       const old = await ctx.db.get(asset.replacesAssetId);
       if (old) {
@@ -200,12 +199,96 @@ export const completeAsset = internalMutation({
         for (const id of blobs) {
           if (id) await ctx.storage.delete(id).catch(() => {});
         }
-        await ctx.scheduler.runAfter(0, internal.videoTranscode.deleteUploadthingFiles, {
-          fileKeys: [old.sourceFileKey],
-        });
+        if (old.sourceFileKey) {
+          await ctx.scheduler.runAfter(0, internal.videoTranscode.deleteUploadthingFiles, {
+            fileKeys: [old.sourceFileKey],
+          });
+        }
         await ctx.db.delete(old._id);
       }
     }
+  },
+});
+
+/**
+ * Client-side transcode initiation and completion.
+ * Allows client to transcode video in-browser and save directly to storage.
+ */
+export const initClientTranscode = mutation({
+  args: { lessonId: v.id("lessons") },
+  handler: async (ctx, args) => {
+    const { lesson } = await requireManager(ctx, args.lessonId);
+    const now = Date.now();
+    const assetId = await ctx.db.insert("videoAssets", {
+      lessonId: args.lessonId,
+      status: "processing",
+      sourceFileUrl: "",
+      sourceFileKey: "",
+      replacesAssetId: lesson.videoAssetId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(args.lessonId, { videoAssetId: assetId, contentType: "video" });
+    return { assetId };
+  },
+});
+
+export const completeClientTranscode = mutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    masterManifestStorageId: v.id("_storage"),
+    variantManifestStorageIds: v.array(v.id("_storage")),
+    segments: v.array(v.object({ variant: v.number(), name: v.string(), storageId: v.id("_storage") })),
+    keyStorageId: v.id("_storage"),
+    ivHex: v.string(),
+    variants: v.array(v.object({ label: v.string(), height: v.number(), bitrate: v.number(), bandwidth: v.number() })),
+    durationSeconds: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Asset not found");
+    await requireManager(ctx, asset.lessonId);
+
+    const { assetId, ...rest } = args;
+    await ctx.db.patch(assetId, { ...rest, status: "ready", updatedAt: Date.now() });
+
+    if (asset.replacesAssetId) {
+      const old = await ctx.db.get(asset.replacesAssetId);
+      if (old) {
+        const blobs = [
+          old.masterManifestStorageId,
+          ...(old.variantManifestStorageIds ?? []),
+          ...(old.segments ?? []).map((s) => s.storageId),
+          old.keyStorageId,
+        ];
+        for (const id of blobs) {
+          if (id) await ctx.storage.delete(id).catch(() => {});
+        }
+        if (old.sourceFileKey) {
+          await ctx.scheduler.runAfter(0, internal.videoTranscode.deleteUploadthingFiles, {
+            fileKeys: [old.sourceFileKey],
+          });
+        }
+        await ctx.db.delete(old._id);
+      }
+    }
+  },
+});
+
+export const failClientTranscode = mutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    errorMessage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) return;
+    await requireManager(ctx, asset.lessonId);
+    await ctx.db.patch(args.assetId, {
+      status: "failed",
+      errorMessage: args.errorMessage.slice(0, 500),
+      updatedAt: Date.now(),
+    });
   },
 });
 

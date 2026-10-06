@@ -105,7 +105,7 @@ export function buildContentSecurityPolicy(nonce: string): string {
     // Safari plays AES-128 HLS natively through <video src>, which is a
     // media-src fetch (hls.js/MSE path uses connect-src instead).
     "media-src 'self' https://*.convex.site",
-    // Convex, Clerk, Paystack and UploadThing speak over connect-src.
+    // UploadThing and unpkg/jsdelivr speak over connect-src.
     [
       "connect-src",
       "'self'",
@@ -118,6 +118,7 @@ export function buildContentSecurityPolicy(nonce: string): string {
       "https://api.paystack.co",
       "https://*.uploadthing.com",
       "https://uploadthing.com",
+      "https://unpkg.com",
     ].join(" "),
     [
       "frame-src",

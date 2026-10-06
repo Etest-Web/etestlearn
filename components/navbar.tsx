@@ -38,8 +38,19 @@ export function Navbar() {
   return (
     /* The rule under the bar is the same `--rule` hairline the dashboard
        sidebar sits on, so the chrome reads as one surface across the two
-       shells. Kept as a translucent plate because the hero scrolls under it. */
-    <header className="sticky top-0 z-60 border-b border-rule bg-background/80 backdrop-blur-md">
+       shells. Kept as a translucent plate because the hero scrolls under it.
+
+       z-40 sits in the app's stacking contract, not above everything:
+         page content  →  z-auto … z-10
+         this bar      →  z-40   (sticky page chrome)
+         portaled UI   →  z-50   (sheet, dialog, drawer, select, dropdown, tooltip)
+
+       Every overlay primitive in components/ui/ is z-50 and the mobile menu
+       is portaled to <body>, so this bar MUST stay below 50 — a `h-full`
+       sheet panel otherwise slides in *under* the header and the hamburger
+       button ends up painted on top of the open drawer. Bump it only in
+       lockstep with those primitives. */
+    <header className="sticky top-0 z-40 border-b border-rule bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-h-20 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2 group">

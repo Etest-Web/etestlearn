@@ -59,7 +59,7 @@ export function HeroPoster() {
               letterSpacing={8}
               uppercase
               color="#ffffff"
-              ribbon
+              
               ribbonColor="#d046f6"
               ribbonWidth={86}
               className="hidden sm:block"
@@ -78,7 +78,7 @@ export function HeroPoster() {
               letterSpacing={8}
               uppercase
               color="#ffffff"
-              ribbon
+              
               ribbonColor="#d046f6"
               ribbonWidth={86}
               className="hidden sm:block"

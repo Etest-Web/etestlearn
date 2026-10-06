@@ -60,7 +60,7 @@ export function HeroPoster() {
               uppercase
               color="#ffffff"
               ribbon
-              ribbonColor="#CACACA"
+              ribbonColor="#3f3f3f"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}
@@ -79,7 +79,7 @@ export function HeroPoster() {
               uppercase
               color="#ffffff"
               ribbon
-              ribbonColor="#CACACA"
+              ribbonColor="#3f3f3f"
               ribbonWidth={86}
               className="hidden sm:block"
               pauseOnHover={false}

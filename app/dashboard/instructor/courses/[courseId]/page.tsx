@@ -24,9 +24,12 @@ import { CertificatesPanel } from "@/components/course-certificates-panel";
 export default function CourseEditPage() {
   const router = useRouter();
   const params = useParams();
-  const courseId = params.courseId as string;
+  const courseId = params?.courseId as string | undefined;
   
-  const courseData = useQuery(api.courses.getCourseById, { courseId: courseId as Id<"courses"> });
+  const courseData = useQuery(
+    api.courses.getCourseById,
+    courseId ? { courseId: courseId as Id<"courses"> } : "skip"
+  );
   const updateCourse = useMutation(api.courses.updateCourse);
   const createLesson = useMutation(api.courses.createLesson);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
@@ -37,9 +40,10 @@ export default function CourseEditPage() {
   // Publishing is a separate operation from editing metadata (see
   // `lib/publishing.ts`), so the server decides which controls exist rather
   // than this page guessing from the price field.
-  const publishing = useQuery(api.courses.getCoursePublishingState, {
-    courseId: courseId as Id<"courses">,
-  });
+  const publishing = useQuery(
+    api.courses.getCoursePublishingState,
+    courseId ? { courseId: courseId as Id<"courses"> } : "skip"
+  );
   const publishCourse = useMutation(api.courses.publishCourse);
   const unpublishCourse = useMutation(api.courses.unpublishCourse);
   const requestUnpublish = useMutation(api.courses.requestUnpublish);

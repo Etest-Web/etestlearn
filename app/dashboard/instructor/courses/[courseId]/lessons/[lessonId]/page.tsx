@@ -36,12 +36,15 @@ import remarkGfm from "remark-gfm";
 export default function LessonEditPage() {
   const router = useRouter();
   const params = useParams();
-  const courseId = params.courseId as string;
-  const lessonId = params.lessonId as string;
+  const courseId = params?.courseId as string | undefined;
+  const lessonId = params?.lessonId as string | undefined;
   
   // We need a way to fetch just this lesson and its parent course
   // For now we'll fetch the whole course and find the lesson
-  const courseData = useQuery(api.courses.getCourseById, { courseId: courseId as Id<"courses"> });
+  const courseData = useQuery(
+    api.courses.getCourseById,
+    courseId ? { courseId: courseId as Id<"courses"> } : "skip"
+  );
   const updateLesson = useMutation(api.courses.updateLesson);
   const deleteLesson = useMutation(api.courses.deleteLesson);
   

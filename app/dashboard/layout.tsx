@@ -546,12 +546,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                             ? "99+"
                                             : unread.notifications}
                                     </span>
-                                ) : (
-                                    <span
-                                        aria-hidden
-                                        className="absolute right-3 top-2.5 size-1.5 rounded-full bg-destructive"
-                                    />
-                                )}
+                                ) : null}
                             </Button>
                         </div>
                         <div className="flex items-center gap-3 border-l border-rule pl-3 sm:pl-6">

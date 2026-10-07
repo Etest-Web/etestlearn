@@ -64,7 +64,12 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
     url: siteConfig.url,
-    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.name }],
+    // Intrinsic size of `siteConfig.ogImage` (public/certf.jpeg), not the
+    // 1200x630 letterbox the previous placeholder implied. Declaring
+    // dimensions the file does not have makes scrapers crop a portrait image
+    // into a landscape box and cut off the recipient's name, which is the one
+    // part of the certificate anyone cares about.
+    images: [{ url: siteConfig.ogImage, width: 1600, height: 1140, alt: siteConfig.name }],
   },
   twitter: {
     card: "summary_large_image",

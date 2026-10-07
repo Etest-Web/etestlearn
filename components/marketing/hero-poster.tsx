@@ -1,171 +1,115 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { useUser } from "@clerk/nextjs";
-import { ArrowRight, BadgeCheck, LockKeyhole, Star } from "lucide-react";
 import Link from "next/link";
-import TextLoop from "@/components/TextLoop";
 import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 
-const TRUST_POINTS = [
-  { icon: BadgeCheck, label: "Verified certificates" },
-  { icon: LockKeyhole, label: "Paystack-secured payments" },
-  { icon: Star, label: "Hand-picked catalog" },
-];
+import { cn } from "@/lib/utils";
 
-function CertificateMock() {
-  return (
-    <div className="group/cert relative mx-auto max-w-sm md:max-w-none">
-      <Image
-        src="/certf.jpeg"
-        alt="Certificate preview"
-        width={1600}
-        height={1140}
-        className="tilt-card h-auto w-full shadow-elevation-raised"
-        priority
-      />
-      <div
-        aria-hidden="true"
-        className="absolute -bottom-3 left-1/2 -z-10 h-full w-[92%] -translate-x-1/2 rounded-sm border border-rule bg-surface-sunken blur-3xl"
-      />
-    </div>
-  );
-}
+/* One button system for the whole page. The marketing sections used to each
+   hand-roll their CTA, which is how three different labels ended up pointing
+   at `/courses` and four pointing at `/become-instructor`. Intent is now a
+   single label wherever it appears: "Browse courses" to learn, "Apply to
+   teach" to teach. The navbar keeps its own longer labels, since nav wording
+   is a separate contract from page copy. */
+const CTA_BASE =
+  "group inline-flex h-11 items-center justify-center gap-2 rounded-sm px-6 text-sm font-semibold transition-transform duration-200 ease-out active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const CTA_PRIMARY = cn(CTA_BASE, "bg-brand text-brand-foreground hover:-translate-y-0.5 hover:bg-brand/90");
+const CTA_SECONDARY = cn(
+  CTA_BASE,
+  "border border-rule-strong bg-card text-foreground hover:-translate-y-0.5 hover:bg-surface-sunken",
+);
 
 export function HeroPoster() {
-  const { user, isLoaded } = useUser();
+  const { user } = useUser();
 
   const primaryHref = user ? "/dashboard" : "/courses";
-  const primaryLabel = user ? "Go to dashboard" : "Start learning";
+  const primaryLabel = user ? "Continue learning" : "Browse courses";
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden">
-      <section className="relative w-full">
-        {/* Fixed TextLoop Background Wrapper */}
-        <div className="absolute inset-0 -z-10 flex items-center justify-center blur">
-          {/* w-full rather than min-w-screen: 100vw counts the scrollbar and
-              would hand the parent ~15px of over-wide canvas to clip. */}
-          <div className="w-full min-h-screen flex flex-col justify-between">
-            <TextLoop
-              text="Glypha"
-              shape="wave"
-              speed={55}
-              path=""
-              direction="forward"
-              separator="✦"
-              curviness={48}
-              fontSize={46}
-              fontWeight={800}
-              letterSpacing={8}
-              uppercase
-              color="#ffffff"
-              ribbon
-              ribbonColor="#3f3f3f"
-              ribbonWidth={86}
-              className="hidden sm:block"
-              pauseOnHover={false}
-            />
-            <TextLoop
-              text="Glypha"
-              shape="wave"
-              speed={55}
-              path=""
-              direction="forward"
-              separator="✦"
-              curviness={48}
-              fontSize={46}
-              fontWeight={800}
-              letterSpacing={8}
-              uppercase
-              color="#ffffff"
-              ribbon
-              ribbonColor="#3f3f3f"
-              ribbonWidth={86}
-              className="hidden sm:block"
-              pauseOnHover={false}
-            />
+    <section className="relative overflow-hidden border-b border-rule">
+      {/* Brand wash. Two soft fields in --brand, so the plane the hero sits on
+          is never the same flat value as the section under it and the eye is
+          carried from the headline to the certificate. Deliberately faint: at
+          the strength the previous section used, this read as an AI-purple
+          glow rather than as the logo's own colour. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -left-48 -top-56 h-[38rem] w-[38rem] rounded-full bg-brand/10 blur-3xl" />
+        <div className="absolute -bottom-64 -right-40 h-[30rem] w-[30rem] rounded-full bg-brand/8 blur-3xl" />
+      </div>
+
+      {/* No `min-h-dvh`. A full-height hero here left the certificate floating
+          in the bottom third with the headline stranded in the middle, and on a
+          short laptop it pushed the primary CTA below the fold. Height is now
+          whatever the content needs, with padding carrying the air. */}
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 md:py-24 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] lg:gap-16">
+        {/* Three text elements: headline, subtext, actions. The eyebrow and the
+            trust micro-strip that used to sit here are both gone. A label
+            above the headline repeated down the whole page, and "Verified
+            certificates / Paystack-secured payments / Hand-picked catalog"
+            inside the hero is a trust strip that belongs below it. */}
+        <div className="space-y-7">
+          <h1 className="hero-enter-1 display-heading max-w-[16ch] text-4xl text-balance sm:text-5xl lg:text-6xl">
+            Learn a skill. Then prove you have it.
+          </h1>
+
+          <p className="hero-enter-2 max-w-[52ch] text-pretty text-base leading-body text-muted-foreground md:text-lg">
+            Hand-picked courses with quizzes, verifiable certificates, and a
+            preference star beside your name across the GlyphaWeb platform.
+          </p>
+
+          <div className="hero-enter-3 flex flex-wrap items-center gap-3">
+            <Link href={primaryHref} className={CTA_PRIMARY}>
+              {primaryLabel}
+              <ArrowRight
+                aria-hidden="true"
+                className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+              />
+            </Link>
+            <Link href="/become-instructor" className={CTA_SECONDARY}>
+              Apply to teach
+              <ArrowUpRight
+                aria-hidden="true"
+                className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              />
+            </Link>
           </div>
         </div>
 
-        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-4 pb-14 pt-10 sm:gap-14 sm:px-6 sm:pb-20 sm:pt-14 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:pb-28 md:pt-20 lg:gap-10">
-          <div className="space-y-6 sm:space-y-8">
-            <p className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground sm:tracking-[0.24em]">
-              <span className="h-px w-8 shrink-0 bg-brand" aria-hidden="true" />
-              Learn skills that move you forward
-            </p>
-
-            {/* Fluid until sm, then the 7xl step. The 7vw coefficient is set
-                against the nowrap'd "HANDS ON": at 320px the clamp floors at
-                1.5rem and the run lands near 130px, comfortably inside the
-                288px content box. The previous 10vw/2rem pair was sized for a
-                condensed face and this one is not — 10vw put the run at ~280px
-                against that same 288px box, one rounding difference from
-                clipping. */}
-            <h1 className="display-heading text-[clamp(1.5rem,7vw,3rem)] text-balance sm:text-7xl">
-              A Digital Hub
-              <br />
-              for{" "}
-              <span className="relative inline-block whitespace-nowrap">
-                <span className="relative z-10">HANDS ON</span>
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-x-[-0.08em] bottom-[0.06em] z-1 h-[0.32em] bg-brand/70"
-                />
-              </span>{" "}
-              Skill Development
-            </h1>
-
-            <p className="max-w-xl text-base text-pretty text-muted-foreground md:text-lg">
-              Glypha Learning pairs a hand-picked catalog with quizzes,
-              certificates you can publicly verify, and a preference star that
-              puts your skills on display across the GlyphaWeb platform.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href={primaryHref}
-                className={cn(
-                  "group inline-flex h-12 items-center justify-center gap-2 rounded-sm bg-brand px-7 text-sm font-semibold text-brand-foreground",
-                  "transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-brand/90 active:translate-y-0 active:scale-[0.96]",
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                )}
-              >
-                {isLoaded ? primaryLabel : "Loading…"}
-                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-              </Link>
-              {!user && (
-                <Link
-                  href="/sign-in"
-                  className="inline-flex h-12 items-center justify-center rounded-sm border border-rule-strong bg-card px-7 text-sm font-medium transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  Sign in to continue
-                </Link>
-              )}
-              <Link
-                href="/become-instructor"
-                className="group inline-flex h-12 items-center justify-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Teach on Glypha
-                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
-              </Link>
-            </div>
-
-            <ul className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
-              {TRUST_POINTS.map(({ icon: Icon, label }) => (
-                <li
-                  key={label}
-                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground"
-                >
-                  <Icon className="h-4 w-4 text-primary" />
-                  {label}
-                </li>
-              ))}
-            </ul>
+        {/* The certificate is a real artifact the product actually issues, not
+            a screenshot stand-in, so it earns the hero slot. Capped at 26rem:
+            at the column width it used to render, a 1600x1140 JPEG pushed the
+            section past a viewport and the CTA off screen. */}
+        <figure className="hero-enter-4 m-0 lg:justify-self-end">
+          <div className="group/cert relative w-full max-w-[22rem] lg:max-w-[26rem]">
+            <Image
+              src="/certf.jpeg"
+              alt="A Glypha certificate of completion for the graphics design course, signed and stamped."
+              width={1600}
+              height={1140}
+              sizes="(max-width: 1024px) 88vw, 26rem"
+              className="tilt-card h-auto w-full border border-rule shadow-raised"
+              priority
+            />
           </div>
 
-          <CertificateMock />
-        </div>
-      </section>
-    </main>
+          {/* Caption sits outside the image, never over it. One functional line
+              about what the artifact does, no photographer credit. */}
+          <figcaption className="mt-6 flex max-w-[22rem] items-start gap-3 border-t border-rule pt-4 lg:max-w-[26rem]">
+            <Image
+              src="/SmallLogo.svg"
+              alt=""
+              width={28}
+              height={28}
+              className="size-7 shrink-0"
+            />
+            <p className="text-pretty text-sm leading-body text-muted-foreground">
+              Every certificate carries its own public verification page.
+            </p>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
   );
 }

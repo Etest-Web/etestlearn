@@ -32,7 +32,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
   return (
     <Link
       href={`/courses/${course.slug}`}
-      className="group flex flex-col overflow-hidden rounded-sm border border-rule bg-card transition-[border-color,transform] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring hover:-translate-y-1 hover:border-rule-strong"
+      className="group flex h-full flex-col overflow-hidden rounded-sm border border-rule bg-card transition-[border-color,transform] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring hover:-translate-y-1 hover:border-rule-strong"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-surface-sunken">
         {course.thumbnailUrl ? (
@@ -95,7 +95,7 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
 
 function CardSkeleton() {
   return (
-    <div className="flex animate-pulse flex-col overflow-hidden rounded-sm border border-rule bg-card">
+    <div className="flex h-full animate-pulse flex-col overflow-hidden rounded-sm border border-rule bg-card">
       <div className="aspect-[16/10] bg-surface-sunken" />
       <div className="space-y-3 p-5">
         <div className="h-3 w-16 rounded-sm bg-surface-sunken" />
@@ -113,10 +113,10 @@ function CatalogEmptyState() {
         icon={BookOpen}
         tone="brand"
         title="The catalog is being curated"
-        description="Our first courses are in review right now. Check back shortly — or apply to teach the first one."
+        description="The first courses are in review right now. Browse back shortly, or apply to teach one of them."
         action={
           <Button render={<Link href="/become-instructor" />}>
-            Become an instructor
+            Apply to teach
           </Button>
         }
       />
@@ -132,16 +132,8 @@ export function CourseShowcase() {
     <section className="mx-auto max-w-6xl px-4 py-20 md:py-28">
       <Reveal>
         <SectionHeading
-          index="01"
-          kicker="The catalog"
-          title={
-            <>
-              INTENTIONAL COURSES
-              <br />
-              HAND-PICKED AND VERIFIED.
-            </>
-          }
-          description="Every course is reviewed before it goes live — structured lessons, real assessments, and outcomes you can show for your time."
+          title="Every course is reviewed before it goes live."
+          description="Structured lessons, real assessments, and the price in naira shown before you enroll."
         />
       </Reveal>
 
@@ -164,11 +156,13 @@ export function CourseShowcase() {
 
       {courses !== undefined && courses.length > 6 && (
         <div className="mt-10 flex justify-center">
+          {/* Same intent, same label as the hero's primary. The old copy here
+              was "Browse all 24 courses", a third label for one destination. */}
           <Link
             href="/courses"
             className="inline-flex h-11 items-center justify-center rounded-sm border border-rule-strong px-6 text-sm font-medium transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            Browse all <span className="tabular">{courses.length}</span> courses
+            Browse courses
           </Link>
         </div>
       )}

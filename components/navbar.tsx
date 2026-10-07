@@ -59,9 +59,12 @@ export function Navbar() {
        lockstep with those primitives. */
     <header className="sticky top-0 z-40 border-b border-rule bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex max-h-20 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        {/* Logo */}
+        {/* Logo. `w-30` was sizing the 300x150 viewBox to 120px wide, which
+            made it 60px tall, and with `py-3` on top of that the bar rendered
+            at 84px. `w-24` brings it to 48px and the bar to 72px, inside the
+            80px ceiling a sticky header should respect. */}
         <Link href="/" className="flex shrink-0 items-center gap-2 group">
-          <div className="flex w-30 items-center justify-center rounded-sm transition-transform group-hover:scale-105">
+          <div className="flex w-24 items-center justify-center rounded-sm transition-transform group-hover:scale-105">
             <Image width={10} height={10} alt="Glypha" src={"/Logo.svg"} className="w-full" />
           </div>
           {/*<span className="text-sm font-bold tracking-tight sm:text-base">Glypha Learning</span>*/}

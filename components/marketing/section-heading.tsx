@@ -1,40 +1,49 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * Section heading for the marketing page.
+ *
+ * Two departures from the version this replaced, both deliberate:
+ *
+ *   1. There is no `index` prop. It rendered "01" / "02" / "04" beside the
+ *      kicker, which turned every section into a page of a printed report.
+ *      Two sections opted out, so the sequence also skipped 03 and read as a
+ *      bug. Nothing on the page enumerates the sections now.
+ *
+ *   2. The kicker is `eyebrow` and it is opt-in. It used to be required, which
+ *      meant all three call sites shipped a small uppercase label above their
+ *      headline, and the page ended up with seven of them. A section's
+ *      position on the page already categorises it; the label was noise. Only
+ *      one section on the page asks for one.
+ *
+ * The description stacks under the headline rather than sitting in a narrow
+ * column beside it. A split header reads as "headline plus filler paragraph"
+ * whenever the second column carries no visual of its own, and none of these
+ * did.
+ *
+ * Headlines are sentence case at display size. The previous all-caps setting
+ * (`INTENTIONAL COURSES HAND-PICKED AND VERIFIED.`) needed the caps to carry
+ * weight, which is why it also needed 60px type to avoid looking small.
+ */
 export function SectionHeading({
-  index,
-  kicker,
+  eyebrow,
   title,
   description,
-  align = "left",
   className,
 }: {
-  index: string;
-  kicker: string;
+  eyebrow?: string;
   title: React.ReactNode;
   description?: string;
-  align?: "left" | "center";
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-4",
-        align === "center" && "items-center text-center",
-        className,
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <span className="tabular text-xs text-primary">{index}</span>
-        <span className="h-px w-10 bg-rule" aria-hidden="true" />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          {kicker}
-        </span>
-      </div>
-      <h2 className="display-heading text-4xl text-balance sm:text-5xl md:text-6xl">
+    <div className={cn("flex max-w-2xl flex-col gap-4", className)}>
+      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+      <h2 className="display-heading text-3xl text-balance sm:text-4xl md:text-5xl">
         {title}
       </h2>
       {description ? (
-        <p className={cn("max-w-xl text-sm text-pretty text-muted-foreground md:text-base", align === "center" && "mx-auto")}>
+        <p className="max-w-[58ch] text-pretty text-base leading-body text-muted-foreground">
           {description}
         </p>
       ) : null}

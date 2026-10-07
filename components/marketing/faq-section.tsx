@@ -4,89 +4,96 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Reveal } from "./reveal";
-import { SectionHeading } from "./section-heading";
 
 const FAQS = [
-    {
-        q: "Are the certificates actually verifiable?",
-        a: "Yes. Every certificate is issued with a unique ID and its own public verification page — anyone (an employer, a client, a school) can confirm it's real in seconds, without contacting us.",
-    },
-    {
-        q: "How much do courses cost?",
-        a: "It varies by course. Many are free; paid courses are priced in Naira and processed securely through Paystack. The price is always shown before you enroll — no hidden fees.",
-    },
-    {
-        q: "What exactly is the preference star?",
-        a: "When you complete a course, a preference star appears next to your name across the GlyphaWeb platform. It tells partners and clients on that platform that your skills are verified — permanently.",
-    },
-    {
-        q: "Who can become an instructor?",
-        a: "Anyone with real expertise can apply through the instructor form. Every application — including your portfolio and bio — is reviewed by our team before publishing access is granted, which is how the catalog stays curated.",
-    },
-    {
-        q: "Do I need an account to browse?",
-        a: "No — you can explore the entire catalog freely. You only need to sign in to enroll, track progress, take quizzes, and earn certificates.",
-    },
+  {
+    q: "Are the certificates actually verifiable?",
+    a: "Yes. Each certificate is issued with a unique ID and a public verification page of its own. An employer, a client or a school can confirm it in seconds without contacting us.",
+  },
+  {
+    q: "How much do courses cost?",
+    a: "It depends on the course. Many are free, and paid ones are priced in naira and settled through Paystack. The price is always on the listing before you enroll, and there are no added fees at checkout.",
+  },
+  {
+    q: "What exactly is the preference star?",
+    a: "It appears next to your name across the GlyphaWeb platform once you complete a course. It marks you as someone whose skills have been verified, and it stays there.",
+  },
+  {
+    q: "Who can become an instructor?",
+    a: "Anyone with real expertise. You apply with your portfolio and bio, and a person reads it before publishing access is granted. That review is how the catalog stays curated.",
+  },
+  {
+    q: "Do I need an account to browse?",
+    a: "No. The whole catalog is open. You only need to sign in to enroll, track your progress, take quizzes and earn certificates.",
+  },
 ];
 
 function FaqItem({ q, a }: { q: string; a: string }) {
-    const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-    return (
-        <div className="border-b border-rule">
-            <button
-                type="button"
-                onClick={() => setOpen(v => !v)}
-                aria-expanded={open}
-                className="flex w-full items-center justify-between gap-6 py-5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-            >
-                <span className={cn("text-base font-medium transition-colors", open && "text-primary")}>{q}</span>
-                <Plus
-                    aria-hidden="true"
-                    className={cn(
-                        "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-300 ease-out",
-                        open && "rotate-45 text-primary",
-                    )}
-                />
-            </button>
-            <div
-                className={cn(
-                    "grid transition-[grid-template-rows] duration-300 ease-out",
-                    open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-                )}
-            >
-                <div className="overflow-hidden">
-                    <p className="max-w-2xl pb-5 text-sm leading-body text-pretty text-muted-foreground">{a}</p>
-                </div>
-            </div>
+  return (
+    <div className="border-b border-rule">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-6 py-5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      >
+        <span
+          className={cn(
+            "text-base font-medium transition-colors",
+            open && "text-primary",
+          )}
+        >
+          {q}
+        </span>
+        <Plus
+          aria-hidden="true"
+          className={cn(
+            "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-300 ease-out",
+            open && "rotate-45 text-primary",
+          )}
+        />
+      </button>
+      {/* Height animated as a grid track rather than max-height, so the answer
+          opens to exactly its own height with no magic number to tune. */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-out",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <p className="max-w-2xl pb-5 text-pretty text-sm leading-body text-muted-foreground">
+            {a}
+          </p>
         </div>
-    );
+      </div>
+    </div>
+  );
 }
 
 export function FaqSection() {
-    return (
-        <section className="mx-auto max-w-6xl px-4 pb-20 md:pb-28">
-            <div className="grid gap-12 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-                <SectionHeading
-                    index="04"
-                    kicker="Questions"
-                    title={
-                        <>
-                            Asked,
-                            <br />
-                            answered.
-                        </>
-                    }
-                    description="Everything learners usually want to know before their first enrollment."
-                />
-                <Reveal>
-                    <div className="border-t border-rule">
-                        {FAQS.map(faq => (
-                            <FaqItem key={faq.q} q={faq.q} a={faq.a} />
-                        ))}
-                    </div>
-                </Reveal>
-            </div>
-        </section>
-    );
+  return (
+    <section className="mx-auto max-w-3xl px-4 pb-20 md:pb-28">
+      {/* The label sits ON the rule rather than floating above the headline.
+          That is the one place on this page a tracked small-caps label earns
+          its place: it labels the accordion below it the way a running head
+          labels a column in print. */}
+      <Reveal>
+        <p className="rule-heading eyebrow pb-4">Before you enroll</p>
+        <h2 className="display-heading text-3xl text-balance sm:text-4xl md:text-5xl">
+          What people ask first.
+        </h2>
+      </Reveal>
+
+      <Reveal delay={90}>
+        <div className="mt-10 border-t border-rule">
+          {FAQS.map((faq) => (
+            <FaqItem key={faq.q} q={faq.q} a={faq.a} />
+          ))}
+        </div>
+      </Reveal>
+    </section>
+  );
 }

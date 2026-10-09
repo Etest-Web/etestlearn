@@ -3,6 +3,7 @@ import { Archivo, Geist_Mono, Inter, Outfit } from "next/font/google";
 import { headers } from "next/headers";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next"
 import { cn } from "@/lib/utils";
 import { TooltipProvider, ThemeProvider } from "@/components/ui";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
@@ -12,18 +13,6 @@ import { Toaster } from "sonner";
 import { siteConfig } from "@/lib/site";
 import ScriptOrg from "@/components/seo/script-org";
 import { organization } from "@/components/seo/organization-schema";
-
-// Four faces, each load-bearing. The sans pair sets body copy, Geist_Mono backs
-// `--font-mono` for the marketing kickers, and Archivo is the display face.
-// Montserrat, Poppins and Geist sans used to load here too and were referenced
-// by nothing in the tree — three fonts of render-blocking CSS for no type.
-//
-// Archivo is a normal-width grotesque with a real lowercase and a full variable
-// weight axis (100–900), which is what a display role needs: the face it
-// replaces was a condensed all-caps face with a single weight, so every heading
-// had to be letter-spaced wide to compensate and read as stretched. No `weight`
-// is passed on purpose — that is what requests the variable font rather than a
-// cut of static instances.
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const outfit = Outfit({
@@ -66,11 +55,6 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
     url: siteConfig.url,
-    // Intrinsic size of `siteConfig.ogImage` (public/certf.jpeg), not the
-    // 1200x630 letterbox the previous placeholder implied. Declaring
-    // dimensions the file does not have makes scrapers crop a portrait image
-    // into a landscape box and cut off the recipient's name, which is the one
-    // part of the certificate anyone cares about.
     images: [{ url: siteConfig.ogImage, width: 1600, height: 1140, alt: siteConfig.name }],
   },
   twitter: {
@@ -112,6 +96,7 @@ export default async function RootLayout({
         <body
           className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
         >
+          <Analytics/>
           <ThemeProvider
             nonce={nonce}
             attribute="class"

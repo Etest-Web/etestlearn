@@ -9,3 +9,4 @@ allowBuilds:
   '@clerk/shared': false
   # Copies a worker file only when `msw.workerDirectory` is set (it isn't here).
   msw: false
+  msgpackr-extract: set this to true or false

@@ -187,6 +187,11 @@ export const NOTIFICATION_TYPES = [
   // otherwise silent, so the applicant would only find out by noticing a
   // console appeared.
   "instructor_application_reviewed",
+  // Written by `internal.payments.markPurchasePaid` when a referral converts.
+  // `referral_converted` is the social proof ("someone you invited bought a
+  // course"); `referral_reward` is the account credit that came with it.
+  "referral_converted",
+  "referral_reward",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -206,6 +211,8 @@ export const notificationTypeValidator = v.union(
   v.literal("course_reminder"),
   v.literal("direct_message"),
   v.literal("instructor_application_reviewed"),
+  v.literal("referral_converted"),
+  v.literal("referral_reward"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

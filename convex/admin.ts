@@ -61,8 +61,13 @@ export const getPlatformOverview = query({
     // Refunds are annotations, not deletions: a refunded purchase stays in the
     // revenue total's denominator as a subtraction, keeping the ledger honest.
     const refunded = paidPurchases.filter((p) => p.refundedAt !== undefined);
+    // `listAmount` is the pre-discount price, so a referral discount does not
+    // shrink platform revenue — the platform funds the discount itself, and its
+    // own cut comes out of the list price. Summing the stored `platformFeeKobo`
+    // would additionally be correct for snapshotted rows; `listAmount` is used
+    // so legacy rows without a snapshot are counted identically.
     const revenueKobo = paidPurchases.reduce(
-      (sum, p) => sum + (p.refundedAt === undefined ? p.amount : 0),
+      (sum, p) => sum + (p.refundedAt === undefined ? (p.listAmount ?? p.amount) : 0),
       0,
     );
 

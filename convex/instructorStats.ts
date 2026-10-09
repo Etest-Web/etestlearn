@@ -2,7 +2,6 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { isStaff, requireUser, type Id, type ReadCtx, type UserDoc } from "./helpers/auth";
 import {
-  INSTRUCTOR_REVENUE_SHARE,
   monthBuckets,
   monthlyEarnings,
   percentChange,
@@ -11,6 +10,7 @@ import {
   type EarningsSale,
   type MonthPoint,
 } from "../lib/instructor-earnings";
+import { INSTRUCTOR_SHARE_BPS, legacyShareKobo } from "../lib/settlement";
 
 /**
  * Instructor console analytics.
@@ -80,13 +80,40 @@ async function loadPaidSales(ctx: ReadCtx, courseId: Id<"courses">) {
     .collect();
 }
 
+/**
+ * Projects a purchase row onto the shape `summarizeEarnings` consumes.
+ *
+ * `gross` is the **pre-discount** price (`listAmount`), not the charge. That is
+ * the whole point of the settlement snapshot: when a referral discount reduced
+ * what the buyer paid, the platform absorbed it and the instructor is still paid
+ * 80% of what the course costs. Reading `amount` here would silently transfer
+ * the platform's acquisition cost onto the instructor.
+ *
+ * The instructor's share and the platform fee come from the stored snapshot.
+ * `instructorShareKobo` is the decided figure and `gross - share` is therefore
+ * the fee, which keeps `share + fee === gross` exactly rather than re-rounding.
+ *
+ * Rows settled before the snapshot existed have no stored share, so they fall
+ * back to `legacyShareKobo` — the same figure the old read-time code would have
+ * produced. Those rows stay sensitive to a rate change (see the comment on that
+ * function); every new sale is frozen.
+ */
 function toSale(purchase: {
   amount: number;
+  listAmount?: number;
   refundedAt?: number;
   paidAt?: number;
+  instructorShareKobo?: number;
 }): EarningsSale {
+  const gross = purchase.listAmount ?? purchase.amount;
+  const share = purchase.instructorShareKobo ?? legacyShareKobo(gross);
+
   return {
-    amount: purchase.amount,
+    amount: gross,
+    // Derived from the stored share rather than rounded again, so the fee column
+    // and the earnings column sum back to gross on every individual row.
+    platformFeeKobo: Math.max(0, gross - share),
+    instructorShareKobo: share,
     refunded: purchase.refundedAt !== undefined,
     // A paid row always has paidAt in practice; fall back to createdAt so a
     // legacy row still lands in the series rather than falling out of every
@@ -221,7 +248,11 @@ export const getEarningsSummary = query({
     courseRows.sort((a, b) => b.netEarningsKobo - a.netEarningsKobo);
 
     return {
-      revenueShare: INSTRUCTOR_REVENUE_SHARE,
+      // The live rate, so the earnings page can state the current split. The
+      // figures it heads are per-sale snapshots and do NOT move when this
+      // changes — which is why the two can disagree after a rate change without
+      // either being wrong.
+      revenueShare: INSTRUCTOR_SHARE_BPS / 10000,
       lifetime,
       last30,
       previous30,

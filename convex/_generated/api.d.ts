@@ -38,6 +38,7 @@ import type * as payments from "../payments.js";
 import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
 import type * as rateLimit from "../rateLimit.js";
+import type * as referrals from "../referrals.js";
 import type * as statistics from "../statistics.js";
 import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   instructorApplications: typeof instructorApplications;
   instructorStats: typeof instructorStats;
   payments: typeof payments;
+  referrals: typeof referrals;
   paystack: typeof paystack;
   quizzes: typeof quizzes;
   rateLimit: typeof rateLimit;

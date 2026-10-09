@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { settleSale } from "./settlement";
 import {
   formatNaira,
   INSTRUCTOR_REVENUE_SHARE,
@@ -28,6 +29,9 @@ describe("platform fee and earnings", () => {
     // The whole reason the fee is rounded once, in one place: a dashboard whose
     // fee column and earnings column do not sum to the headline is the classic
     // "which number is right?" bug.
+    //
+    // Also holds for snapshotted sales — see the settlement tests below, which
+    // cover per-sale rounding explicitly.
     for (const gross of [1, 7, 99, 100, 333, 4_999, 123_457, 100_000_000]) {
       expect(platformFeeKobo(gross) + netEarningsKobo(gross)).toBe(gross);
     }
@@ -47,6 +51,106 @@ describe("platform fee and earnings", () => {
       1 - INSTRUCTOR_REVENUE_SHARE,
       10,
     );
+  });
+
+  test("the legacy share agrees with the settlement snapshot", () => {
+    // `INSTRUCTOR_REVENUE_SHARE` is now only a fallback for rows settled before
+    // the snapshot existed. If the two ever disagreed, a course's earnings would
+    // depend on which code path rendered it.
+    for (const amount of [1, 999, 4_999, 500_000]) {
+      expect(netEarningsKobo(amount)).toBe(
+        settleSale({ listAmount: amount, discountAmount: 0 }).instructorShareKobo,
+      );
+    }
+  });
+});
+
+describe("settlement snapshots", () => {
+  const NOW_MS = Date.UTC(2026, 9, 9);
+
+  /** A sale carrying the stored split, as a settled purchase row does. */
+  function snapshotted(
+    listAmount: number,
+    daysAgo: number,
+    shareKobo: number,
+    refunded = false,
+  ): EarningsSale {
+    return {
+      amount: listAmount,
+      refunded,
+      paidAt: NOW_MS - daysAgo * 86_400_000,
+      instructorShareKobo: shareKobo,
+    };
+  }
+
+  test("sums the stored shares rather than re-deriving them", () => {
+    const totals = summarizeEarnings([
+      snapshotted(500_000, 2, 400_000),
+      snapshotted(500_000, 1, 400_000),
+    ]);
+
+    expect(totals.grossKobo).toBe(1_000_000);
+    expect(totals.netEarningsKobo).toBe(800_000);
+    expect(totals.platformFeeKobo).toBe(200_000);
+  });
+
+  // The reason the snapshot exists. Under the old read-time derivation these
+  // numbers moved the moment the share constant changed.
+  test("history does not move when the share rate changes", () => {
+    const sales = [snapshotted(333, 1, 266), snapshotted(667, 1, 534)];
+
+    const totals = summarizeEarnings(sales);
+    expect(totals.netEarningsKobo).toBe(800);
+    expect(totals.platformFeeKobo).toBe(200);
+
+    // Nothing here depends on a rate, so there is no rate to change. The
+    // equivalent derived figure would be netEarningsKobo(1000) === 800 too,
+    // but only because this particular total divides evenly.
+    expect(totals.platformFeeKobo + totals.netEarningsKobo).toBe(totals.grossKobo);
+  });
+
+  test("per-sale snapshots reconcile with the gross total", () => {
+    const amounts = [1, 3, 7, 999, 1001, 33333];
+    const sales = amounts.map((amount, i) =>
+      snapshotted(amount, i + 1, settleSale({ listAmount: amount, discountAmount: 0 }).instructorShareKobo),
+    );
+
+    const totals = summarizeEarnings(sales);
+    expect(totals.platformFeeKobo + totals.netEarningsKobo).toBe(totals.grossKobo);
+  });
+
+  // A referral discount is funded by the platform: the sale's `amount` is the
+  // pre-discount list price, so the instructor still earns their full share.
+  test("a discounted sale does not reduce the instructor's earnings", () => {
+    const listAmount = 500_000;
+    const settlement = settleSale({ listAmount, discountAmount: 100_000 });
+
+    const totals = summarizeEarnings([
+      snapshotted(listAmount, 1, settlement.instructorShareKobo),
+    ]);
+
+    expect(totals.netEarningsKobo).toBe(400_000);
+    expect(totals.platformFeeKobo).toBe(100_000);
+  });
+
+  test("falls back to the derived split for legacy rows with no snapshot", () => {
+    const totals = summarizeEarnings([sale(500_000, 1)]);
+
+    expect(totals.netEarningsKobo).toBe(400_000);
+    expect(totals.platformFeeKobo).toBe(100_000);
+  });
+
+  test("a refunded snapshot is reported and excluded from income", () => {
+    const totals = summarizeEarnings([
+      snapshotted(500_000, 2, 400_000),
+      snapshotted(500_000, 1, 400_000, true),
+    ]);
+
+    expect(totals.sales).toBe(1);
+    expect(totals.refunds).toBe(1);
+    expect(totals.grossKobo).toBe(500_000);
+    expect(totals.refundedKobo).toBe(500_000);
+    expect(totals.netEarningsKobo).toBe(400_000);
   });
 });
 

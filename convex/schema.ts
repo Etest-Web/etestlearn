@@ -17,8 +17,14 @@ export default defineSchema({
     // resolves identity through the shared helper refuses them platform-wide
     // without any data being deleted — unsuspending restores everything.
     suspendedAt: v.optional(v.number()),
+    // Permanent share code, generated lazily by `referrals.ensureMyCode` rather
+    // than by the Clerk webhook: a code is only needed when someone opens the
+    // referral page, so new and existing accounts share one generation path and
+    // no backfill migration is needed. Indexed for code lookup at checkout.
+    referralCode: v.optional(v.string()),
     createdAt: v.number(),
-  }).index("by_clerk_id", ["clerkId"]),
+  }).index("by_clerk_id", ["clerkId"])
+    .index("by_referral_code", ["referralCode"]),
 
   courses: defineTable({
     title: v.string(),
@@ -290,6 +296,31 @@ export default defineSchema({
     // never silently removes someone's course.
     refundedAt: v.optional(v.number()),
     refundReason: v.optional(v.string()),
+    // ── Settlement snapshot ───────────────────────────────────────────────────
+    // The rule these four fields exist to enforce: `amount` is ALWAYS the number
+    // sent to Paystack and charged to the buyer. `listAmount` is what the course
+    // cost before any referral discount, and is the basis for the instructor
+    // split. Readers that must not re-derive money — `verifyAndCompletePurchase`
+    // compares `json.data.amount >= purchase.amount` — depend on that invariant
+    // holding, so nothing may repurpose `amount` as "list price".
+    //
+    // The split is written once by `internal.payments.markPurchasePaid` and read
+    // thereafter. It was previously recomputed at read time from a constant,
+    // which meant changing `INSTRUCTOR_REVENUE_SHARE` silently rewrote figures
+    // instructors had already seen. See `lib/settlement.ts`.
+    //
+    // All optional because purchases settled before this change have no
+    // snapshot; they fall back to `legacyShareKobo` in the query layer. New rows
+    // always carry them.
+    listAmount: v.optional(v.number()), // kobo, price before referral discount
+    discountAmount: v.optional(v.number()), // kobo, referral discount applied
+    instructorShareKobo: v.optional(v.number()), // snapshotted at settlement
+    platformFeeKobo: v.optional(v.number()), // snapshotted at settlement
+    // The referral grant consumed by this purchase, if any. Recorded so a grant
+    // is spent at most once — `referralGrants` is re-read inside the settlement
+    // mutation, and Convex serializes mutations, so this is atomic.
+    grantId: v.optional(v.id("referralGrants")),
+    grantAppliedKobo: v.optional(v.number()),
   }).index("by_reference", ["paystackReference"])
     .index("by_user", ["userId"])
     .index("by_user_course", ["userId", "courseId"])
@@ -297,6 +328,91 @@ export default defineSchema({
     // Serves the unpublish gate: "does this course already have a buyer?" is a
     // single range read that stops at the first paid row.
     .index("by_course_status", ["courseId", "status"]),
+
+  // ── Referrals ───────────────────────────────────────────────────────────────
+  //
+  // `referrals` records who invited whom, and converts when the invitee buys.
+  // `referralGrants` is what the referrer earns — deliberately NOT a balance.
+
+  /**
+   * One row per person who arrived with a referral code, created on their first
+   * purchase attempt and converted when that purchase settles.
+   *
+   * `by_referred_user` is what makes a referral single-use: it lets
+   * `referrals.bindReferral` ask "was this person already referred?" in one
+   * range read, so nobody can re-enter through a second code. Self-referral is
+   * refused separately, since a code belongs to exactly one account.
+   */
+  referrals: defineTable({
+    referrerId: v.id("users"),
+    referredUserId: v.id("users"),
+    // Snapshot of the code used, so the attribution survives the referrer's
+    // code being regenerated or the referring account being deleted.
+    code: v.string(),
+    status: v.union(v.literal("pending"), v.literal("converted")),
+    rewardKobo: v.optional(v.number()),
+    convertedPurchaseId: v.optional(v.id("purchases")),
+    convertedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_referrer", ["referrerId"])
+    .index("by_referrer_status", ["referrerId", "status"])
+    .index("by_referred_user", ["referredUserId"]),
+
+  /**
+   * A credit earned by a referrer, redeemable against one future purchase.
+   *
+   * Deliberately a row per grant rather than a mutable balance on `users`:
+   * a balance has to be kept equal to the sum of its entries across refunds,
+   * adjustments and races, and when the two disagree there is no principled way
+   * to decide which is right. Immutable grants make the total a sum of rows, so
+   * drift is not representable.
+   *
+   * Also deliberately non-withdrawable — it can only ever reduce the price of a
+   * course, never be paid out. That caps what fraud is worth at one capped
+   * discount, which is the whole reason a wallet was not built. See
+   * `lib/referrals.ts`.
+   *
+   * Consumption is oldest-first (`awardedAt`) so an expiring grant is spent
+   * before one with more life left in it.
+   */
+  referralGrants: defineTable({
+    userId: v.id("users"),
+    referralId: v.id("referrals"),
+    source: v.literal("referral"),
+    originalKobo: v.number(),
+    remainingKobo: v.number(),
+    status: v.union(v.literal("available"), v.literal("consumed"), v.literal("expired")),
+    awardedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    consumedByPurchaseId: v.optional(v.id("purchases")),
+    consumedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  /**
+   * Singleton row of referral program settings, so an admin can retune rates
+   * without a deploy.
+   *
+   * A row is created lazily by `referrals.updateSettings` on first save; readers
+   * fall back to `DEFAULT_SETTINGS` when the table is empty, so the program is
+   * functional on a fresh deployment without a migration step.
+   *
+   * `enabled` exists because the rates are easy to get wrong in a way that costs
+   * real money, and a switch that turns the program off without deleting grants
+   * is the fastest way to stop the bleeding.
+   */
+  referralSettings: defineTable({
+    enabled: v.boolean(),
+    inviteeDiscountBps: v.number(),
+    maxInviteeDiscountKobo: v.number(),
+    referrerGrantBps: v.number(),
+    maxReferrerGrantKobo: v.number(),
+    grantExpiryDays: v.optional(v.number()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+  }).index("by_updatedAt", ["updatedAt"]),
 
   discussionThreads: defineTable({
     courseId: v.id("courses"),
@@ -480,6 +596,11 @@ export default defineSchema({
       v.literal("course_reminder"),
       v.literal("direct_message"),
       v.literal("instructor_application_reviewed"),
+      // Written by `internal.payments.markPurchasePaid` when a referral
+      // converts. A referrer whose invitee bought a course has earned a credit
+      // they would otherwise have no way of knowing about.
+      v.literal("referral_converted"),
+      v.literal("referral_reward"),
     ),
     title: v.string(),
     body: v.optional(v.string()),

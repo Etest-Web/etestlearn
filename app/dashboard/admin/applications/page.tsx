@@ -14,6 +14,8 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,11 +29,18 @@ import {
   Briefcase,
   ExternalLink,
   Loader2,
-  ShieldAlert,
 } from "lucide-react";
 
-export default function AdminApplicationsPage() {
-  const dbUser = useQuery(api.users.getCurrentUser);
+/**
+ * The queue body, mounted *inside* the guard.
+ *
+ * This used to live in the page component, which called
+ * `listApplications` at the top and only then checked `dbUser.role`. That is
+ * not just duplication of the guard — a signed-in non-admin who opened this URL
+ * fired a query that throws "Not authorized" server-side, every time. Splitting
+ * the body out means the query never runs for someone who cannot see the result.
+ */
+function ApplicationsBody() {
   const [statusFilter, setStatusFilter] = useState<
     "pending" | "approved" | "rejected" | undefined
   >("pending");
@@ -45,34 +54,6 @@ export default function AdminApplicationsPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Loading
-  if (dbUser === undefined) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-9 w-64" />
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 w-full" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Not admin
-  if (!dbUser || dbUser.role !== "admin") {
-    return (
-      <div className="mx-auto w-full max-w-md">
-        <EmptyState
-          icon={ShieldAlert}
-          title="Admin only"
-          description="This page is restricted to administrators. You do not have permission to review instructor applications."
-          tone="warning"
-        />
-      </div>
-    );
-  }
 
   const handleReview = async (
     applicationId: string,
@@ -132,12 +113,7 @@ export default function AdminApplicationsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
-        title="Instructor Applications"
-        description="Review and manage instructor applications."
-      />
-
+    <>
       {/* Filter strip — wraps so all four stay reachable on a narrow phone, and
           reads as one control so the active filter is unambiguous. */}
       <div
@@ -333,6 +309,20 @@ export default function AdminApplicationsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
+  );
+}
+
+export default function AdminApplicationsPage() {
+  return (
+    <AdminGuard>
+      <PageShell>
+        <PageHeader
+          title="Instructor applications"
+          description="Review and manage instructor applications. Approving promotes the applicant to instructor and notifies them."
+        />
+        <ApplicationsBody />
+      </PageShell>
+    </AdminGuard>
   );
 }

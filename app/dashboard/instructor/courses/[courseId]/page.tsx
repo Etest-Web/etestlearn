@@ -12,6 +12,7 @@ import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { Badge } from "@/components/ui";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
@@ -309,7 +310,7 @@ export default function CourseEditPage() {
           title="Course not found"
           description="This course does not exist, or it is not one of yours to edit."
           action={
-            <Button onClick={() => router.push("/dashboard/instructor")}>Back to Courses</Button>
+            <Button onClick={() => router.push("/dashboard/instructor/courses")}>Back to Courses</Button>
           }
         />
       </div>
@@ -317,7 +318,7 @@ export default function CourseEditPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full pb-20">
+    <PageShell className="gap-6 pb-20">
       {/* Back sits above the header rather than inside its action slot, so it
           keeps its place at the leading edge of the page. */}
       <Button
@@ -325,13 +326,16 @@ export default function CourseEditPage() {
         size="icon"
         aria-label="Back to my courses"
         className="-ml-2 self-start"
-        onClick={() => router.push("/dashboard/instructor")}
+        onClick={() => router.push("/dashboard/instructor/courses")}
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
+      {/* The course title is the description, so the heading stays a stable
+          "Edit course" rather than repeating it in display type. Sentence case
+          to match the rest of the console. */}
       <PageHeader
-        title="Edit Course"
+        title="Edit course"
         description={courseData.course.title}
         actions={
           <div className="flex items-center gap-2">
@@ -683,7 +687,7 @@ export default function CourseEditPage() {
           <CertificatesPanel courseId={courseData.course._id as Id<"courses">} />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }
 

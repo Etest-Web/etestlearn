@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  EmptyState,
   Input,
   Select,
   SelectContent,
@@ -29,7 +31,7 @@ import {
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
-import { Ban, Eye, Search, ShieldCheck } from "lucide-react";
+import { Ban, Eye, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 
 type Role = "student" | "instructor" | "admin";
@@ -277,8 +279,17 @@ function UsersBody() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                      No users match “{search}”.
+                    <td colSpan={6} className="p-0">
+                      <EmptyState
+                        icon={Users}
+                        className="border-y-0"
+                        title="No users match"
+                        description={
+                          search
+                            ? `Nothing matches “${search}”. Try a different name, email or role.`
+                            : "No users on the platform yet."
+                        }
+                      />
                     </td>
                   </tr>
                 )}
@@ -411,7 +422,7 @@ function UsersBody() {
 export default function AdminUsersPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Users"
           description={
@@ -422,7 +433,7 @@ export default function AdminUsersPage() {
           }
         />
         <UsersBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

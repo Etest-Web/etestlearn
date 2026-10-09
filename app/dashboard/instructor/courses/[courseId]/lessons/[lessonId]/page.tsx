@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
@@ -229,7 +230,7 @@ export default function LessonEditPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full pb-20">
+    <PageShell className="gap-6 pb-20">
       {/* Back sits above the header rather than inside its action slot, so it
           keeps its place at the leading edge of the page. */}
       <Button
@@ -243,7 +244,8 @@ export default function LessonEditPage() {
       </Button>
 
       <PageHeader
-        title="Edit Lesson"
+        title="Edit lesson"
+        description="Content, quiz and ordering for this lesson."
         actions={
           <AlertDialog>
             <AlertDialogTrigger render={
@@ -495,7 +497,7 @@ export default function LessonEditPage() {
           </CardFooter>
         </Card>
       </form>
-    </div>
+    </PageShell>
   );
 }
 

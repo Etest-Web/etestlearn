@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button, Card, Input, Label } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 function CategoriesBody() {
@@ -130,8 +131,13 @@ function CategoriesBody() {
             </li>
           ))}
           {categories.length === 0 && (
-            <li className="p-8 text-center text-sm text-muted-foreground">
-              No categories yet — add the first one.
+            <li>
+              <EmptyState
+                icon={Tags}
+                tone="brand"
+                title="No categories yet"
+                description="Categories group the public catalog and are what learners filter by. Add the first one above."
+              />
             </li>
           )}
         </ul>
@@ -143,13 +149,13 @@ function CategoriesBody() {
 export default function AdminCategoriesPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-4xl space-y-8">
+      <PageShell width="narrow">
         <PageHeader
           title="Categories"
           description="The curated taxonomy for courses — renames and deletions are audited."
         />
         <CategoriesBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

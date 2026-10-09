@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Badge,
@@ -13,6 +14,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
   Input,
   Select,
   SelectContent,
@@ -21,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Undo2 } from "lucide-react";
+import { Receipt, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 type StatusFilter = "all" | "pending" | "paid" | "failed";
@@ -145,8 +147,13 @@ function PaymentsBody() {
               ))}
               {purchases.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                    No purchases in this view yet.
+                  <td colSpan={6} className="p-0">
+                    <EmptyState
+                      icon={Receipt}
+                      className="border-y-0"
+                      title="No purchases in this view"
+                      description="Paystack checkouts appear here as the webhook confirms them. Pending checkouts are not shown until payment settles."
+                    />
                   </td>
                 </tr>
               )}
@@ -161,13 +168,13 @@ function PaymentsBody() {
 export default function AdminPaymentsPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Payments"
           description="Every Paystack purchase across the platform, with refund tracking."
         />
         <PaymentsBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

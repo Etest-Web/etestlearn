@@ -7,6 +7,13 @@ import { api } from "@/convex/_generated/api";
 import { ArrowRight, MoreVertical, UserPlus, Play, Sparkles, Target, Trophy, Clock, Flame, BookOpen, Award, TrendingUp } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area } from "recharts";
 import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import {
+  landingForMode,
+  roleCanUseMode,
+  type DashboardMode,
+} from "@/components/dashboard-nav";
+import { readDashboardMode } from "@/lib/dashboard-mode";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/dashboard-shell";
 import { Megaphone, X } from "lucide-react";
 
 /**
@@ -55,9 +63,59 @@ function AnnouncementBanner() {
   );
 }
 
+/**
+ * Where `/dashboard` should actually go.
+ *
+ * Staff are learners too — `convex/enrollments.ts` deliberately exempts
+ * instructors and admins from the paid-course purchase check — so the student
+ * dashboard is not removed for them, it is just not where they *start*. The
+ * `glypha_mode` cookie records which console they last chose, and this gate
+ * honours it.
+ *
+ * Two decisions worth stating, because both could reasonably go the other way:
+ *
+ * · **The cookie is a preference, never a permission.** `roleCanUseMode` is
+ *   re-checked here against the live role, so an account demoted from admin
+ *   while holding `glypha_mode=admin` lands on their dashboard instead of being
+ *   bounced into a console that would only render "Access Denied". The check has
+ *   to happen here, client-side: a server component reading `cookies()` cannot
+ *   see the role, so it would have to trust the cookie blindly and reintroduce
+ *   exactly that loop.
+ * · **`replace`, not `push`.** The dashboard the user did not want should not
+ *   become a back-button trap.
+ *
+ * Staff are *not* stranded here: the sidebar's mode switch sets this cookie and
+ * "Learning" writes `student`, so coming back is one click and it sticks.
+ */
+function useDashboardModeGate(): { ready: boolean } {
+  const dbUser = useQuery(api.users.getCurrentUser);
+  const router = useRouter();
+
+  // Null until the cookie has been read. `document.cookie` is unavailable
+  // during SSR, so this has to be an effect — the wait is invisible because the
+  // page renders its skeleton for the same beat that `dbUser` is resolving.
+  const [mode, setMode] = useState<DashboardMode | null | undefined>(undefined);
+
+  useEffect(() => {
+    setMode(readDashboardMode());
+  }, []);
+
+  useEffect(() => {
+    // `undefined` = cookie not read yet, `null` = read and absent or unparseable.
+    // Both mean "no preference", but only the second is safe to act on: the
+    // first still needs the role, which may not have landed either.
+    if (mode === undefined || mode === null || !dbUser) return;
+    if (!roleCanUseMode(dbUser.role, mode)) return;
+    router.replace(landingForMode(mode));
+  }, [mode, dbUser, router]);
+
+  return { ready: mode !== undefined && !!dbUser };
+}
+
 export default function DashboardPage() {
   const { user } = useUser();
   const dbUser = useQuery(api.users.getCurrentUser);
+  const { ready } = useDashboardModeGate();
   const enrollments = useQuery(api.enrollments.getUserEnrollments);
   const courses = useQuery(api.courses.listPublishedCourses);
   const statistics = useQuery(
@@ -73,11 +131,21 @@ export default function DashboardPage() {
     dbUser ? { activeOnly: true } : "skip",
   );
 
-  // Loading state
-  if (!dbUser || enrollments === undefined || courses === undefined || statistics === undefined) {
+  // Loading state. `!ready` covers the mode cookie as well as the queries —
+  // rendering the dashboard first and redirecting a frame later would flash the
+  // exact page the gate exists to skip.
+  if (
+    !ready ||
+    !dbUser ||
+    enrollments === undefined ||
+    courses === undefined ||
+    statistics === undefined
+  ) {
     return (
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-8">
+      // The same wrapper the settled page uses — same width, same two columns —
+      // so nothing shifts sideways or vertically when the data lands.
+      <PageShell className="gap-8 xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start" aria-busy>
+        <div className="flex flex-col gap-8">
           <Skeleton className="h-[240px] w-full rounded-sm" />
           <Skeleton className="h-20 w-full rounded-sm" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -86,10 +154,12 @@ export default function DashboardPage() {
             <Skeleton className="h-48 rounded-sm" />
           </div >
         </div >
-        <div className="hidden xl:block">
-          <Skeleton className="h-full w-full rounded-sm" />
+        <div className="hidden xl:flex xl:flex-col xl:gap-8">
+          <Skeleton className="h-96 w-full rounded-sm" />
+          <Skeleton className="h-64 w-full rounded-sm" />
         </div >
-      </div >
+        <span className="sr-only">Loading your dashboard…</span>
+      </PageShell>
     );
   }
 
@@ -110,7 +180,10 @@ export default function DashboardPage() {
   const chartData = weeklyChart ?? [];
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+    // Two columns, so the measure is capped like every other dashboard page —
+    // uncapped, this ran to the viewport edge on a wide monitor while every
+    // sibling stopped at 6xl.
+    <PageShell className="gap-8 xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
       {/* LEFT COLUMN: Main Content */}
       <div className="flex min-w-0 flex-col gap-8">
         <AnnouncementBanner />
@@ -146,52 +219,76 @@ export default function DashboardPage() {
           </div >
         </div >
 
-        {/* Quick Stats Pills */}
-        <div className="flex flex-wrap gap-4">
-          {enrolledCourses.slice(0, 3).map((item, idx) => (
-            <div key={item.course._id} className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-sm border border-rule bg-card p-4">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0 flex-1">
-                <div className={`w-12 h-12 flex items-center justify-center rounded-sm ${progressColors[idx % 3]}`}>
-                  <Play className={iconColors[idx % 3]} size={20} fill="currentColor" />
+        {/* This section used to carry no heading at all, so the pills were
+            orphaned between the hero and "Continue Watching". It names itself. */}
+        <div>
+          <h2 className="rule-heading eyebrow mb-4">In progress</h2>
+          <div className="flex flex-wrap gap-4">
+            {enrolledCourses.slice(0, 3).map((item, idx) => (
+              <Link
+                key={item.course._id}
+                href={`/dashboard/courses/${item.course.slug}`}
+                aria-label={`Open ${item.course.title}`}
+                className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-sm border border-rule bg-card p-4 transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0 flex-1">
+                  <div className={`w-12 h-12 flex items-center justify-center rounded-sm ${progressColors[idx % 3]}`}>
+                    <Play className={iconColors[idx % 3]} size={20} fill="currentColor" aria-hidden />
+                  </div >
+                  <div className="flex flex-col min-w-0">
+                    <span className="tabular text-xs font-semibold text-muted-foreground">
+                      {Math.round(item.enrollment.progressPercent)}% watched
+                    </span >
+                    <span className="text-sm font-bold text-foreground truncate">
+                      {item.course.category || item.course.title}
+                    </span >
+                  </div >
                 </div >
-                <div className="flex flex-col">
-                  <span className="tabular text-xs font-semibold text-muted-foreground">
-                    {Math.round(item.enrollment.progressPercent)}% watched
-                  </span >
-                  <span className="text-sm font-bold text-foreground">
-                    {item.course.category || item.course.title}
-                  </span >
-                </div >
-              </div >
-              <button className="text-muted-foreground hover:text-foreground"><MoreVertical size={16} /></button>
-            </div >
-          ))}
+                {/* Was a bare <button> with no handler and no label — it did
+                    nothing. The whole card is the link now, so the affordance is
+                    the card itself and the arrow points where it goes. */}
+                <ArrowRight size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+              </Link>
+            ))}
+          </div>
           {enrolledCourses.length === 0 && (
             <EmptyState
               icon={Play}
               title="No courses started yet"
               description="Browse the catalog and enrol in a course to start making progress."
               action={<Button render={<Link href="/courses" />}>Browse the catalog</Button>}
-              className="w-full"
             />
           )}
         </div >
 
-        {/* Continue Watching Row */}
+        {/* Continue Watching. The cards carried `cursor-pointer` and a hover
+            scale but were plain <div>s — they looked clickable and were not.
+            Each is a real link to the course now. */}
         <div>
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="rule-heading eyebrow flex-1">Continue Watching</h2>
+            <Link
+              href="/dashboard/courses"
+              className="shrink-0 text-sm font-medium text-brand hover:underline"
+            >
+              See all
+            </Link>
           </div>
-          
+
           <div className="flex overflow-x-auto gap-4 pb-4 snap-x sm:gap-6">
             {enrolledCourses.length > 0 ? (
               enrolledCourses.map((item) => (
-                <div key={item.course._id} className="w-[72%] max-w-[280px] min-w-0 shrink-0 sm:w-[280px] snap-start flex flex-col rounded-sm border border-rule bg-card overflow-hidden group">
-                  <div className="h-36 bg-surface-sunken relative group cursor-pointer overflow-hidden">
-                    <img 
-                      src={item.course.thumbnailUrl || "/hero-backdrop.jpg"} 
-                      alt="" 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                <Link
+                  key={item.course._id}
+                  href={`/dashboard/courses/${item.course.slug}`}
+                  aria-label={`Continue ${item.course.title}`}
+                  className="w-[72%] max-w-[280px] min-w-0 shrink-0 sm:w-[280px] snap-start flex flex-col rounded-sm border border-rule bg-card overflow-hidden group transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <div className="h-36 bg-surface-sunken relative overflow-hidden">
+                    <img
+                      src={item.course.thumbnailUrl || "/hero-backdrop.jpg"}
+                      alt=""
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </div >
                   <div className="p-4 flex flex-col gap-2 relative">
@@ -204,16 +301,24 @@ export default function DashboardPage() {
                       {item.course.title}
                     </h3>
                     <div className="flex items-center gap-2 mt-2 pt-4 border-t border-rule">
-                      <div className="w-6 h-6 rounded-full bg-surface-sunken flex items-center justify-center text-[11px] font-bold">
+                      {/* Initials are derived from the instructor id, and the
+                          labels used to claim "Mentor" / "Verified" for
+                          whoever it happened to be — a verification claim the
+                          data does not support. Progress is the honest label. */}
+                      <div className="w-6 h-6 rounded-full bg-surface-sunken flex items-center justify-center text-[11px] font-bold" aria-hidden>
                         {item.course.instructorId.substring(0,2).toUpperCase()}
                       </div >
                       <div className="flex min-w-0 flex-col">
-                        <span className="text-xs font-bold text-foreground truncate">Mentor</span>
-                        <span className="text-[11px] text-muted-foreground">Verified</span>
+                        <span className="text-xs font-bold text-foreground truncate">
+                          {Math.round(item.enrollment.progressPercent)}% complete
+                        </span >
+                        <span className="text-[11px] text-muted-foreground">
+                          {item.enrollment.completedLessonIds?.length || 0} lessons done
+                        </span >
                       </div >
                     </div >
                   </div >
-                </div >
+                </Link >
               ))
             ) : (
                 <EmptyState
@@ -221,21 +326,40 @@ export default function DashboardPage() {
                   title="Nothing to continue yet"
                   description="You are not enrolled in any courses yet — enrol in one and your lessons appear here."
                   action={<Button render={<Link href="/courses" />}>Browse the catalog</Button>}
-                  className="w-full"
                 />
             )}
-          </div >
+          </div>
         </div >
 
-        {/* Your Lesson List */}
+
+        {/* Your Lessons. `rule-heading` is a flex row whose ::after absorbs the
+            remaining width with the rule, so `ml-auto` on a link inside it
+            collapses that rule and jams the label against the text. The link
+            lives beside the heading instead. */}
         <div>
-          <h2 className="rule-heading eyebrow mb-4">
-            Your Lessons
-            <Link href="/dashboard/courses" className="ml-auto text-brand hover:underline">See all</Link>
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="rule-heading eyebrow flex-1">Your Lessons</h2>
+            <Link
+              href="/dashboard/courses"
+              className="shrink-0 text-sm font-medium text-brand hover:underline"
+            >
+              See all
+            </Link>
+          </div>
 
           {/* The Card is the surface and nothing inside it draws a second border:
               the table head is a sunken well and the rows are divided by rules. */}
+          {/* The table had no empty branch, so a brand-new account saw a bordered Card
+            containing an empty table — a third, different treatment for a
+            condition the two sections above already handle. */}
+          {enrolledCourses.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="No lessons yet"
+              description="Enrol in a course and it appears here with your progress."
+              action={<Button render={<Link href="/dashboard/courses" />}>See all courses</Button>}
+            />
+          ) : (
           <Card className="gap-0 overflow-hidden p-0">
             <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] text-left border-collapse">
@@ -283,6 +407,7 @@ export default function DashboardPage() {
             </table >
             </div >
           </Card>
+          )}
         </div >
       </div >
 
@@ -290,12 +415,11 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         
         {/* Main Stat Card - Overall Progress */}
+        {/* A card header with no action does not need a trailing ghost button. The
+            one that was here had no handler, no label and did nothing. */}
         <Card>
-          <div className="w-full flex justify-between items-center mb-6">
+          <div className="w-full mb-6">
             <CardTitle>Your Progress</CardTitle>
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <MoreVertical size={16} />
-            </Button>
           </div >
           
           <div className="relative w-32 h-32 mx-auto mb-6">
@@ -314,7 +438,22 @@ export default function DashboardPage() {
               />
             </svg>
             <div className="absolute inset-0 m-auto w-24 h-24 rounded-full overflow-hidden bg-surface-sunken border-4 border-card">
-                <img src={user?.imageUrl || "https://i.pravatar.cc/100"} alt="User Avatar" className="w-full h-full object-cover" />
+                {/* The fallback was `https://i.pravatar.cc/100`, a third-party
+                    tracking pixel. Initials are honest, render offline, and do
+                    not leak a visit to an external host. */}
+                {user?.imageUrl ? (
+                  <img
+                    src={user.imageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="grid h-full w-full place-items-center text-xl font-semibold text-brand-ink">
+                    {(user?.firstName ?? dbUser?.name ?? "L")
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </span>
+                )}
             </div >
             <Badge className="tabular absolute -top-2 -right-2 px-2">
                {overallProgress}%
@@ -398,27 +537,22 @@ export default function DashboardPage() {
         </div >
 
         {/* Goals Section */}
+        {/* There is no goals management screen, so both buttons here did nothing.
+            The count is now a sentence and the remaining goals are listed
+            rather than hidden behind a control that goes nowhere. */}
         {(userGoals && userGoals.length > 0) && (
           <Card>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6">
               <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-brand" />
+                <Target className="w-5 h-5 text-brand" aria-hidden />
                 Your Goals
               </CardTitle>
-              <Button variant="ghost" size="sm" className="text-brand hover:bg-primary/10">
-                Manage
-              </Button>
             </div >
-            
+
             <div className="flex flex-col gap-4">
-              {userGoals.slice(0, 3).map((goal) => (
+              {userGoals.map((goal) => (
                 <GoalProgressCard key={goal._id} goal={goal} />
               ))}
-              {userGoals.length > 3 && (
-                <Button variant="ghost" size="sm" className="text-brand hover:bg-primary/10 justify-start">
-                  +{userGoals.length - 3} more goals
-                </Button>
-              )}
             </div >
           </Card>
         )}
@@ -469,7 +603,7 @@ export default function DashboardPage() {
           </div >
         </Card>
       </div >
-    </div >
+    </PageShell>
   );
 }
 

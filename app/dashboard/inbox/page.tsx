@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Award,
+  BadgeCheck,
   Bell,
   BookOpen,
   Check,
@@ -66,6 +67,7 @@ import type {
 } from "@/lib/inbox-api";
 import { buildNotificationPreview, formatUnreadBadge, groupNotificationsByDay } from "@/lib/inbox";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { PageShell } from "@/components/dashboard-shell";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -163,6 +165,13 @@ const NOTIFICATION_ICONS: Record<
     icon: MessageSquare,
     tint: "text-violet-500 bg-violet-500/10",
     verb: "New message",
+  },
+  instructor_application_reviewed: {
+    icon: BadgeCheck,
+    // Success rather than the neutral plate: this is the outcome an applicant
+    // has been waiting on, and it should not read like routine activity.
+    tint: "text-success bg-success/10",
+    verb: "Instructor application reviewed",
   },
 };
 
@@ -300,10 +309,10 @@ function InboxPage() {
         }.`;
 
   return (
-    // The house shell is `max-w-6xl`; this page widens to `max-w-7xl` because a
-    // two-pane mailbox needs the room — at 6xl the conversation pane collapses to
-    // roughly the width of a phone on a desktop screen.
-    <div className="flex flex-col gap-8 max-w-7xl w-full">
+    // The house shell is `max-w-6xl`; the `inbox` width is `max-w-7xl` because
+    // a two-pane mailbox needs the room — at 6xl the conversation pane collapses
+    // to roughly the width of a phone on a desktop screen.
+    <PageShell width="inbox">
       <PageHeader
         title="Inbox"
         description={<span className="tabular">{unreadSummary}</span>}
@@ -384,7 +393,7 @@ function InboxPage() {
         onOpenChange={setDialogOpen}
         onOpened={(threadId) => selectThread(threadId)}
       />
-    </div>
+    </PageShell>
   );
 }
 
@@ -1525,7 +1534,7 @@ export default function DashboardInboxPage() {
 
 function InboxSkeleton() {
   return (
-    <div className="flex flex-col gap-8 max-w-7xl w-full" aria-busy>
+    <PageShell width="inbox" aria-busy>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-9 w-40" />
         <Skeleton className="h-5 w-72" />
@@ -1567,6 +1576,6 @@ function InboxSkeleton() {
         </div>
       </div>
       <span className="sr-only">Loading your inbox…</span>
-    </div>
+    </PageShell>
   );
 }

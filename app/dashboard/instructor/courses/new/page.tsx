@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { slugify } from "@/lib/slug";
@@ -66,7 +67,7 @@ export default function CreateCoursePage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
+    <PageShell width="form" className="gap-6">
       {/* Back sits above the header rather than inside its action slot, so it
           keeps its place at the leading edge of the page. */}
       <Button
@@ -74,12 +75,19 @@ export default function CreateCoursePage() {
         size="icon"
         aria-label="Back to my courses"
         className="-ml-2 self-start"
-        onClick={() => router.push("/dashboard/instructor")}
+        onClick={() => router.push("/dashboard/instructor/courses")}
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
-      <PageHeader title="Create New Course" />
+      {/* Sentence case, and no eyebrow. The rest of the console says "My
+          courses", "Earnings", "Overview"; this one said "Create New Course",
+          which read as a different voice. "New course" is also the label of the
+          button that brought you here. */}
+      <PageHeader
+        title="New course"
+        description="Name it and save. Lessons, pricing and publishing come after."
+      />
 
       <Card>
         <form onSubmit={handleSubmit}>
@@ -148,7 +156,7 @@ export default function CreateCoursePage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => router.push("/dashboard/instructor")}>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => router.push("/dashboard/instructor/courses")}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -158,6 +166,6 @@ export default function CreateCoursePage() {
           </CardFooter>
         </form>
       </Card>
-    </div>
+    </PageShell>
   );
 }

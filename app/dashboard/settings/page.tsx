@@ -7,9 +7,11 @@ import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, ModeToggle } from "@/components/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/dashboard-shell";
 import { Loader2, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +71,21 @@ export default function SettingsPage() {
     }
   }, [currentUser, name]);
 
+  // This page had no loading state at all: while `getCurrentUser` was in flight
+  // it rendered the whole form with empty values and a disabled Save, which is
+  // indistinguishable from a genuinely blank profile — and `name` stayed ""
+  // until the effect above fired, so the field visibly popped.
+  if (currentUser === undefined) {
+    return (
+      <PageShell width="form" className="gap-6" aria-busy>
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-72 w-full rounded-2xl" />
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <span className="sr-only">Loading your settings…</span>
+      </PageShell>
+    );
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!currentUser) return;
@@ -116,8 +133,14 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto w-full space-y-6">
-      <PageHeader title="Settings" />
+    <PageShell width="form" className="gap-6">
+      {/* The sidebar tooltip promises "customize your dashboard and your
+          account" and puts the theme toggle beside this link, so the page
+          explains that rather than leaving a bare heading. */}
+      <PageHeader
+        title="Settings"
+        description="Your profile as it appears across Glypha Learn — in courses, discussions and on certificates."
+      />
 
       <Card>
         <CardHeader>
@@ -198,6 +221,22 @@ export default function SettingsPage() {
           </CardFooter>
         </form>
       </Card>
-    </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>
+            The sidebar toggle below switches between light, dark and your
+            system&apos;s setting, and applies immediately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-foreground">Theme</p>
+            <ModeToggle />
+          </div>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Badge,
@@ -13,6 +14,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
   Input,
   Label,
   Textarea,
@@ -154,8 +156,13 @@ function AnnouncementsBody() {
               </li>
             ))}
             {announcements.length === 0 && (
-              <li className="p-8 text-center text-sm text-muted-foreground">
-                Nothing published yet.
+              <li>
+                <EmptyState
+                  icon={Megaphone}
+                  tone="brand"
+                  title="Nothing published yet"
+                  description="An announcement appears as a dismissible banner on every learner dashboard. Write one above to broadcast it."
+                />
               </li>
             )}
           </ul>
@@ -168,13 +175,13 @@ function AnnouncementsBody() {
 export default function AdminAnnouncementsPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-5xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Announcements"
           description="Platform-wide notices rendered on every learner's dashboard."
         />
         <AnnouncementsBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

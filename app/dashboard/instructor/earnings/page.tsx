@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   EarningsChart,
@@ -42,7 +43,7 @@ const RANGES = [
 
 function EarningsSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
@@ -50,7 +51,7 @@ function EarningsSkeleton() {
       </div>
       <Skeleton className="h-80" />
       <Skeleton className="h-64" />
-    </div>
+    </PageShell>
   );
 }
 
@@ -98,9 +99,8 @@ export default function InstructorEarningsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <PageHeader
-        eyebrow="Instructor"
         title="Earnings"
         description={
           <>
@@ -444,6 +444,6 @@ export default function InstructorEarningsPage() {
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
-    </div>
+    </PageShell>
   );
 }

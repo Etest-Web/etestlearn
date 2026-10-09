@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
-import { Badge, Card, Input } from "@/components/ui";
+import { Badge, Card, EmptyState, Input } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollText } from "lucide-react";
 
@@ -87,9 +88,24 @@ function AuditBody() {
             ))}
             {logs.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                  <ScrollText className="mx-auto mb-2 h-6 w-6 opacity-40" />
-                  No audit entries{action.trim() ? ` for “${action.trim()}”` : " yet"}.
+                {/* `EmptyState` carries its own rules above and below; inside a
+                    `td` they would draw across the whole row, so the border is
+                    dropped here and the cell keeps the table's padding. */}
+                <td colSpan={5} className="p-0">
+                  <EmptyState
+                    icon={ScrollText}
+                    className="border-y-0"
+                    title={
+                      action.trim()
+                        ? "No matching entries"
+                        : "No audit entries yet"
+                    }
+                    description={
+                      action.trim()
+                        ? `Nothing recorded for “${action.trim()}”.`
+                        : "Privileged actions — role changes, suspensions, refunds, moderation, publishing — are appended here as they happen."
+                    }
+                  />
                 </td>
               </tr>
             )}
@@ -103,13 +119,13 @@ function AuditBody() {
 export default function AdminAuditPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Audit Log"
           description="Append-only record of privileged actions: role changes, suspensions, refunds, moderation and publishing decisions."
         />
         <AuditBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

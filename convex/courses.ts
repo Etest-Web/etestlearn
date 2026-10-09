@@ -869,6 +869,36 @@ export const listUnpublishRequests = query({
 });
 
 /**
+ * How many unpublish requests are waiting on an admin.
+ *
+ * Exists so the dashboard sidebar can badge the queue on every admin page load
+ * without pulling `listUnpublishRequests` — which joins a course, a requester
+ * and a sales count per row, and is capped at 100. A badge needs a number, not
+ * a list, and it renders on the chrome that every admin route mounts.
+ *
+ * `collect()` rather than a cheaper read is honest here: Convex has no count
+ * aggregation, and a pending queue is a small set by construction — requests
+ * are cleared by the review that this badge is nudging toward. Do not "optimise"
+ * this to `.take(1)`, which would report 1 for every non-empty queue.
+ */
+export const countPendingUnpublishRequests = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+    if (user.role !== "admin") {
+      throw new Error("Not authorized — admin access required");
+    }
+
+    const rows = await ctx.db
+      .query("courseUnpublishRequests")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    return rows.length;
+  },
+});
+
+/**
  * Admin decision on an unpublish request. Approving is what actually takes the
  * course down — the instructor's request never touched `published`, so there is
  * no window where a sold course is silently off sale.

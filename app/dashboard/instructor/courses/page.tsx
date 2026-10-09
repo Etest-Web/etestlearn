@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedControl } from "@/components/instructor-console";
 import { formatNaira } from "@/lib/instructor-earnings";
@@ -80,9 +81,8 @@ export default function InstructorCoursesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <PageHeader
-        eyebrow="Instructor"
         title="My courses"
         description={
           courses
@@ -268,6 +268,6 @@ export default function InstructorCoursesPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

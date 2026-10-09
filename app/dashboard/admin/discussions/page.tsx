@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Button,
@@ -12,9 +13,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  EmptyState,
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Lock, LockOpen, Trash2 } from "lucide-react";
+import { Lock, LockOpen, MessagesSquare, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 function DiscussionsBody() {
@@ -64,9 +66,12 @@ function DiscussionsBody() {
   return (
     <div className="space-y-4">
       {threads.length === 0 && (
-        <Card className="rounded-2xl p-8 text-center text-sm text-muted-foreground">
-          No discussion threads exist yet.
-        </Card>
+        <EmptyState
+          icon={MessagesSquare}
+          tone="brand"
+          title="No discussion threads"
+          description="Threads appear here as learners post them inside a course. Deleting one removes it for everyone enrolled."
+        />
       )}
       {threads.map((thread) => (
         <Card key={thread._id} className="rounded-2xl p-0">
@@ -161,13 +166,13 @@ function DiscussionsBody() {
 export default function AdminDiscussionsPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-4xl space-y-8">
+      <PageShell width="narrow">
         <PageHeader
           title="Discussions"
           description="Lock pile-ons without erasing history, and remove individual messages or whole threads. Every moderation action is audited."
         />
         <DiscussionsBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

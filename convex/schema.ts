@@ -479,6 +479,7 @@ export default defineSchema({
       v.literal("course_purchased"),
       v.literal("course_reminder"),
       v.literal("direct_message"),
+      v.literal("instructor_application_reviewed"),
     ),
     title: v.string(),
     body: v.optional(v.string()),

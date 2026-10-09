@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Badge,
@@ -14,11 +15,19 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  EmptyState,
   Input,
   Textarea,
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Search, Star, Undo2, XCircle } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  Search,
+  Star,
+  Undo2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 function formatNaira(kobo: number) {
@@ -119,9 +128,12 @@ function CoursesBody() {
         </CardHeader>
         <CardContent className="p-0">
           {reviewRequests.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-muted-foreground">
-              No courses are waiting for review.
-            </p>
+            <EmptyState
+              icon={CheckCircle2}
+              tone="brand"
+              title="Nothing waiting for review"
+              description="An instructor publishing a course that learners have already paid for asks for sign-off first. Requests land here."
+            />
           ) : (
             <ul className="divide-y divide-rule">
               {reviewRequests.map((request) => (
@@ -266,8 +278,17 @@ function CoursesBody() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
-                      No courses match “{search}”.
+                    <td colSpan={7} className="p-0">
+                      <EmptyState
+                        icon={BookOpen}
+                        className="border-y-0"
+                        title="No courses match"
+                        description={
+                          search
+                            ? `Nothing matches “${search}” in this view.`
+                            : "No courses in this view yet."
+                        }
+                      />
                     </td>
                   </tr>
                 )}
@@ -287,13 +308,13 @@ function CoursesBody() {
 export default function AdminCoursesPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Courses"
           description="Moderate listings: review queue, bulk publish actions, and the featured catalog order."
         />
         <CoursesBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

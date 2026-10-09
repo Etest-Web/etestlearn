@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   EnrollmentFunnelChart,
@@ -53,7 +54,7 @@ const TABLE_HEADINGS = [
 
 function AnalyticsSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
@@ -64,7 +65,7 @@ function AnalyticsSkeleton() {
         <Skeleton className="h-64" />
         <Skeleton className="h-64" />
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -424,9 +425,8 @@ export default function InstructorAnalyticsPage() {
   const performance = useQuery(api.instructorStats.listInstructorCoursePerformance);
 
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <PageHeader
-        eyebrow="Instructor"
         title="Analytics"
         description="Enrollment, completion and quiz performance for every course you own, side by side."
         actions={
@@ -462,6 +462,6 @@ export default function InstructorAnalyticsPage() {
           <PerformanceTable />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

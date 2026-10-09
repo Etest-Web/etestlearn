@@ -19,39 +19,22 @@ import {
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
 import { CertificateTemplateEditor } from "@/components/certificate-template-editor";
 
-export default function AdminCertificatesPage() {
-  const currentUser = useQuery(api.users.getCurrentUser);
+/**
+ * The console body, mounted *inside* the guard. `listAllCertificates` is
+ * admin-only, and this component used to call it above its own role check.
+ */
+function CertificatesBody() {
   const certificates = useQuery(api.certificates.listAllCertificates);
   const revoke = useMutation(api.certificates.revokeCertificate);
   const reinstate = useMutation(api.certificates.reinstateCertificate);
 
   const [serial, setSerial] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-
-  if (currentUser === undefined || (certificates === undefined && currentUser?.role === "admin")) {
-    return (
-      <div className="max-w-5xl mx-auto w-full space-y-6">
-        <Skeleton className="h-9 w-56" />
-        <Skeleton className="h-72 w-full" />
-      </div>
-    );
-  }
-
-  if (currentUser?.role !== "admin") {
-    return (
-      <div className="mx-auto mt-16 w-full max-w-md">
-        <EmptyState
-          icon={Award}
-          title="Access denied"
-          description="This console is for administrators. Your account does not have access to it."
-          tone="warning"
-        />
-      </div>
-    );
-  }
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string) {
     setBusy(key);
@@ -65,7 +48,19 @@ export default function AdminCertificatesPage() {
     }
   }
 
-  const rows = certificates ?? [];
+  // Distinguish "still loading" from "genuinely none". `?? []` collapsed the two,
+  // so the first paint flashed "No certificates issued yet" before the list
+  // arrived — a confident wrong answer rather than a loading state.
+  if (certificates === undefined) {
+    return (
+      <>
+        <Skeleton className="h-72 w-full rounded-2xl" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
+      </>
+    );
+  }
+
+  const rows = certificates;
   const search = serial.trim().toLowerCase();
   const filtered = search
     ? rows.filter(
@@ -77,12 +72,7 @@ export default function AdminCertificatesPage() {
     : rows;
 
   return (
-    <div className="max-w-5xl mx-auto w-full space-y-8">
-      <PageHeader
-        title="Certificates"
-        description="Every certificate issued on the platform, plus the single background design they are stamped onto. Revoking keeps the audit record but makes the public verification page report it as withdrawn."
-      />
-
+    <>
       <CertificateTemplateEditor />
 
       <Card className="gap-0 p-0">
@@ -110,6 +100,7 @@ export default function AdminCertificatesPage() {
           {rows.length === 0 ? (
             <EmptyState
               icon={Award}
+              tone="brand"
               title="No certificates issued yet"
               description="Certificates appear here as learners complete a course that awards one."
               className="mt-5"
@@ -206,6 +197,20 @@ export default function AdminCertificatesPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
+  );
+}
+
+export default function AdminCertificatesPage() {
+  return (
+    <AdminGuard>
+      <PageShell>
+        <PageHeader
+          title="Certificates"
+          description="Every certificate issued on the platform, plus the single background design they are stamped onto. Revoking keeps the audit record but makes the public verification page report it as withdrawn."
+        />
+        <CertificatesBody />
+      </PageShell>
+    </AdminGuard>
   );
 }

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/dashboard-shell";
 
 export default function MyLessonsPage() {
   const { user } = useUser();
@@ -27,7 +28,7 @@ export default function MyLessonsPage() {
   // Loading state
   if (enrollments === undefined || courses === undefined) {
     return (
-      <div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
+      <PageShell>
         <Skeleton className="h-20 w-full max-w-[200px] rounded-sm" />
         <Skeleton className="h-12 w-full max-w-[300px] rounded-sm" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -35,7 +36,7 @@ export default function MyLessonsPage() {
           <Skeleton className="h-72 rounded-sm" />
           <Skeleton className="h-72 rounded-sm" />
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -56,8 +57,7 @@ export default function MyLessonsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-8 max-w-6xl w-full">
-
+    <PageShell>
       <PageHeader
         title="My Lessons"
         description={`You are enrolled in ${enrolledCourses.length} course${enrolledCourses.length === 1 ? "" : "s"}. Let's keep making progress, ${user?.firstName}!`}
@@ -92,8 +92,7 @@ export default function MyLessonsPage() {
           <CourseGrid items={completedCourses} emptyTitle="Nothing completed yet" emptyMessage="You haven't completed any lessons yet. Keep at it!" />
         </TabsContent>
       </Tabs>
-
-    </div>
+    </PageShell>
   );
 }
 

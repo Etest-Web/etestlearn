@@ -17,6 +17,7 @@ import { AssignmentsTab } from "./assignments-tab";
 import { GradingTab } from "./grading-tab";
 import { MyTasksTab } from "./my-tasks-tab";
 import { getGradingSummary } from "./api";
+import { PageShell } from "@/components/dashboard-shell";
 
 const TABS = ["assignments", "grading", "my-tasks"] as const;
 type TabValue = (typeof TABS)[number];
@@ -76,7 +77,7 @@ function TasksContent() {
   if (dbUser === undefined) return <TasksSkeleton />;
 
   return (
-    <div className="flex flex-col gap-8 max-w-6xl w-full">
+    <PageShell>
       <PageHeader
         title="Tasks"
         description="Coursework your instructors set, and the study plan you set for yourself."
@@ -121,12 +122,14 @@ function TasksContent() {
           <MyTasksTab />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }
 
 /** The count of ungraded submissions, announced politely as it changes. */
 function AwaitingGradeBadge() {
+  // Only subscribed when the tab that shows it is actually reachable, so a
+  // student is not paying for a grading query they can never see.
   const summary = useQuery(getGradingSummary, {});
   if (summary === undefined || summary.awaitingGrade === 0) return null;
   return (
@@ -141,7 +144,7 @@ function AwaitingGradeBadge() {
 
 function TasksSkeleton() {
   return (
-    <div className="flex flex-col gap-8 max-w-6xl w-full" aria-hidden>
+    <PageShell aria-hidden>
       <div className="flex flex-col gap-2">
         <Skeleton className="h-9 w-40" />
         <Skeleton className="h-5 w-72 max-w-full" />
@@ -155,7 +158,7 @@ function TasksSkeleton() {
         ))}
       </div>
       <Skeleton className="h-40 w-full" />
-    </div>
+    </PageShell>
   );
 }
 

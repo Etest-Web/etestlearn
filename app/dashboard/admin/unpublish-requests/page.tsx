@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -24,15 +26,19 @@ import {
   Clock,
   User,
   Loader2,
-  ShieldAlert,
   ExternalLink,
   EyeOff,
 } from "lucide-react";
 
 type Decision = "approved" | "rejected";
 
-export default function AdminUnpublishRequestsPage() {
-  const dbUser = useQuery(api.users.getCurrentUser);
+/**
+ * The queue body, mounted *inside* the guard — same reason as
+ * `admin/applications`: `listUnpublishRequests` is admin-only, and calling it
+ * above the role check meant a signed-in non-admin opening this URL fired a
+ * query that throws server-side.
+ */
+function UnpublishRequestsBody() {
   const [statusFilter, setStatusFilter] = useState<
     "pending" | "approved" | "rejected" | undefined
   >("pending");
@@ -44,32 +50,6 @@ export default function AdminUnpublishRequestsPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-
-  if (dbUser === undefined) {
-    return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-9 w-64" />
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 w-full" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (!dbUser || dbUser.role !== "admin") {
-    return (
-      <div className="mx-auto w-full max-w-md">
-        <EmptyState
-          icon={ShieldAlert}
-          title="Admin only"
-          description="This page is restricted to administrators. You do not have permission to review unpublish requests."
-          tone="warning"
-        />
-      </div>
-    );
-  }
 
   const handleReview = async (requestId: string, decision: Decision) => {
     setIsProcessing(true);
@@ -126,12 +106,7 @@ export default function AdminUnpublishRequestsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
-        title="Unpublish Requests"
-        description="Instructors cannot take a course that learners have already paid for off sale on their own. Approving a request here takes the course down; rejecting it leaves it selling."
-      />
-
+    <>
       <div
         className="flex w-max gap-0.5 overflow-x-auto rounded-md border border-rule bg-surface-sunken p-0.5"
         role="group"
@@ -324,6 +299,20 @@ export default function AdminUnpublishRequestsPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
+  );
+}
+
+export default function AdminUnpublishRequestsPage() {
+  return (
+    <AdminGuard>
+      <PageShell>
+        <PageHeader
+          title="Unpublish requests"
+          description="Instructors cannot take a course that learners have already paid for off sale on their own. Approving a request here takes the course down; rejecting it leaves it selling."
+        />
+        <UnpublishRequestsBody />
+      </PageShell>
+    </AdminGuard>
   );
 }

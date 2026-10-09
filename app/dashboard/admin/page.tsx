@@ -2,7 +2,8 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/admin-guard";
+import { AdminGuard } from "@/components/role-guard";
+import { PageShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -16,17 +17,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  Award,
-  BookOpen,
-  Download,
-  GraduationCap,
-  ShoppingBag,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { NAV_GROUPS } from "@/components/dashboard-nav";
 
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "";
@@ -51,15 +45,29 @@ function downloadCsv(name: string, rows: Record<string, unknown>[]) {
   URL.revokeObjectURL(url);
 }
 
-const QUICK_LINKS = [
-  { href: "/dashboard/admin/users", label: "Users", icon: Users },
-  { href: "/dashboard/admin/courses", label: "Courses & review queue", icon: BookOpen },
-  { href: "/dashboard/admin/payments", label: "Payments", icon: ShoppingBag },
-  { href: "/dashboard/admin/discussions", label: "Discussions", icon: TrendingUp },
-  { href: "/dashboard/admin/announcements", label: "Announcements", icon: GraduationCap },
-  { href: "/dashboard/admin/audit", label: "Audit log", icon: Award },
-];
+/**
+ * The overview's "Jump to" grid.
+ *
+ * Derived from `NAV_GROUPS` rather than a second hand-written list. It used to be
+ * an independent array of six routes, which is how `/dashboard/admin/applications`
+ * ended up reachable from neither the footer nor this grid — the only path to the
+ * instructor-application queue was an `<a>` inside a sentence on the Users page.
+ * One declaration now means a new admin route cannot be forgotten here.
+ */
+const QUICK_LINKS = NAV_GROUPS.find((g) => g.id === "admin")?.items.filter(
+  (item) => item.href !== "/dashboard/admin",
+) ?? [];
 
+/**
+ * The overview's stat card.
+ *
+ * Deliberately *not* the instructor console's `StatTile`, which is where these
+ * figures used to be duplicated from. The two were written independently and had
+ * drifted into different voices — this one shouted every label in uppercase
+ * tracking and used `rounded-2xl` shadows, the other set the label in the
+ * `eyebrow` face with a hairline border. Five identical cards side by side want
+ * the quieter treatment anyway.
+ */
 function StatCard({
   label,
   value,
@@ -70,12 +78,14 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <Card className="rounded-2xl p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    <Card className="flex flex-col gap-4 p-5">
+      <p className="eyebrow">{label}</p>
+      <div className="flex flex-col gap-1">
+        <p className="tabular text-[1.75rem] font-semibold leading-none tracking-[-0.02em] text-foreground">
+          {value}
+        </p>
+        {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+      </div>
     </Card>
   );
 }
@@ -226,13 +236,13 @@ function OverviewBody() {
 export default function AdminOverviewPage() {
   return (
     <AdminGuard>
-      <div className="mx-auto w-full max-w-6xl space-y-8">
+      <PageShell>
         <PageHeader
           title="Platform Overview"
           description="Live totals and 8-week trends across users, courses, enrollments and revenue."
         />
         <OverviewBody />
-      </div>
+      </PageShell>
     </AdminGuard>
   );
 }

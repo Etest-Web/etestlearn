@@ -725,3 +725,108 @@ describe("buyers are not punished by any of this", () => {
     ).rejects.toThrow(/Course not found/);
   });
 });
+describe("the unpublish queue badge", () => {
+  // The sidebar renders this number on every admin page, so it has to be
+  // cheap, admin-only, and honest about the difference between "nothing
+  // pending" (0) and "not loaded yet" (undefined) — the first shows no badge,
+  // the second shows the same thing, but only one of them is a real answer.
+
+  const queueRequest = (
+    t: TestConvex<typeof testSchema>,
+    courseId: Id<"courses">,
+    requestedBy: Id<"users">,
+  ) =>
+    t.run((ctx: TestCtx) =>
+      ctx.db.insert("courseUnpublishRequests", {
+        courseId,
+        requestedBy,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+
+  test("counts pending requests and ignores decided ones", async () => {
+    const t = convexTest(testSchema, modules);
+    const world: World = await seedWorld(t);
+
+    await queueRequest(t, world.paidCourseId, world.instructorId);
+    await queueRequest(t, world.paidCourseId, world.instructorId);
+
+    const second = await queueRequest(t, world.paidCourseId, world.instructorId);
+    await t.run(async (ctx: TestCtx) =>
+      ctx.db.patch(second, { status: "rejected", updatedAt: Date.now() }),
+    );
+
+    const count = await as(t, "clerk_admin").query(
+      api.courses.countPendingUnpublishRequests,
+      {},
+    );
+    expect(count).toBe(2);
+  });
+
+  test("is 0, not undefined, on an empty queue", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    const count = await as(t, "clerk_admin").query(
+      api.courses.countPendingUnpublishRequests,
+      {},
+    );
+    expect(count).toBe(0);
+  });
+
+  test("an approved request leaves the queue", async () => {
+    const t = convexTest(testSchema, modules);
+    const world: World = await seedWorld(t);
+    await seedPurchase(t, { userId: world.studentId, courseId: world.paidCourseId });
+
+    await as(t, "clerk_instructor").mutation(api.courses.requestUnpublish, {
+      courseId: world.paidCourseId,
+      reason: "Correcting an error",
+    });
+
+    const before = await as(t, "clerk_admin").query(
+      api.courses.countPendingUnpublishRequests,
+      {},
+    );
+    expect(before).toBe(1);
+
+    const [request] = await requests(t);
+    await as(t, "clerk_admin").mutation(api.courses.reviewUnpublishRequest, {
+      requestId: request._id,
+      decision: "approved",
+    });
+
+    const after = await as(t, "clerk_admin").query(
+      api.courses.countPendingUnpublishRequests,
+      {},
+    );
+    expect(after).toBe(0);
+  });
+
+  test("refuses a non-admin, so a student cannot poll the queue", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    await expect(
+      as(t, "clerk_student").query(api.courses.countPendingUnpublishRequests, {}),
+    ).rejects.toThrow(/admin access required/i);
+
+    await expect(
+      as(t, "clerk_instructor").query(
+        api.courses.countPendingUnpublishRequests,
+        {},
+      ),
+    ).rejects.toThrow(/admin access required/i);
+  });
+
+  test("refuses a signed-out caller", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    await expect(
+      t.query(api.courses.countPendingUnpublishRequests, {}),
+    ).rejects.toThrow(/Not authenticated/i);
+  });
+});

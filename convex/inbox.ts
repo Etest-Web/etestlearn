@@ -183,6 +183,10 @@ export const NOTIFICATION_TYPES = [
   "course_purchased",
   "course_reminder",
   "direct_message",
+  // Written by `instructorApplications.reviewApplication` — promotion is
+  // otherwise silent, so the applicant would only find out by noticing a
+  // console appeared.
+  "instructor_application_reviewed",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -201,6 +205,7 @@ export const notificationTypeValidator = v.union(
   v.literal("course_purchased"),
   v.literal("course_reminder"),
   v.literal("direct_message"),
+  v.literal("instructor_application_reviewed"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

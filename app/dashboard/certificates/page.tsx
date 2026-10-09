@@ -6,12 +6,14 @@ import Link from "next/link";
 import { Award } from "lucide-react";
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   EmptyState,
   PageHeader,
   Skeleton,
 } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
 
 export default function CertificatesPage() {
@@ -21,16 +23,16 @@ export default function CertificatesPage() {
 
   if (certificates === undefined) {
     return (
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+      <PageShell width="narrow" className="gap-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full rounded-sm" />
         <Skeleton className="h-40 w-full rounded-sm" />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <PageShell width="narrow" className="gap-6">
       <PageHeader
         title="Certificates"
         description={
@@ -43,8 +45,16 @@ export default function CertificatesPage() {
       {certificates.length === 0 ? (
         <EmptyState
           icon={Award}
+          tone="brand"
           title="No certificates yet"
           description="Finish every lesson and pass every quiz in a course to earn one automatically."
+          // Every other empty state in the dashboard offers the next step. This
+          // one used to be a dead end with no route onward.
+          action={
+            <Button variant="outline" render={<Link href="/dashboard/courses" />}>
+              Find a course to finish
+            </Button>
+          }
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
@@ -93,6 +103,6 @@ export default function CertificatesPage() {
           })}
         </ul>
       )}
-    </div>
+    </PageShell>
   );
 }

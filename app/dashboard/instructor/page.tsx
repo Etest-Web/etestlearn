@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { PageShell } from "@/components/dashboard-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActivityFeed,
@@ -52,7 +53,7 @@ const ATTENTION_ICON = {
 
 function OverviewSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <div className="grid gap-4 lg:grid-cols-3">
         <Skeleton className="h-32" />
         <Skeleton className="h-32" />
@@ -63,7 +64,7 @@ function OverviewSkeleton() {
         <Skeleton className="h-64" />
         <Skeleton className="h-64" />
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -471,9 +472,8 @@ export default function InstructorOverviewPage() {
   const freeCourses = earnings?.freeCourseCount ?? 0;
 
   return (
-    <div className="flex flex-col gap-8">
+    <PageShell>
       <PageHeader
-        eyebrow="Instructor"
         title="Overview"
         description="What you have earned, how your learners are doing, and what needs fixing today."
         actions={
@@ -552,6 +552,6 @@ export default function InstructorOverviewPage() {
         <RecentActivity />
         <CourseListPreview />
       </div>
-    </div>
+    </PageShell>
   );
 }

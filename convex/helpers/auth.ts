@@ -62,6 +62,26 @@ export function isStaff(user: UserDoc): boolean {
 }
 
 /**
+ * Throws unless the caller is an admin.
+ *
+ * Promoted here for the same reason `getCurrentUser` was: this existed as a
+ * private copy in at least two modules (`certificateTemplates.ts`,
+ * `categories.ts`), and they had already drifted — one threw "Not authorized",
+ * the other "Not authorized — admin access required". One definition means the
+ * message and the shape of the check are identical platform-wide.
+ *
+ * This is an identity check, not a capability check. Ownership rules still
+ * belong in the calling function (`canManageCourse`).
+ */
+export async function requireAdmin(ctx: AnyCtx): Promise<UserDoc> {
+  const user = await requireUser(ctx);
+  if (user.role !== "admin") {
+    throw new Error("Not authorized — admin access required");
+  }
+  return user;
+}
+
+/**
  * Owner-or-admin check for a course. Returns false when the course is missing
  * so callers must also handle a null course.
  */

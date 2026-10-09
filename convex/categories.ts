@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { requireUser, type AnyCtx } from "./helpers/auth";
 import { logAudit } from "./helpers/audit";
 
@@ -69,7 +70,7 @@ async function requireAdmin(ctx: AnyCtx) {
 }
 
 export const create = mutation({
-  args: { name: v.string() },
+  args: { name: v.string(), parentId: v.optional(v.id("categories")) },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
 
@@ -92,7 +93,7 @@ export const create = mutation({
 
     return await ctx.db.insert("categories", {
       name,
-      parentId: args.parentId || undefined,
+      parentId: args.parentId,
       slug: args.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
       sortOrder: Date.now(), // rough ordering; admin can re-sort later
       createdBy: admin._id,
@@ -249,13 +250,15 @@ export const seedDefaults = mutation({
       const slug = cat.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
       // If parentId is a string, it's a name lookup; resolve the id
-      let parent_id = cat.parentId;
-      if (parent_id && typeof parent_id === "string") {
+      let parent_id: Id<"categories"> | undefined = undefined;
+      if (cat.parentId && typeof cat.parentId === "string") {
         const parentRow = await ctx.db
           .query("categories")
-          .withIndex("by_name", (q) => q.eq("name", parent_id))
+          .withIndex("by_name", (q) => q.eq("name", cat.parentId))
           .first();
-        parent_id = parentRow ? parentRow._id : null;
+        if (parentRow) {
+          parent_id = parentRow._id;
+        }
       }
 
       await ctx.db.insert("categories", {

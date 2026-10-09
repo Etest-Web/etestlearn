@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { requireUser, type AnyCtx } from "./helpers/auth";
 import { logAudit } from "./helpers/audit";
 
@@ -44,7 +45,7 @@ export const create = mutation({
     return await ctx.db.insert("skills", {
       name,
       slug: args.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
-      categoryId: args.categoryId || undefined,
+      categoryId: undefined,
       sortOrder: Date.now(), // rough ordering; admin can re-sort later
       createdAt: Date.now(),
     });
@@ -91,30 +92,15 @@ export const remove = mutation({
     const row = await ctx.db.get(args.skillId);
     if (!row) throw new Error("Skill not found");
 
-    // Check if any course still uses this skill
-    const inUse = await ctx.db
-      .query("courses")
-      .filter((q) => {
-        // Manually check if skillIds array contains the skillId
-        const skillIds = q.field("skillIds");
-        // If skillIds is null/undefined, it doesn't contain the skill
-        // We need to check if it's an array and contains the skillId
-        // Since Convex doesn't have a direct "contains" for arrays in filter,
-        // we'll fetch and check in memory for now
-        return q.literal(true); // Temporarily accept all, will filter below
-      })
-      .first();
-    if (inUse) {
-      // Now check in memory if any course actually uses this skill
-      const courses = await ctx.db.query("courses").collect();
-      const actuallyInUse = courses.some(course => 
-        course.skillIds?.some(id => id.equals(args.skillId))
+    // Check if any course still uses this skill (in memory check)
+    const courses = await ctx.db.query("courses").collect();
+    const actuallyInUse = courses.some(course =>
+      course.skillIds?.some(id => id === args.skillId)
+    );
+    if (actuallyInUse) {
+      throw new Error(
+        "This skill is still used by courses — remove it from those courses first",
       );
-      if (actuallyInUse) {
-        throw new Error(
-          "This skill is still used by courses — remove it from those courses first",
-        );
-      }
     }
 
     await ctx.db.delete(args.skillId);

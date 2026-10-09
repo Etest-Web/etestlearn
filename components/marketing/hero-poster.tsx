@@ -7,13 +7,6 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import TextLoop from "@/components/TextLoop";
 import { cn } from "@/lib/utils";
-
-/* One button system for the whole page. The marketing sections used to each
-   hand-roll their CTA, which is how three different labels ended up pointing
-   at `/courses` and four pointing at `/become-instructor`. Intent is now a
-   single label wherever it appears: "Browse courses" to learn, "Apply to
-   teach" to teach. The navbar keeps its own longer labels, since nav wording
-   is a separate contract from page copy. */
 const CTA_BASE =
   "group inline-flex h-11 items-center justify-center gap-2 rounded-sm px-6 text-sm font-semibold transition-transform duration-200 ease-out active:translate-y-0 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 const CTA_PRIMARY = cn(CTA_BASE, "bg-brand text-brand-foreground hover:-translate-y-0.5 hover:bg-brand/90");
@@ -30,25 +23,6 @@ export function HeroPoster() {
 
   return (
     <section className="relative overflow-hidden border-b border-rule">
-      {/* The Glypha wave. This is the brand motif: the same wordmark repeats down
-          the side of every certificate, so it is the one piece of decoration
-          on this page that is doing real work rather than filling space.
-
-          Three things were wrong with how it was wired up before, and all
-          three are fixed here without touching the component:
-
-          · Colour was hardcoded to `#ffffff`, which is invisible on the
-            light page background. `currentColor` plus a `text-` class means it
-            follows the theme: light-mode brand, and the lightened brand that
-            `--brand` already steps up to in dark mode.
-          · `ribbon` painted a 86px band in `#3f3f3f`, a fixed dark grey that
-            read as a smear on a near-white page. Off now.
-          · Two instances were stacked to fill the hero height. One is enough,
-            and a second doubled the GSAP work for a texture nobody looks at
-            twice. `pauseOnHover` stays false so it never stalls mid-scroll.
-
-          `hidden sm:block` because the wave is a texture, not information:
-          on a phone it was competing with the headline for the same pixels. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 flex select-none items-center justify-center overflow-hidden opacity-100 blur-[2px] text-brand/25 dark:text-brand/30"
@@ -74,15 +48,10 @@ export function HeroPoster() {
 
       {/* A wash at a third of the strength the previous section used. Under
           the wave it only needs to stop the plane being a flat value. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+      {/* <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -left-48 -top-56 h-[38rem] w-[38rem] rounded-full bg-brand/6 blur-3xl" />
         <div className="absolute -bottom-64 -right-40 h-[30rem] w-[30rem] rounded-full bg-brand/5 blur-3xl" />
-      </div>
-
-      {/* No `min-h-dvh`. A full-height hero here left the certificate floating
-          in the bottom third with the headline stranded in the middle, and on a
-          short laptop it pushed the primary CTA below the fold. Height is now
-          whatever the content needs, with padding carrying the air. */}
+      </div> */}
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 md:py-24 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] lg:gap-16">
         {/* Three text elements: headline, subtext, actions. The eyebrow and the
             trust micro-strip that used to sit here are both gone. A label

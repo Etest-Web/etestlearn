@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -131,32 +132,40 @@ export function ModeSwitcher({ role }: { role: Role | null | undefined }) {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="start" className="min-w-52">
-                <DropdownMenuLabel className="eyebrow">
-                    Console
-                </DropdownMenuLabel>
-                {modes.map((mode) => {
-                    const isActive = mode === active;
-                    return (
-                        <DropdownMenuItem
-                            key={mode}
-                            onClick={() => choose(mode)}
-                            className="min-h-9 justify-between"
-                        >
-                            <span className="flex items-center gap-2.5">
-                                <ActiveIcon mode={mode} className="size-4 shrink-0" />
-                                {modeLabel(mode)}
-                            </span>
-                            {isActive ? (
-                                <Check className="size-4 shrink-0 text-brand" aria-hidden />
-                            ) : null}
-                        </DropdownMenuItem>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                <p className="px-2 py-1.5 text-[11px] leading-[1.5] text-muted-foreground">
-                    You can learn and teach at the same time. This only changes
-                    where you land.
-                </p>
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel className="eyebrow">
+                        Console
+                    </DropdownMenuLabel>
+                    {modes.map((mode) => {
+                        const isActive = mode === active;
+                        return (
+                            <DropdownMenuItem
+                                key={mode}
+                                onClick={() => choose(mode)}
+                                className="min-h-9 justify-between"
+                            >
+                                <span className="flex items-center gap-2.5">
+                                    <ActiveIcon
+                                        mode={mode}
+                                        className="size-4 shrink-0"
+                                    />
+                                    {modeLabel(mode)}
+                                </span>
+                                {isActive ? (
+                                    <Check
+                                        className="size-4 shrink-0 text-brand"
+                                        aria-hidden
+                                    />
+                                ) : null}
+                            </DropdownMenuItem>
+                        );
+                    })}
+                    <DropdownMenuSeparator />
+                    <p className="px-2 py-1.5 text-[11px] leading-[1.5] text-muted-foreground">
+                        You can learn and teach at the same time. This only
+                        changes where you land.
+                    </p>
+                </DropdownMenuGroup>
             </DropdownMenuContent>
         </DropdownMenu>
     );

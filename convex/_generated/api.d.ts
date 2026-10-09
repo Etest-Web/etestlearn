@@ -79,10 +79,10 @@ declare const fullApi: ApiFromModules<{
   instructorApplications: typeof instructorApplications;
   instructorStats: typeof instructorStats;
   payments: typeof payments;
-  referrals: typeof referrals;
   paystack: typeof paystack;
   quizzes: typeof quizzes;
   rateLimit: typeof rateLimit;
+  referrals: typeof referrals;
   statistics: typeof statistics;
   tasks: typeof tasks;
   users: typeof users;

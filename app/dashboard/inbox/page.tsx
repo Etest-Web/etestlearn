@@ -109,37 +109,37 @@ const NOTIFICATION_ICONS: Record<
   },
   course_completed: {
     icon: GraduationCap,
-    tint: "text-emerald-500 bg-emerald-500/10",
+    tint: "text-success bg-success/10",
     verb: "Course completed",
   },
   quiz_graded: {
     icon: ClipboardCheck,
-    tint: "text-blue-500 bg-blue-500/10",
+    tint: "text-info bg-info/10",
     verb: "Quiz graded",
   },
   streak_milestone: {
     icon: Flame,
-    tint: "text-orange-500 bg-orange-500/10",
+    tint: "text-warning bg-warning/10",
     verb: "Streak milestone",
   },
   discussion_reply: {
     icon: MessagesSquare,
-    tint: "text-sky-500 bg-sky-500/10",
+    tint: "text-info bg-info/10",
     verb: "Discussion reply",
   },
   task_assigned: {
     icon: ClipboardList,
-    tint: "text-amber-500 bg-amber-500/10",
+    tint: "text-warning bg-warning/10",
     verb: "Task assigned",
   },
   task_graded: {
     icon: CheckCircle2,
-    tint: "text-emerald-500 bg-emerald-500/10",
+    tint: "text-success bg-success/10",
     verb: "Task graded",
   },
   group_invite: {
     icon: Users,
-    tint: "text-indigo-500 bg-indigo-500/10",
+    tint: "text-info bg-info/10",
     verb: "Group invite",
   },
   friend_request: {
@@ -149,7 +149,7 @@ const NOTIFICATION_ICONS: Record<
   },
   friend_accepted: {
     icon: UserCheck,
-    tint: "text-emerald-500 bg-emerald-500/10",
+    tint: "text-success bg-success/10",
     verb: "Friend accepted",
   },
   course_purchased: {
@@ -159,12 +159,12 @@ const NOTIFICATION_ICONS: Record<
   },
   course_reminder: {
     icon: Clock,
-    tint: "text-amber-500 bg-amber-500/10",
+    tint: "text-warning bg-warning/10",
     verb: "Course reminder",
   },
   direct_message: {
     icon: MessageSquare,
-    tint: "text-violet-500 bg-violet-500/10",
+    tint: "text-brand-ink bg-brand/10",
     verb: "New message",
   },
   instructor_application_reviewed: {
@@ -1342,7 +1342,7 @@ function ReplyCard({ item }: { item: DiscussionActivityView }) {
     >
       <article className="border border-rule bg-card p-5 transition-colors hover:border-rule-strong">
         <div className="flex items-start gap-3">
-          <IconTile icon={MessagesSquare} tint="text-sky-500 bg-sky-500/10" />
+          <IconTile icon={MessagesSquare} tint="text-info bg-info/10" />
           <div className="min-w-0 flex-1">
             <p className="eyebrow">{item.courseTitle}</p>
             <h3 className="display-subheading mt-1 text-lg leading-snug text-foreground">
@@ -1369,7 +1369,7 @@ function ReplyCard({ item }: { item: DiscussionActivityView }) {
                 "inline-flex items-center gap-1 rounded-sm border px-2 py-1",
                 item.createdByMe
                   ? "border-brand/30 bg-brand/10 text-brand-ink"
-                  : "border-sky-500/30 bg-sky-500/10 text-sky-500/90",
+                  : "border-info/30 bg-info/10 text-info",
               )}
             >
               {item.createdByMe ? <PencilLine size={14} /> : <MessagesSquare size={14} />}

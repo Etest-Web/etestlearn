@@ -19,11 +19,13 @@ import { cn } from "@/lib/utils";
  *
  * `danger` / `warning` / `success` deliberately use Tailwind's own ramps with
  * explicit dark steps rather than the `--destructive` / `--warning` /
- * `--success` custom properties. Those three are declared in `:root` but are
- * never mapped into `@theme inline`, so `bg-success`, `bg-warning` and
- * `text-warning-foreground` are not generated as utilities at all; only
- * `--destructive` is mapped. Reported to the design-system owner rather than
- * worked around in globals.css, which is out of scope here.
+ * `--success` custom properties. This predates those tokens being mapped into
+ * `@theme inline` in `globals.css`; `text-success`, `bg-success/10`,
+ * `text-warning` and `text-info` all generate real CSS there now. Left as-is
+ * because the amber step is warmer at 10% than `--warning` and the pills have
+ * already been reviewed at that contrast — but the comment's premise ("not
+ * generated as utilities at all") is no longer true, so don't read it as a
+ * reason to keep choosing raw ramps.
  */
 
 export type PillTone = "brand" | "danger" | "warning" | "success" | "neutral";

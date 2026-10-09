@@ -3,12 +3,20 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutList, PlusCircle } from "lucide-react";
+import { BarChart3, LayoutDashboard, LayoutList, PlusCircle, Wallet } from "lucide-react";
 import { InstructorGuard } from "@/components/instructor-guard";
 import { cn } from "@/lib/utils";
 
+/**
+ * Four sections, in the order an instructor works in them: what is happening
+ * (Overview), what they sell (Courses), what it earned (Earnings), and whether
+ * it is working (Analytics). "New course" is an action rather than a section,
+ * so it stays last, off the same rule as the rest.
+ */
 const NAV_ITEMS = [
-  { href: "/dashboard/instructor", label: "My Courses", icon: LayoutList },
+  { href: "/dashboard/instructor", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/instructor/courses", label: "Courses", icon: LayoutList },
+  { href: "/dashboard/instructor/earnings", label: "Earnings", icon: Wallet },
   { href: "/dashboard/instructor/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/instructor/courses/new", label: "New Course", icon: PlusCircle },
 ];
@@ -24,7 +32,9 @@ export default function InstructorLayout({ children }: { children: ReactNode }) 
               <h1> through PageHeader, so this is the one label above the rule
               rather than a second heading competing with them. */}
           <p className="eyebrow">Instructor Panel</p>
-          {/* Three tabs run ~374px — wrap rather than overflow the phone. */}
+          {/* Five tabs run past a phone's width — scroll rather than wrap, so
+              the strip stays one line and the underline bar keeps its position
+              relative to its labels. */}
           <nav className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
             {/* Section nav carries the same hairline + brand bar as the `rule`
                 tab strip: selection reads as position and weight, not a filled

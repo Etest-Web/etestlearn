@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, useClerk } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import {
     Award,
@@ -89,6 +89,7 @@ const FOOTER_LINK =
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const { user } = useUser();
+    const { signOut } = useClerk();
     const dbUser = useQuery(api.users.getCurrentUser);
     const isInstructor = dbUser?.role === "instructor" || dbUser?.role === "admin";
     const isAdmin = dbUser?.role === "admin";
@@ -443,6 +444,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 <button
                                     type="button"
                                     className={cn(FOOTER_LINK, "text-destructive hover:bg-destructive/10 hover:text-destructive")}
+                                    onClick={() => signOut()}
                                 />
                             }
                         >

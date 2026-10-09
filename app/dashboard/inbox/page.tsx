@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Clock,
   Flame,
+  Gift,
   GraduationCap,
   Loader2,
   Mail,
@@ -172,6 +173,18 @@ const NOTIFICATION_ICONS: Record<
     // has been waiting on, and it should not read like routine activity.
     tint: "text-success bg-success/10",
     verb: "Instructor application reviewed",
+  },
+  referral_converted: {
+    icon: UserPlus,
+    tint: "text-brand-ink bg-brand/10",
+    verb: "Referral converted",
+  },
+  referral_reward: {
+    icon: Gift,
+    // The one notification type that is about money, so it wears the success
+    // tint — the reward is a credit the referrer can spend right now.
+    tint: "text-success bg-success/10",
+    verb: "Referral reward earned",
   },
 };
 

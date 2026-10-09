@@ -26,9 +26,14 @@
  */
 
 /**
- * Fraction of collected revenue an instructor earns; the remainder is the
- * platform's share. Stated here rather than per-call site so the fee can never
- * be applied at two different rates on two different screens.
+ * Fraction of collected revenue an instructor earns, as a float.
+ *
+ * **Only used for sales settled before the settlement snapshot existed.**
+ * New sales carry `instructorShareKobo`, and their figures are frozen — changing
+ * this value no longer rewrites what an instructor has already been shown. The
+ * single knob for the whole platform is now `INSTRUCTOR_SHARE_BPS` in
+ * `lib/settlement.ts`; this float is kept so the legacy fallback in
+ * `summarizeEarnings` reproduces the old arithmetic exactly.
  */
 export const INSTRUCTOR_REVENUE_SHARE = 0.8;
 
@@ -36,16 +41,32 @@ export const INSTRUCTOR_REVENUE_SHARE = 0.8;
 export const PLATFORM_FEE_RATE = 1 - INSTRUCTOR_REVENUE_SHARE;
 
 /**
- * A sale, reduced to the three fields the arithmetic needs. Kept structural so
- * a Convex `Doc<"purchases">` satisfies it directly.
+ * A sale, reduced to the fields the arithmetic needs. Kept structural so a
+ * Convex `Doc<"purchases">` satisfies it directly.
+ *
+ * `platformFeeKobo` and `instructorShareKobo` are the **settlement snapshot**
+ * written by `internal.payments.markPurchasePaid` — the decision made once, when
+ * the money moved. When present they are authoritative and this module sums
+ * them. When absent (a row settled before the snapshot existed) the share is
+ * derived from `amount` via `legacyShareKobo`, which reproduces the old
+ * read-time behaviour exactly.
+ *
+ * The practical difference: with the snapshot present, changing
+ * `INSTRUCTOR_REVENUE_SHARE` no longer rewrites an instructor's history, and a
+ * referral discount — which the platform funds — is not charged to the
+ * instructor. See `lib/settlement.ts`.
  */
 export interface EarningsSale {
-  /** Kobo. */
+  /** Kobo. The pre-discount list price when a snapshot is present. */
   amount: number;
   /** `true` when an admin annotated this purchase as refunded. */
   refunded: boolean;
   /** Epoch ms the purchase settled — what the monthly series buckets on. */
   paidAt: number;
+  /** Snapshotted platform cut. Derived from the share when absent. */
+  platformFeeKobo?: number;
+  /** Snapshotted instructor cut. Derived from `amount` when absent. */
+  instructorShareKobo?: number;
 }
 
 export interface EarningsTotals {
@@ -159,6 +180,15 @@ export function summarizeEarnings(sales: EarningsSale[]): EarningsTotals {
   let salesCount = 0;
   let refunds = 0;
 
+  // Accumulated as a difference rather than computed from the total, because
+  // once every sale carries a snapshot the two are no longer interchangeable:
+  // the snapshot rounds once per sale, and rounding the sum instead would move
+  // an instructor's history. Per-sale values sum exactly; a derived total does
+  // not.
+  let feeKobo = 0;
+  let earningsKobo = 0;
+  let anySnapshot = false;
+
   for (const sale of sales) {
     if (!Number.isFinite(sale.amount) || sale.amount <= 0) continue;
     if (sale.refunded) {
@@ -168,17 +198,34 @@ export function summarizeEarnings(sales: EarningsSale[]): EarningsTotals {
     }
     grossKobo += sale.amount;
     salesCount += 1;
+
+    if (sale.instructorShareKobo !== undefined) {
+      anySnapshot = true;
+      earningsKobo += sale.instructorShareKobo;
+      // `gross - share` is derived from the stored share rather than rounded
+      // again, which keeps fee + earnings === gross on every row.
+      feeKobo += Math.max(0, sale.amount - sale.instructorShareKobo);
+    } else {
+      earningsKobo += netEarningsKobo(sale.amount);
+      feeKobo += platformFeeKobo(sale.amount);
+    }
   }
 
-  const fee = platformFeeKobo(grossKobo);
+  // Mixed inputs (some snapshotted, some legacy) still round once over the
+  // total, matching the pre-snapshot behaviour for the legacy tail rather than
+  // silently blending two rounding regimes within one total.
+  if (!anySnapshot) {
+    feeKobo = platformFeeKobo(grossKobo);
+    earningsKobo = netEarningsKobo(grossKobo);
+  }
 
   return {
     grossKobo,
     refundedKobo,
     sales: salesCount,
     refunds,
-    platformFeeKobo: fee,
-    netEarningsKobo: Math.max(0, grossKobo - fee),
+    platformFeeKobo: feeKobo,
+    netEarningsKobo: Math.max(0, earningsKobo),
     averageOrderKobo: salesCount === 0 ? 0 : Math.round(grossKobo / salesCount),
   };
 }

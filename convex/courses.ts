@@ -126,6 +126,32 @@ export const searchCourses = query({
   },
 });
 
+/** List published courses optionally filtered by category name OR skillIds. */
+export const filterByCategory = query({
+  args: { category: v.optional(v.string()), skillIds: v.optional(v.array(v.id("skills"))) },
+  handler: async (ctx, args) => {
+    const base = ctx.db.query("courses").withIndex("by_published", (q) => q.eq("published", true));
+
+    // Apply filters: category OR skills
+    if (args.category || args.skillIds?.length) {
+      // If we have any filter, we need to get all published courses and filter in memory
+      // because we can't efficiently combine multiple filters with indexes in Convex
+      const courses = await base.collect();
+      return courses.filter(course => {
+        if (args.category && course.category !== args.category) {
+          return false;
+        }
+        if (args.skillIds?.length && !course.skillIds?.some(skillId => args.skillIds!.includes(skillId))) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return await base.collect();
+  },
+});
+
 export const getCourseBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
@@ -171,6 +197,7 @@ export const createCourse = mutation({
     slug: v.string(),
     description: v.string(),
     category: v.optional(v.string()),
+    skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
     // Kobo; omit or 0 for free courses.
@@ -202,6 +229,7 @@ export const createCourse = mutation({
       description: args.description,
       instructorId: user._id,
       category: args.category,
+      skillIds: args.skillIds,
       level: args.level,
       published: false,
       thumbnailUrl: args.thumbnailUrl,
@@ -229,6 +257,7 @@ export const updateCourse = mutation({
     slug: v.optional(v.string()),
     description: v.optional(v.string()),
     category: v.optional(v.string()),
+    skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
     price: v.optional(v.number()),
@@ -269,6 +298,7 @@ export const updateCourse = mutation({
     }
     if (args.description !== undefined) updates.description = args.description;
     if (args.category !== undefined) updates.category = args.category;
+    if (args.skillIds !== undefined) updates.skillIds = args.skillIds;
     if (args.level !== undefined) updates.level = args.level;
     if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
     if (args.price !== undefined) updates.price = args.price;

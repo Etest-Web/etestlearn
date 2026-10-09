@@ -32,6 +32,7 @@ export default defineSchema({
     description: v.string(),
     instructorId: v.id("users"),
     category: v.optional(v.string()),
+    skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     published: v.boolean(),
     thumbnailUrl: v.optional(v.string()),
@@ -50,6 +51,8 @@ export default defineSchema({
     .index("by_published", ["published"])
     // Serves the admin featured picker and the catalog's featured-first sort.
     .index("by_featured", ["featured"])
+    // Enables fast filtering of published courses by category name.
+    .index("by_category", ["category", "published"])
     .searchIndex("search", {
       searchField: "searchText",
       filterFields: ["published"],
@@ -802,9 +805,27 @@ export default defineSchema({
 
   categories: defineTable({
     name: v.string(),
+    // Optional parent for hierarchical tree (null = top-level).
+    parentId: v.optional(v.id("categories")),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    sortOrder: v.number(),
+    icon: v.optional(v.string()),
     createdBy: v.id("users"),
     createdAt: v.number(),
-  }).index("by_name", ["name"]),
+  }).index("by_name", ["name"]).index("by_slug", ["slug"]).index("by_parent", ["parentId"]),
+
+  // Granular skill tags for courses; independent of category hierarchy but
+  // optionally linked to a category for semantic organization.
+  skills: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    categoryId: v.optional(v.id("categories")),
+    icon: v.optional(v.string()),
+    sortOrder: v.number(),
+    createdAt: v.number(),
+  }).index("by_name", ["name"]).index("by_slug", ["slug"]).index("by_category", ["categoryId"]),
 
   courseReviewRequests: defineTable({
     courseId: v.id("courses"),

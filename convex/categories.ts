@@ -5,21 +5,58 @@ import { logAudit } from "./helpers/audit";
 
 const MAX_NAME = 60;
 
-/**
- * The curated category list. `courses.category` remains a free string —
- * migrating every course to a foreign-key id would rewrite course rows and
- * search text for a convenience — so this table is the menu the course form
- * offers and the catalog groups by, while historical free-typed values keep
- * working alongside it.
- */
-
-/** Signed-in read: the course form and catalog both call this. */
 export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireUser(ctx);
     const rows = await ctx.db.query("categories").collect();
-    return rows.sort((a, b) => a.name.localeCompare(b.name));
+    return rows.sort((a, b) => {
+      // Sort: parents first (no parentId), then by name within same parent level.
+      const aIsRoot = !a.parentId;
+      const bIsRoot = !b.parentId;
+      if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  },
+});
+
+/** Return a nested tree: { name, children: [...] } sorted by sortOrder then name. */
+export const listTree = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireUser(ctx);
+    const all = await ctx.db.query("categories").collect();
+    // Build a map id → row
+    const byId = new Map(all.map((r) => [r._id, r]));
+    // Find roots (no parentId)
+    const roots = all.filter((r) => !r.parentId);
+    // Recursive builder
+    function buildNode(row: typeof all[0]): {
+      _id: string;
+      name: string;
+      slug: string;
+      description?: string;
+      sortOrder: number;
+      icon?: string;
+      children: ReturnType<typeof buildNode>[];
+    } {
+      const children = all.filter((r) => r.parentId === row._id);
+      return {
+        _id: row._id,
+        name: row.name,
+        slug: row.slug,
+        description: row.description,
+        sortOrder: row.sortOrder,
+        icon: row.icon,
+        children: children.sort((a, b) => {
+          const aS = a.sortOrder ?? 0;
+          const bS = b.sortOrder ?? 0;
+          if (aS !== bS) return aS - bS;
+          return a.name.localeCompare(b.name);
+        }).map(buildNode),
+      };
+    }
+    return roots.map(buildNode);
   },
 });
 
@@ -47,8 +84,17 @@ export const create = mutation({
       .first();
     if (clash) throw new Error("That category already exists");
 
+    // If a parentId is provided, ensure it exists
+    if (args.parentId) {
+      const parent = await ctx.db.get(args.parentId);
+      if (!parent) throw new Error("Parent category not found");
+    }
+
     return await ctx.db.insert("categories", {
       name,
+      parentId: args.parentId || undefined,
+      slug: args.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+      sortOrder: Date.now(), // rough ordering; admin can re-sort later
       createdBy: admin._id,
       createdAt: Date.now(),
     });
@@ -68,6 +114,7 @@ export const rename = mutation({
     const row = await ctx.db.get(args.categoryId);
     if (!row) throw new Error("Category not found");
 
+    // Don't allow renaming to a name that already exists as a sibling or parent
     const clash = await ctx.db
       .query("categories")
       .withIndex("by_name", (q) => q.eq("name", name))
@@ -91,6 +138,7 @@ export const rename = mutation({
  * Deleting is refused while any course still uses the name — a category that
  * vanishes under a course would leave an orphaned label in the catalog and
  * search text with no owner. Retire a category by renaming it instead.
+ * Also refuses if the category has children (non-leaf).
  */
 export const remove = mutation({
   args: { categoryId: v.id("categories") },
@@ -100,6 +148,18 @@ export const remove = mutation({
     const row = await ctx.db.get(args.categoryId);
     if (!row) throw new Error("Category not found");
 
+    // Refuse if it has children
+    const hasChildren = await ctx.db
+      .query("categories")
+      .withIndex("by_parent", (q) => q.eq("parentId", args.categoryId))
+      .first();
+    if (hasChildren) {
+      throw new Error(
+        "This category has subcategories — rename them first or reparent them",
+      );
+    }
+
+    // Refuse if any published course still uses the name
     const inUse = await ctx.db
       .query("courses")
       .withIndex("by_published", (q) => q.eq("published", true))
@@ -119,5 +179,95 @@ export const remove = mutation({
       targetId: args.categoryId,
       details: { name: row.name },
     });
+  },
+});
+
+/** Internal: seed default tech-skill taxonomy if the table is empty. */
+export const seedDefaults = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const admin = await requireAdmin(ctx);
+
+    // Check if already seeded
+    const count = await ctx.db.query("categories").collect();
+    if (count.length > 0) {
+      return; // Already seeded
+    }
+
+    const now = Date.now();
+
+    const defaultCategories = [
+      // Programming
+      { name: "Programming", parentId: null },
+      { name: "Web Development", parentId: "Programming" },
+      { name: "Frontend Development", parentId: "Web Development" },
+      { name: "React", parentId: "Frontend Development" },
+      { name: "Vue", parentId: "Frontend Development" },
+      { name: "Angular", parentId: "Frontend Development" },
+      { name: "Backend Development", parentId: "Web Development" },
+      { name: "Node.js", parentId: "Backend Development" },
+      { name: "Python", parentId: "Backend Development" },
+      { name: "Java", parentId: "Backend Development" },
+      { name: "Go", parentId: "Backend Development" },
+      { name: "Mobile Development", parentId: "Programming" },
+      { name: "iOS Development", parentId: "Mobile Development" },
+      { name: "Android Development", parentId: "Mobile Development" },
+      { name: "Flutter", parentId: "Mobile Development" },
+      // Data Science & AI
+      { name: "Data Science & AI", parentId: null },
+      { name: "Data Analysis", parentId: "Data Science & AI" },
+      { name: "Machine Learning", parentId: "Data Science & AI" },
+      { name: "Deep Learning", parentId: "Machine Learning" },
+      { name: "Data Visualization", parentId: "Data Science & AI" },
+      { name: "Statistics", parentId: "Data Science & AI" },
+      // Design
+      { name: "Design", parentId: null },
+      { name: "UI/UX Design", parentId: "Design" },
+      { name: "Figma", parentId: "UI/UX Design" },
+      { name: "Adobe XD", parentId: "UI/UX Design" },
+      { name: "Graphic Design", parentId: "Design" },
+      { name: "Brand Identity", parentId: "Graphic Design" },
+      // Business
+      { name: "Business", parentId: null },
+      { name: "Project Management", parentId: "Business" },
+      { name: "Product Management", parentId: "Business" },
+      { name: "Finance", parentId: "Business" },
+      { name: "Marketing", parentId: "Business" },
+      // Operations
+      { name: "Operations", parentId: null },
+      { name: "DevOps", parentId: "Operations" },
+      { name: "Cloud Computing", parentId: "DevOps" },
+      { name: "Docker", parentId: "Cloud Computing" },
+      { name: "Kubernetes", parentId: "Cloud Computing" },
+      { name: "Cybersecurity", parentId: null },
+      { name: "Network Security", parentId: "Cybersecurity" },
+      { name: "Ethical Hacking", parentId: "Cybersecurity" },
+    ];
+
+    for (const cat of defaultCategories) {
+      // Derive slug from name
+      const slug = cat.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+      // If parentId is a string, it's a name lookup; resolve the id
+      let parent_id = cat.parentId;
+      if (parent_id && typeof parent_id === "string") {
+        const parentRow = await ctx.db
+          .query("categories")
+          .withIndex("by_name", (q) => q.eq("name", parent_id))
+          .first();
+        parent_id = parentRow ? parentRow._id : null;
+      }
+
+      await ctx.db.insert("categories", {
+        name: cat.name,
+        parentId: parent_id,
+        slug,
+        sortOrder: 0, // will be re-sorted later if needed
+        description: undefined,
+        icon: undefined,
+        createdBy: admin._id,
+        createdAt: now,
+      });
+    }
   },
 });

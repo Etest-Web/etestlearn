@@ -10,7 +10,6 @@ import {
   CardTitle,
   CardContent,
   Button,
-  Checkbox,
   EmptyState,
   PageHeader,
 } from "@/components/ui";
@@ -94,7 +93,7 @@ export default function LessonQuizPage() {
                 <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
                 {question.prompt}
               </p>
-              <div className="space-y-1">
+              <div className="space-y-1" role="radiogroup">
                 {options.map((opt: any) => {
                   const questionKey = String(question._id);
                   const optionKey = String(opt._id);
@@ -103,16 +102,24 @@ export default function LessonQuizPage() {
                   return (
                     <label
                       key={opt._id}
-                      className="flex items-center gap-2 rounded-sm border border-rule px-3 py-1.5 text-sm"
+                      className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-sm transition-colors ${
+                        checked
+                          ? "border-brand bg-brand/5 font-medium"
+                          : "border-rule hover:bg-surface-sunken"
+                      }`}
                     >
-                      <Checkbox
+                      <input
+                        type="radio"
+                        name={`question-${questionKey}`}
+                        value={optionKey}
                         checked={checked}
-                        onCheckedChange={() =>
+                        onChange={() =>
                           setSelected((prev) => ({
                             ...prev,
                             [questionKey]: optionKey,
                           }))
                         }
+                        className="accent-brand"
                       />
                       <span>{opt.text}</span>
                     </label>

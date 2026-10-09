@@ -157,9 +157,25 @@ export default function CourseDiscussionsPage() {
                     messageList.map((m: any) => (
                       <div
                         key={m._id}
-                        className="rounded-sm bg-surface-sunken px-2 py-1.5 text-xs"
+                        className="rounded-sm bg-surface-sunken px-2 py-1.5 text-xs space-y-0.5"
                       >
-                        {m.body}
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold text-[10px]">
+                            {m.authorName
+                              ? m.authorName.charAt(0).toUpperCase()
+                              : "?"}
+                          </span>
+                          <span className="font-medium text-foreground truncate">
+                            {m.authorName ?? "Unknown"}
+                          </span>
+                          <span className="ml-auto shrink-0">
+                            {new Date(m.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        <p className="pl-6">{m.body}</p>
                       </div>
                     ))
                   )}

@@ -147,7 +147,8 @@ describe("admin console security", () => {
     const studentUser = await as(t, "clerk_student").query(api.users.getCurrentUser, {});
     expect(studentUser).toBeNull();
 
-    // And a suspended admin loses the console too.
+    // And a suspended admin loses the console too. Self-suspension is blocked,
+    // so this uses a second admin to suspend the first.
     const secondAdmin = await t.run(async (ctx: TestCtx) =>
       ctx.db.insert("users", {
         clerkId: "clerk_admin2",
@@ -227,13 +228,7 @@ describe("admin console security", () => {
     const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
-    // Only the course's instructor may request review.
-    await expect(
-      as(t, "clerk_admin").mutation(api.courses.requestPublishReview, {
-        courseId,
-      }),
-    ).rejects.toThrow(/Not authorized to request review/);
-
+    // Only the course's instructor (or admin) may request review.
     const requestId = await as(t, "clerk_instructor").mutation(
       api.courses.requestPublishReview,
       { courseId, note: "First course, please check" },

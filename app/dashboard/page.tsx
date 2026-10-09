@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ArrowRight, MoreVertical, Heart, UserPlus, Play, Sparkles, Target, Trophy, Clock, Flame, BookOpen, Award, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, MoreVertical, UserPlus, Play, Sparkles, Target, Trophy, Clock, Flame, BookOpen, Award, TrendingUp } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area } from "recharts";
 import { useUser } from "@clerk/nextjs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -181,15 +181,7 @@ export default function DashboardPage() {
         <div>
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="rule-heading eyebrow flex-1">Continue Watching</h2>
-            <div className="flex shrink-0 gap-2">
-              <button aria-label="Previous courses" className="w-9 h-9 rounded-sm border border-rule flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors">
-                <ChevronLeft size={16} />
-              </button>
-              <button aria-label="Next courses" className="w-9 h-9 rounded-sm bg-brand flex items-center justify-center text-brand-foreground hover:bg-brand/90 transition-colors">
-                <ChevronRight size={16} />
-              </button>
-            </div >
-          </div >
+          </div>
           
           <div className="flex overflow-x-auto gap-4 pb-4 snap-x sm:gap-6">
             {enrolledCourses.length > 0 ? (
@@ -201,7 +193,6 @@ export default function DashboardPage() {
                       alt="" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     />
-                    <button aria-label={`Add ${item.course.title} to favourites`} className="absolute top-3 right-3 bg-card/20 p-2 rounded-sm hover:bg-destructive transition-colors"><Heart size={16} /></button>
                   </div >
                   <div className="p-4 flex flex-col gap-2 relative">
                     {item.course.category && (
@@ -278,7 +269,7 @@ export default function DashboardPage() {
                     </td >
                     <td className="px-4 py-3">
                       <span className="tabular text-sm font-bold text-foreground">
-                        {item.enrollment.completedLessonIds?.length || 0} / {item.course.id ? item.course.id.length : 0}
+                        {item.enrollment.completedLessonIds?.length || 0} lessons done
                       </span >
                     </td >
                     <td className="px-4 py-3 text-right">

@@ -15,7 +15,7 @@ import { EmptyState, PageHeader } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
-import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, AlignJustify, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock, SearchX } from "lucide-react";
+import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
@@ -654,9 +654,6 @@ export default function CourseEditPage() {
                         className="group flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-surface-sunken"
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <button aria-label={`Reorder ${lesson.title}`} className="shrink-0 cursor-grab text-muted-foreground transition-colors hover:text-foreground">
-                            <AlignJustify className="h-4 w-4" />
-                          </button>
                           <span className="tabular w-6 shrink-0 text-sm text-muted-foreground">
                             {index + 1}.
                           </span>

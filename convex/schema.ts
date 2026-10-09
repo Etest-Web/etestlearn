@@ -68,7 +68,8 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_status", ["status"])
     .index("by_course", ["courseId"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_createdAt", ["createdAt"])
+    .index("by_course_status", ["courseId", "status"]),
 
   lessons: defineTable({
     courseId: v.id("courses"),
@@ -456,7 +457,8 @@ export default defineSchema({
     userId: v.id("users"),
     threadId: v.id("dmThreads"),
     lastReadAt: v.number(),
-  }).index("by_user", ["userId"]),
+  }).index("by_user", ["userId"])
+    .index("by_user_thread", ["userId", "threadId"]),
 
   // In-app event feed. Rows are written by other modules' mutations (or by an
   // internal helper) rather than by the client, so `type` is a closed union the
@@ -514,7 +516,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_course", ["courseId"])
-    .index("by_course_status", ["courseId", "status"]),
+    .index("by_course_status", ["courseId", "status"])
+    .index("by_creator", ["createdBy"]),
 
   assignmentSubmissions: defineTable({
     assignmentId: v.id("assignments"),
@@ -534,10 +537,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_assignment", ["assignmentId"])
-    // Serves the grader's work queue: "open submissions for assignment X",
-    // newest first, without loading every graded row.
     .index("by_assignment_submitted", ["assignmentId", "submittedAt"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_assignment_user", ["assignmentId", "userId"]),
 
   studyTasks: defineTable({
     userId: v.id("users"),
@@ -591,7 +593,8 @@ export default defineSchema({
     joinedAt: v.number(),
   })
     .index("by_group", ["groupId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_group_user", ["groupId", "userId"]),
 
   studyGroupJoinRequests: defineTable({
     groupId: v.id("studyGroups"),

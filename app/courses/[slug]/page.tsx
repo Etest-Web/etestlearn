@@ -13,6 +13,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/ui";
+import { CourseSchema } from "@/components/seo/course-schema";
 import { notFound, useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { ArrowLeft, ListChecks, Loader2, Lock } from "lucide-react";
@@ -109,7 +110,19 @@ export default function CoursePage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:py-12">
+    <>
+      <CourseSchema
+        course={{
+          title: course.title,
+          description: course.description,
+          slug: course.slug,
+          category: course.category,
+          level: course.level,
+          thumbnailUrl: course.thumbnailUrl,
+          priceKobo: course.price,
+        }}
+      />
+      <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:py-12">
       {/* Kept outside PageHeader rather than in its `actions` slot: that slot
           sits beside the title on desktop but *below* it on mobile, and "Back"
           has to stay above the title at every width. */}
@@ -180,6 +193,7 @@ export default function CoursePage() {
           Payments are processed securely by Paystack — cards, bank transfer &amp; USSD accepted.
         </p>
       )}
-    </main>
+      </main>
+    </>
   );
 }

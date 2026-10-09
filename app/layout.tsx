@@ -10,6 +10,8 @@ import { Navbar } from "@/components/navbar";
 import { EnsureCurrentUser } from "@/components/ensure-current-user";
 import { Toaster } from "sonner";
 import { siteConfig } from "@/lib/site";
+import ScriptOrg from "@/components/seo/script-org";
+import { organization } from "@/components/seo/organization-schema";
 
 // Four faces, each load-bearing. The sans pair sets body copy, Geist_Mono backs
 // `--font-mono` for the marketing kickers, and Archivo is the display face.
@@ -76,6 +78,8 @@ export const metadata: Metadata = {
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
+    // Site handle — lets Twitter/X know who owns the account.
+    site: "@glypha_learn",
   },
 };
 
@@ -99,31 +103,34 @@ export default async function RootLayout({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("font-outfit", outfit.variable, inter.variable)}
-    >
-      <body
-        className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
+    <>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={cn("font-outfit", outfit.variable, inter.variable)}
       >
-        <ThemeProvider
-          nonce={nonce}
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
+        <body
+          className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
         >
-          <ClerkProvider>
-            <ConvexClientProvider>
-              <EnsureCurrentUser />
-              <Navbar/>
-              <TooltipProvider>{children}</TooltipProvider>
-              <Toaster richColors position="top-right" />
-            </ConvexClientProvider>
-          </ClerkProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+          <ThemeProvider
+            nonce={nonce}
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ClerkProvider>
+              <ConvexClientProvider>
+                <EnsureCurrentUser />
+                <Navbar/>
+                <TooltipProvider>{children}</TooltipProvider>
+                <Toaster richColors position="top-right" />
+              </ConvexClientProvider>
+            </ClerkProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+      <ScriptOrg organization={organization} />
+    </>
   );
 }

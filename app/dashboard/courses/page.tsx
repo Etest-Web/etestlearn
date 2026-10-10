@@ -142,7 +142,7 @@ function CourseGrid({
                {item.course.category && (
                  <Badge
                    variant="outline"
-                   className="absolute left-4 top-4 border-0 bg-background/90 backdrop-blur-sm"
+                   className="absolute left-4 top-4 border-0 bg-background/80 backdrop-blur-sm"
                  >
                   {item.course.category}
                 </Badge>

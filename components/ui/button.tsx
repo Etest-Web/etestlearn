@@ -18,7 +18,7 @@ const buttonVariants = cva(
       variant: {
         // Solid brand, no gradient and no shadow. Hover darkens rather than
         // lightening, which keeps the perceived weight constant.
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary/80",
         // Hairline outline. This is the default for secondary actions in an
         // editorial layout because a bordered rectangle sits on the page like a
         // printed box rather than like a floating chip.

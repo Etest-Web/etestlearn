@@ -295,8 +295,29 @@ export function currentItemHref(
     return best?.href ?? null;
 }
 
-/** `99+` past 99, the cap every badge in the dashboard uses. */
-export function capBadge(count: number): string {
+/**
+ * The group the sidebar should be showing for a given URL.
+ *
+ * Exactly one group at a time. Rendering every accessible group stacked made
+ * switching mode look like the new console had been appended *below* the learner
+ * pages rather than replacing them; the switcher now swaps the whole nav.
+ *
+ * The URL decides, not a preference — so a hand-typed address always paints the
+ * matching side. `groups` is the role-filtered set, which is what keeps a
+ * student who hand-types `/dashboard/admin` from being shown links they cannot
+ * open: no admin group is in the set, and this falls back to the first one they
+ * can actually use.
+ */
+export function activeGroupFor(
+    groups: readonly NavGroup[],
+    pathname: string,
+): NavGroup | null {
+    if (groups.length === 0) return null;
+    const mode = modeForPath(pathname);
+    return groups.find((group) => group.mode === mode) ?? groups[0];
+}
+
+/** `99+` past 99, the cap every badge in the dashboard uses. */export function capBadge(count: number): string {
     return count > 99 ? "99+" : String(count);
 }
 

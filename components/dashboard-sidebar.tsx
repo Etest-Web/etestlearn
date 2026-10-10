@@ -37,6 +37,8 @@ import {
     capBadge,
     currentItemHref,
     groupsForRole,
+    activeGroupFor,
+    modeForPath,
     type NavBadge,
     type NavGroup,
     type NavItem,
@@ -223,23 +225,6 @@ function SidebarNavGroup({
     );
 }
 
-/**
- * Placeholder rows for groups whose existence depends on a role we have not
- * resolved yet. Cheaper and steadier than letting Teach and Admin pop in below
- * the open group a beat after first paint.
- */
-function PendingGroupSlots() {
-    return (
-        <>
-            {[0, 1].map((i) => (
-                <div key={i} className="px-2 py-3">
-                    <Skeleton className="h-3 w-16" />
-                </div>
-            ))}
-        </>
-    );
-}
-
 /* ── friends ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -363,10 +348,37 @@ export function DashboardSidebar() {
         pendingUnpublish: pendingUnpublish ?? 0,
     };
 
-    const groups = groupsForRole(role);
-    // Everything reachable, in nav order — the flat rail has no room for group
-    // structure, and a hidden group would hide its own landing page.
-    const allItems = groups.flatMap((group) => group.items);
+    /**
+     * One set of items at a time, taken from the console you are standing in.
+     *
+     * The nav used to render every group the role could reach, stacked, which
+     * made switching mode look like the new console had been appended *below* the
+     * learner pages rather than replacing them. The mode switcher now swaps the
+     * whole sidebar instead: the URL decides the mode, and exactly that mode's
+     * group is on screen.
+     *
+     * `groupsForRole` is still the gate, so this never reveals a console the
+     * role cannot open — a student who hand-types /dashboard/admin gets the
+     * learner items back, and the page itself says "Access Denied".
+     */
+    const accessibleGroups = groupsForRole(role);
+    const pathname = usePathname();
+    const activeMode = modeForPath(pathname);
+    // One group at a time — the URL decides which, and `activeGroupFor` keeps the
+    // role filter applied so a console is never shown to someone who cannot
+    // open it.
+    const activeGroup = activeGroupFor(accessibleGroups, pathname);
+
+    // A console route before the role has resolved: showing the learner items
+    // would flash the wrong nav and then swap it. Hold a skeleton instead — the
+    // path already says which mode this is, we just cannot yet promise the
+    // links are addressable.
+    const resolvingConsole = dbUser === undefined && activeMode !== "student";
+
+    // Only the active group's items, in nav order. The collapsed rail and the
+    // group body both read this, so they can never disagree about what is on
+    // screen.
+    const allItems = activeGroup?.items ?? [];
 
     return (
         <Sidebar className="border-r border-rule bg-sidebar" collapsible="icon">
@@ -404,7 +416,8 @@ export function DashboardSidebar() {
             <SidebarContent className="px-3 gap-4">
                 {railMode ? (
                     // Flat rail: every item as an icon, each with its label on
-                    // hover. Group structure has no 48px to live in.
+                    // hover. Group structure has no 48px to live in. Still only
+                    // the active mode's items — the rail is the same nav.
                     <SidebarMenu className="gap-2">
                         {allItems.map((item) => (
                             <NavLink
@@ -415,26 +428,31 @@ export function DashboardSidebar() {
                             />
                         ))}
                     </SidebarMenu>
-                ) : (
-                    <>
-                        {groups.map((group) => (
-                            <SidebarNavGroup
-                                key={group.id}
-                                group={group}
-                                allItems={allItems}
-                                counts={counts}
-                            >
-                                {group.id === "learn" ? (
-                                    <FriendsBlock friends={friends} />
-                                ) : null}
-                            </SidebarNavGroup>
-                        ))}
-                        {/* Until the role resolves we cannot know whether Teach
-                            and Admin apply, so their slots are held open rather
-                            than allowed to pop in under the open group. */}
-                        {dbUser === undefined ? <PendingGroupSlots /> : null}
-                    </>
-                )}
+                ) : resolvingConsole ? (
+                    // Role still loading on a console route. Hold the shape
+                    // rather than showing the learner items and swapping.
+                    <SidebarGroup>
+                        <Skeleton className="ml-3 h-3 w-16" />
+                        <div className="mt-3 space-y-2">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                                <Skeleton
+                                    key={i}
+                                    className="h-11 w-full rounded-sm"
+                                />
+                            ))}
+                        </div>
+                    </SidebarGroup>
+                ) : activeGroup ? (
+                    <SidebarNavGroup
+                        group={activeGroup}
+                        allItems={allItems}
+                        counts={counts}
+                    >
+                        {activeGroup.id === "learn" ? (
+                            <FriendsBlock friends={friends} />
+                        ) : null}
+                    </SidebarNavGroup>
+                ) : null}
             </SidebarContent>
 
             <SidebarFooter className="mt-auto space-y-1 p-4">

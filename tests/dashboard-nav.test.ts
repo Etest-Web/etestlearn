@@ -3,6 +3,7 @@ import { Square } from "lucide-react";
 
 import {
   NAV_GROUPS,
+  activeGroupFor,
   badgeCountFor,
   capBadge,
   groupsForRole,
@@ -331,6 +332,77 @@ describe("nav data", () => {
   it("keeps the teach group inside /dashboard/instructor", () => {
     for (const item of teachGroup.items) {
       expect(item.href.startsWith("/dashboard/instructor")).toBe(true);
+    }
+  });
+});
+
+describe("activeGroupFor", () => {
+  const all = groupsForRole("admin");
+  const instructor = groupsForRole("instructor");
+  const student = groupsForRole("student");
+
+  it("shows exactly one group, chosen by the URL — switching mode swaps the nav", () => {
+    // The reported bug: the sidebar rendered every accessible group stacked, so
+    // switching to a console appended its links *below* the learner pages
+    // instead of replacing them. One group at a time is the whole fix.
+    expect(activeGroupFor(all, "/dashboard/instructor")?.id).toBe("teach");
+    expect(activeGroupFor(all, "/dashboard/admin")?.id).toBe("admin");
+    expect(activeGroupFor(all, "/dashboard")?.id).toBe("learn");
+    expect(activeGroupFor(all, "/dashboard/courses")?.id).toBe("learn");
+  });
+
+  it("follows a console into its sub-pages", () => {
+    expect(activeGroupFor(all, "/dashboard/instructor/courses/new")?.id).toBe(
+      "teach",
+    );
+    expect(activeGroupFor(all, "/dashboard/admin/users")?.id).toBe("admin");
+  });
+
+  it("never hands a student a group they cannot open", () => {
+    // /dashboard/admin is role-gated, so the admin group is not in a student's
+    // set. Falling back to the first group they *can* use is what keeps the
+    // sidebar honest while the page itself denies access.
+    expect(activeGroupFor(student, "/dashboard/admin")?.id).toBe("learn");
+    expect(activeGroupFor(student, "/dashboard/instructor")?.id).toBe("learn");
+  });
+
+  it("an instructor is offered their own console but never admin", () => {
+    expect(activeGroupFor(instructor, "/dashboard/admin")?.id).toBe("learn");
+    expect(activeGroupFor(instructor, "/dashboard/instructor")?.id).toBe("teach");
+    expect(activeGroupFor(instructor, "/dashboard")?.id).toBe("learn");
+  });
+
+  it("an admin gets the admin console at /dashboard/admin", () => {
+    expect(activeGroupFor(all, "/dashboard/admin")?.id).toBe("admin");
+  });
+
+  it("returns null for an empty set rather than throwing", () => {
+    // The sidebar treats null as "no nav to paint", which is the right answer
+    // for a suspended or not-yet-provisioned account.
+    expect(activeGroupFor([], "/dashboard")).toBeNull();
+  });
+
+  it("picks the group whose landing matches the mode the switcher would pick", () => {
+    // Keeps the switcher and the sidebar from disagreeing: choosing "Admin"
+    // lands on /dashboard/admin, which must then paint the admin group.
+    for (const mode of modesForRole("admin")) {
+      const group = activeGroupFor(all, landingForMode(mode));
+      expect(group?.mode).toBe(mode);
+    }
+  });
+
+  it("only ever surfaces one group for staff, never two stacked", () => {
+    // Direct assertion of the property the bug violated.
+    for (const path of [
+      "/dashboard",
+      "/dashboard/inbox",
+      "/dashboard/instructor",
+      "/dashboard/admin/audit",
+    ]) {
+      const active = activeGroupFor(all, path);
+      const matches = all.filter((g) => g.mode === modeForPath(path));
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toBe(active);
     }
   });
 });

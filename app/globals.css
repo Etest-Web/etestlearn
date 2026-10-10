@@ -128,22 +128,22 @@
      gold    #EABE5D  →  accent only: charts, badges, progress fills
      Neutrals carry a very low-chroma cast at the purple hue (318.82) so the
      greys sit in the same colour family as the mark.                        */
-  --background: oklch(100% 0.006 318.82);
+  --background: oklch(99.2% 0.005 318.82);
   --foreground: oklch(14.5% 0.012 318.82);
   --brand: oklch(56.556% 0.121 318.82);
   --brand-foreground: oklch(100% 0 0);
   --brand-ink: oklch(44% 0.109 318.82);
-  --card: oklch(100% 0.006 318.82);
+  --card: oklch(100% 0 0);
   --card-foreground: oklch(14.5% 0.012 318.82);
-  --popover: oklch(100% 0.006 318.82);
+  --popover: oklch(100% 0 0);
   --popover-foreground: oklch(14.5% 0.012 318.82);
   --primary: oklch(56.556% 0.121 318.82);
   --primary-foreground: oklch(100% 0 0);
   --secondary: oklch(97% 0.008 318.82);
   --secondary-foreground: oklch(20.5% 0.011 318.82);
-  --muted: oklch(97% 0.008 318.82);
-  --muted-foreground: oklch(55.6% 0.011 318.82);
-  --accent: oklch(95.5% 0.028 318.82);
+  --muted: oklch(96.5% 0.01 318.82);
+  --muted-foreground: oklch(52% 0.011 318.82);
+  --accent: oklch(95% 0.035 318.82);
   --accent-foreground: oklch(20.5% 0.011 318.82);
   --destructive: oklch(57.7% 0.245 27.325);
   --success: oklch(62.1% 0.174 145.2);
@@ -152,11 +152,11 @@
   --warning-foreground: oklch(20% 0.05 82.5);
   --info: oklch(65% 0.12 250);
   --info-foreground: oklch(100% 0 0);
-  --border: oklch(92.2% 0.01 318.82);
-  --input: oklch(92.2% 0.01 318.82);
+  --border: oklch(90% 0.012 318.82);
+  --input: oklch(90% 0.012 318.82);
   --ring: oklch(56.556% 0.121 318.82);
   --chart-1: oklch(56.556% 0.121 318.82);
-  --chart-2: #eabe5d;
+  --chart-2: oklch(79.893% 0.102 87.38);
   --chart-3: oklch(44% 0.109 318.82);
   --chart-4: oklch(57% 0.108 84.92);
   --chart-5: oklch(72% 0.102 318.82);
@@ -172,7 +172,6 @@
   --rule-strong: oklch(74% 0.02 318.82);
   --surface-sunken: oklch(98% 0.009 318.82);
   --surface-raised: oklch(100% 0.004 318.82);
-  --background: oklch(99.2% 0.005 318.82);
   --sidebar: oklch(98.5% 0.007 318.82);
   --sidebar-foreground: oklch(14.5% 0.012 318.82);
   --sidebar-primary: oklch(56.556% 0.121 318.82);
@@ -181,14 +180,6 @@
   --sidebar-accent-foreground: oklch(20.5% 0.011 318.82);
   --sidebar-border: oklch(92.2% 0.01 318.82);
   --sidebar-ring: oklch(56.556% 0.121 318.82);
-
-  /* Dark rules sit at a lower alpha than light rules rather than a different
-     hue: on a near-black surface, opacity is the only lever that keeps a
-     hairline visible without it turning into a hard grey line. */
-  --rule: oklch(100% 0 0 / 14%);
-  --rule-strong: oklch(100% 0 0 / 28%);
-  --surface-sunken: oklch(17.5% 0.011 318.82);
-  --surface-raised: oklch(23% 0.012 318.82);
 }
 
 .dark {
@@ -204,6 +195,10 @@
   --brand-foreground: oklch(14.5% 0.012 318.82);
   /* the lightened brand already reads as text on dark, so ink === brand */
   --brand-ink: oklch(72% 0.102 318.82);
+  --rule: oklch(100% 0 0 / 14%);
+  --rule-strong: oklch(100% 0 0 / 28%);
+  --surface-sunken: oklch(17.5% 0.011 318.82);
+  --surface-raised: oklch(23% 0.012 318.82);
   --card: oklch(20.5% 0.011 318.82);
   --card-foreground: oklch(98.5% 0.006 318.82);
   --popover: oklch(20.5% 0.011 318.82);
@@ -232,7 +227,7 @@
   --input: oklch(100% 0 0 / 15%);
   --ring: oklch(72% 0.102 318.82);
   --chart-1: oklch(56.556% 0.121 318.82);
-  --chart-2: #eabe5d;
+  --chart-2: oklch(79.893% 0.102 87.38);
   --chart-3: oklch(44% 0.109 318.82);
   --chart-4: oklch(57% 0.108 84.92);
   --chart-5: oklch(72% 0.102 318.82);

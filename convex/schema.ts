@@ -7,6 +7,13 @@ export default defineSchema({
     email: v.optional(v.string()),
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    // Extended profile fields
+    bio: v.optional(v.string()),
+    location: v.optional(v.string()),
+    website: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    pronouns: v.optional(v.string()),
+    birthday: v.optional(v.number()), // Unix timestamp
     role: v.union(
       v.literal("student"),
       v.literal("instructor"),
@@ -23,6 +30,41 @@ export default defineSchema({
     // no backfill migration is needed. Indexed for code lookup at checkout.
     referralCode: v.optional(v.string()),
     createdAt: v.number(),
+    // Customization & accessibility preferences
+    preferences: v.optional(v.object({
+      // Theme preferences
+      theme: v.optional(v.union(v.literal("light"), v.literal("dark"), v.literal("system"))),
+      // Layout preferences
+      layoutDensity: v.optional(v.union(v.literal("compact"), v.literal("comfortable"), v.literal("spacious"))),
+      sidebarCollapsed: v.optional(v.boolean()),
+      // Accessibility preferences
+      reducedMotion: v.optional(v.boolean()),
+      highContrast: v.optional(v.boolean()),
+      fontSize: v.optional(v.union(v.literal("small"), v.literal("medium"), v.literal("large"), v.literal("xl"))),
+      focusVisible: v.optional(v.boolean()),
+      dyslexiaFriendly: v.optional(v.boolean()),
+      screenReaderMode: v.optional(v.boolean()),
+      // Display preferences
+      showAvatars: v.optional(v.boolean()),
+      showOnlineStatus: v.optional(v.boolean()),
+      showLastSeen: v.optional(v.boolean()),
+      // Content preferences
+      autoplayVideos: v.optional(v.boolean()),
+      showSubtitles: v.optional(v.boolean()),
+      // Notification preferences
+      emailNotifications: v.optional(v.boolean()),
+      pushNotifications: v.optional(v.boolean()),
+      courseUpdates: v.optional(v.boolean()),
+      discussionReplies: v.optional(v.boolean()),
+      achievementNotifications: v.optional(v.boolean()),
+      marketingEmails: v.optional(v.boolean()),
+      // Privacy preferences
+      profileVisibility: v.optional(v.union(v.literal("public"), v.literal("friends"), v.literal("private"))),
+      showEmail: v.optional(v.boolean()),
+      showLocation: v.optional(v.boolean()),
+      showWebsite: v.optional(v.boolean()),
+      showActivity: v.optional(v.boolean()),
+    })),
   }).index("by_clerk_id", ["clerkId"])
     .index("by_referral_code", ["referralCode"]),
 

@@ -302,6 +302,12 @@ export const updateProfile = mutation({
   args: {
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    location: v.optional(v.string()),
+    website: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    pronouns: v.optional(v.string()),
+    birthday: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -314,15 +320,80 @@ export const updateProfile = mutation({
     if (!user) throw new Error("User record not found");
     if (user.suspendedAt !== undefined) throw new Error("Account suspended");
 
-    const updates: { name?: string; imageUrl?: string } = {};
+    const updates: { name?: string; imageUrl?: string; bio?: string; location?: string; website?: string; phone?: string; pronouns?: string; birthday?: number } = {};
     if (args.name !== undefined && args.name.trim().length > 0) {
       updates.name = args.name.trim();
     }
     if (args.imageUrl !== undefined) {
       updates.imageUrl = args.imageUrl;
     }
+    if (args.bio !== undefined) {
+      updates.bio = args.bio.trim();
+    }
+    if (args.location !== undefined) {
+      updates.location = args.location.trim();
+    }
+    if (args.website !== undefined) {
+      updates.website = args.website.trim();
+    }
+    if (args.phone !== undefined) {
+      updates.phone = args.phone.trim();
+    }
+    if (args.pronouns !== undefined) {
+      updates.pronouns = args.pronouns.trim();
+    }
+    if (args.birthday !== undefined) {
+      updates.birthday = args.birthday;
+    }
 
     await ctx.db.patch(user._id, updates);
+  },
+});
+
+export const updatePreferences = mutation({
+  args: {
+    preferences: v.object({
+      theme: v.optional(v.union(v.literal("light"), v.literal("dark"), v.literal("system"))),
+      layoutDensity: v.optional(v.union(v.literal("compact"), v.literal("comfortable"), v.literal("spacious"))),
+      sidebarCollapsed: v.optional(v.boolean()),
+      reducedMotion: v.optional(v.boolean()),
+      highContrast: v.optional(v.boolean()),
+      fontSize: v.optional(v.union(v.literal("small"), v.literal("medium"), v.literal("large"), v.literal("xl"))),
+      focusVisible: v.optional(v.boolean()),
+      dyslexiaFriendly: v.optional(v.boolean()),
+      screenReaderMode: v.optional(v.boolean()),
+      showAvatars: v.optional(v.boolean()),
+      showOnlineStatus: v.optional(v.boolean()),
+      showLastSeen: v.optional(v.boolean()),
+      autoplayVideos: v.optional(v.boolean()),
+      showSubtitles: v.optional(v.boolean()),
+      emailNotifications: v.optional(v.boolean()),
+      pushNotifications: v.optional(v.boolean()),
+      courseUpdates: v.optional(v.boolean()),
+      discussionReplies: v.optional(v.boolean()),
+      achievementNotifications: v.optional(v.boolean()),
+      marketingEmails: v.optional(v.boolean()),
+      profileVisibility: v.optional(v.union(v.literal("public"), v.literal("friends"), v.literal("private"))),
+      showEmail: v.optional(v.boolean()),
+      showLocation: v.optional(v.boolean()),
+      showWebsite: v.optional(v.boolean()),
+      showActivity: v.optional(v.boolean()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) throw new Error("User record not found");
+    if (user.suspendedAt !== undefined) throw new Error("Account suspended");
+
+    await ctx.db.patch(user._id, {
+      preferences: { ...(user.preferences || {}), ...args.preferences },
+    });
   },
 });
 

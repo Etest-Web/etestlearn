@@ -15,7 +15,6 @@ import {
   Input,
   Label,
 } from "@/components/ui"
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { AuthBackground } from "@/components/auth-background"
 
 export default function SignInPage() {
@@ -47,12 +46,6 @@ export default function SignInPage() {
     if (signIn.status === "complete") await finalize()
   }
 
-  async function handleMFA(formData: FormData) {
-    const code = formData.get("code") as string
-    await signIn.mfa.verifyTOTP({ code })
-    if (signIn.status === "complete") await finalize()
-  }
-
   async function handleSSO(strategy: "oauth_google" | "oauth_apple") {
     await signIn.sso({
       strategy,
@@ -62,49 +55,6 @@ export default function SignInPage() {
   }
 
   if (isSignedIn) return null
-
-  // MFA step
-  if (
-    signIn.status === "needs_second_factor" ||
-    signIn.status === "needs_client_trust"
-  ) {
-    return (
-      <Shell>
-        <Card className="mx-auto w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>Two-factor authentication</CardTitle>
-            <CardDescription>
-              Enter the code from your authenticator app to continue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={handleMFA} className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="code">Verification code</Label>
-                <InputOTP id="code" name="code" maxLength={6}>
-                  <InputOTPGroup>
-                    {Array.from({ length: 6 }, (_, i) => (
-                      <InputOTPSlot key={i} index={i} />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
-                {errors?.fields?.code && (
-                  <p className="text-sm text-destructive">{errors.fields.code.message}</p>
-                )}
-              </div>
-              <Button type="submit" disabled={pending} className="w-full">
-                {pending && <Loader2 className="animate-spin" />}
-                Verify
-              </Button>
-              {errors?.global?.map((e, i) => (
-                <p key={i} className="text-sm text-destructive">{e.message}</p>
-              ))}
-            </form>
-          </CardContent>
-        </Card>
-      </Shell>
-    )
-  }
 
   // Main sign-in form
   return (

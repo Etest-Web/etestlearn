@@ -39,7 +39,25 @@ function CoursesWrapper() {
         description={
           query
             ? undefined
-            : "Browse published courses created by you and approved instructors."
+            : (
+              <>
+                <p className="mb-4 text-base leading-body">
+                  Every course in this catalog is hand-picked and reviewed before it goes
+                  live — no filler, no outdated tutorials. Whether you're starting a
+                  <strong>graphic design course</strong> to build a portfolio, a
+                  <strong>web development course</strong> to switch careers, or a
+                  <strong>data analysis course</strong> to level up at work, you'll
+                  find structured lessons, real assessments, and the price in naira shown
+                  before you enroll.
+                </p>
+                <p className="text-sm leading-body text-muted-foreground">
+                  Free and paid options available. All courses include quizzes, a
+                  verifiable certificate with its own public verification page, and a
+                  preference star on your GlyphaWeb profile once you complete the
+                  assessment.
+                </p>
+              </>
+            )
         }
       />
 
@@ -58,7 +76,7 @@ function CoursesWrapper() {
           {filteredCourses.map((course) => (
             <Card key={course._id} variant="interactive">
               <CardHeader>
-                <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
+                <Image src={course.thumbnailUrl || "/certf.jpeg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
                 <div className="flex flex-wrap gap-2">
                   {course.category && (
                     <Badge variant="secondary">{course.category}</Badge>

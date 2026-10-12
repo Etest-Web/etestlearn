@@ -24,9 +24,7 @@ export function AuthBackground() {
           letterSpacing={8}
           uppercase
           color="#ffffff"
-          ribbon
-          ribbonColor="#3f3f3f"
-          ribbonWidth={86}
+          ribbon={false}
           className="hidden sm:block"
           pauseOnHover={false}
         />
@@ -43,9 +41,7 @@ export function AuthBackground() {
           letterSpacing={8}
           uppercase
           color="#ffffff"
-          ribbon
-          ribbonColor="#3f3f3f"
-          ribbonWidth={86}
+          ribbon={false}
           className="hidden sm:block"
           pauseOnHover={false}
         />

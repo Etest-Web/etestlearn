@@ -127,6 +127,7 @@ export function buildContentSecurityPolicy(nonce: string): string {
       "https://api.publit.io",
       "https://*.publit.io",
       "https://media.publit.io",
+      "https://va.vercel-scripts.com",
       // Cloudflare Turnstile verification API calls.
       "https://challenges.cloudflare.com",
       // Clerk bot / abuse protection API calls (requires wildcard port per Clerk docs)

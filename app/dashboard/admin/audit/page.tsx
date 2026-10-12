@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/role-guard";
+import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge, Card, EmptyState, Input } from "@/components/ui";
@@ -118,7 +118,7 @@ function AuditBody() {
 
 export default function AdminAuditPage() {
   return (
-    <AdminGuard>
+    <>
       <PageShell>
         <PageHeader
           title="Audit Log"
@@ -126,6 +126,6 @@ export default function AdminAuditPage() {
         />
         <AuditBody />
       </PageShell>
-    </AdminGuard>
+    </>
   );
 }

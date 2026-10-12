@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { gradeQuiz } from "../lib/quiz";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
+import { requireUser } from "./helpers/auth";
 
 /**
  * Convex has no range validator — `v.number()` exposes only `.optional()`,
@@ -26,14 +27,7 @@ export const getQuizForLesson = query({
   handler: async (ctx, args) => {
     // SECURITY: quiz data (including which options are correct) must never be
     // readable by unauthenticated or unenrolled callers.
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!user) throw new Error("User record not found");
+    const user = await requireUser(ctx);
 
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) return null;
@@ -90,14 +84,7 @@ export const getQuizForLesson = query({
 export const getQuizAnswerKey = query({
   args: { quizId: v.id("quizzes") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!user) throw new Error("User record not found");
+    const user = await requireUser(ctx);
 
     const quiz = await ctx.db.get(args.quizId);
     if (!quiz) throw new Error("Quiz not found");

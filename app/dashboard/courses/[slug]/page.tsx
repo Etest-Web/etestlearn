@@ -26,7 +26,7 @@ export default function DashboardCoursePage() {
   const issueCertificate = useMutation(api.certificates.issueCertificate);
   const certStatus = useQuery(
     api.certificates.getCourseCertificateStatus,
-    dbUser && data?.course._id ? { courseId: data.course._id as any } : "skip",
+    dbUser && data?.course._id ? { courseId: data.course._id } : "skip",
   );
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);

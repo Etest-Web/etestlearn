@@ -95,8 +95,9 @@ export async function POST(request: Request) {
   // Keyed on the first address in X-Forwarded-For so a single user cannot
   // trivially rotate identities behind the limiter.
   const ip =
+    request.headers.get("cf-connecting-ip")?.trim() ??
+    request.headers.get("x-real-ip")?.trim() ??
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("x-real-ip") ??
     "unknown";
 
   if (rateLimited(ip)) {

@@ -3,9 +3,24 @@ import { NextResponse } from "next/server";
 import { getPublitioUploadUrl } from "@/lib/publitio";
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  const token = await getToken({ template: "convex" });
+  if (!convexUrl || !token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { ConvexHttpClient } = await import("convex/browser");
+  const { api } = await import("@/convex/_generated/api");
+  const convex = new ConvexHttpClient(convexUrl);
+  convex.setAuth(token);
+  const me = await convex.query(api.users.getCurrentUser);
+  if (!me || (me.role !== "instructor" && me.role !== "admin")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const apiKey = process.env.PUBLITIO_API_KEY;

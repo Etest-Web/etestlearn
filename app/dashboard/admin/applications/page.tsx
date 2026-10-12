@@ -14,7 +14,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { AdminGuard } from "@/components/role-guard";
+import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui";
@@ -315,7 +315,7 @@ function ApplicationsBody() {
 
 export default function AdminApplicationsPage() {
   return (
-    <AdminGuard>
+    <>
       <PageShell>
         <PageHeader
           title="Instructor applications"
@@ -323,6 +323,6 @@ export default function AdminApplicationsPage() {
         />
         <ApplicationsBody />
       </PageShell>
-    </AdminGuard>
+    </>
   );
 }

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { AdminGuard } from "@/components/role-guard";
+import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -305,7 +305,7 @@ function UnpublishRequestsBody() {
 
 export default function AdminUnpublishRequestsPage() {
   return (
-    <AdminGuard>
+    <>
       <PageShell>
         <PageHeader
           title="Unpublish requests"
@@ -313,6 +313,6 @@ export default function AdminUnpublishRequestsPage() {
         />
         <UnpublishRequestsBody />
       </PageShell>
-    </AdminGuard>
+    </>
   );
 }

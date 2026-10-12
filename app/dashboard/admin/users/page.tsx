@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/role-guard";
+import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -421,7 +421,7 @@ function UsersBody() {
 
 export default function AdminUsersPage() {
   return (
-    <AdminGuard>
+    <>
       <PageShell>
         <PageHeader
           title="Users"
@@ -434,6 +434,6 @@ export default function AdminUsersPage() {
         />
         <UsersBody />
       </PageShell>
-    </AdminGuard>
+    </>
   );
 }

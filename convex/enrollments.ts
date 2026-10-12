@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { computeProgress } from "../lib/progress";
 import { createNotification } from "./helpers/notifications";
+import { getCurrentUser, requireUser } from "./helpers/auth";
 
 export const enrollInCourse = mutation({
   args: { courseId: v.id("courses") },
@@ -13,14 +14,7 @@ export const enrollInCourse = mutation({
       throw new Error("Not authenticated");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      throw new Error("User record not found");
-    }
+    const user = await requireUser(ctx);
 
     const existing = await ctx.db
       .query("enrollments")
@@ -105,19 +99,7 @@ export const enrollInCourse = mutation({
 export const getUserEnrollments = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) {
-      return [];
-    }
+    const user = await requireUser(ctx);
 
     return await ctx.db
       .query("enrollments")
@@ -133,14 +115,7 @@ export const completeLesson = mutation({
     durationMinutes: v.optional(v.number()), // Time spent on lesson
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!user) throw new Error("User record not found");
+    const user = await requireUser(ctx);
 
     const enrollment = await ctx.db
       .query("enrollments")
@@ -288,12 +263,7 @@ export async function checkUserInactivityReminders(
 export const checkInactivityReminders = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const user = await getCurrentUser(ctx);
     if (!user) return;
     await checkUserInactivityReminders(ctx, user._id);
   },

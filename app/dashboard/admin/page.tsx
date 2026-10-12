@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AdminGuard } from "@/components/role-guard";
+
 import { PageShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -235,14 +235,12 @@ function OverviewBody() {
 
 export default function AdminOverviewPage() {
   return (
-    <AdminGuard>
-      <PageShell>
-        <PageHeader
-          title="Platform Overview"
-          description="Live totals and 8-week trends across users, courses, enrollments and revenue."
-        />
-        <OverviewBody />
-      </PageShell>
-    </AdminGuard>
+    <PageShell>
+      <PageHeader
+        title="Platform Overview"
+        description="Live totals and 8-week trends across users, courses, enrollments and revenue."
+      />
+      <OverviewBody />
+    </PageShell>
   );
 }

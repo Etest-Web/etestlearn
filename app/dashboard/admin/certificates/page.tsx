@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdminGuard } from "@/components/role-guard";
+import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { formatCertificateDate, isCertificateRevoked } from "@/lib/certificates";
 import { CertificateTemplateEditor } from "@/components/certificate-template-editor";
@@ -203,7 +203,7 @@ function CertificatesBody() {
 
 export default function AdminCertificatesPage() {
   return (
-    <AdminGuard>
+    <>
       <PageShell>
         <PageHeader
           title="Certificates"
@@ -211,6 +211,6 @@ export default function AdminCertificatesPage() {
         />
         <CertificatesBody />
       </PageShell>
-    </AdminGuard>
+    </>
   );
 }

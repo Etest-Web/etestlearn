@@ -23,7 +23,7 @@ export function AuthBackground() {
           fontWeight={800}
           letterSpacing={8}
           uppercase
-          color="#ffffff"
+          color="currentColor"
           ribbon={false}
           className="hidden sm:block"
           pauseOnHover={false}
@@ -40,7 +40,7 @@ export function AuthBackground() {
           fontWeight={800}
           letterSpacing={8}
           uppercase
-          color="#ffffff"
+          color="currentColor"
           ribbon={false}
           className="hidden sm:block"
           pauseOnHover={false}

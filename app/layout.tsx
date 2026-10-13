@@ -93,6 +93,9 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={cn("font-outfit", outfit.variable, inter.variable)}
       >
+        <head>
+          <meta name="google-site-verification" content="wFwCJGycYcPHfP8xZ3zVFS9bCobqpYTcgpJH4tS2Q_s" />
+        </head>
         <body
           className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
         >

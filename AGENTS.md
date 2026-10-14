@@ -169,6 +169,28 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    also unpublish directly — pulling down a fraudulent course shouldn't wait on a queue — and
    republishing resolves any pending request. Buyers lose nothing either way: access is keyed on the
    enrollment, not on `published`. Queues are read at `app/dashboard/admin/unpublish-requests`.
+10. **Maintenance mode is a gate in `proxy.ts`, not a page or a layout.** The switch lives in
+    `convex/maintenance.ts` (singleton `maintenanceMode` row, lazily created, read through
+    `by_updatedAt` — the `referralSettings` shape); the *policy* — the message, its 280-char ceiling
+    and the route allow-list — is in `lib/maintenance.ts` and imported, never restated. Three things
+    are load-bearing and easy to undo by accident:
+    - **It runs before `auth.protect()`.** That ordering is the feature: after the redirect, a
+      signed-out visitor hitting `/dashboard` never reaches the gate, so the notice would only ever
+      be seen by people who have an account.
+    - **It fails OPEN.** If the Convex read throws, the site renders normally. A Convex blip must not
+      take the storefront offline — this is deliberately the opposite of the shared-secret and
+      rate-limit helpers. The *staff* check fails **closed**, because failing open there would hand
+      anonymous callers the whole site.
+    - **Staff are exempt, and that is what makes the toggle usable.** `maintenance.isStaffCaller`
+      resolves the `users` role from a Clerk session token (never a client-supplied id). Staff fall
+      through to the normal `auth.protect()` path rather than returning early. Verified shape:
+      503 + `Retry-After` for pages (a rewrite to `/maintenance`, which keeps the requested URL and
+      keeps the CSP/nonce), a JSON 503 for `/api`, and `/become-instructor` plus
+      `/api/instructor-applications/notify` left open so instructors can still apply. `/maintenance`
+      must be in **both** `MAINTENANCE_ALLOWED_ROUTES` (else the rewrite loops) **and**
+      `isPublicRoute` (else `auth.protect()` sends the outage page to sign-in). The toggle is at
+      `/dashboard/admin/maintenance`; `proxy.ts` caches the flag for 5s per isolate, so flipping it
+      is not instant.
 
 ---
 
@@ -293,11 +315,14 @@ The seven
   workaround `lib/durable-rate-limit.ts` uses. Keep it.
 - **`proxy.ts` at the repo root is the Next 16 middleware** (Next renamed `middleware.ts` →
   `proxy.ts`). There is **no** `middleware.ts` — do not "fix" this by adding one; you'd run two
-  handlers. Public routes: `/sign-in`, `/sign-up`, `/`, `/courses(.*)`, `/verify(.*)` and the one
+  handlers. Public routes: `/sign-in`, `/sign-up`, `/`, `/courses(.*)`, `/verify(.*)`,
+  `/become-instructor`, `/maintenance` and the one
   API route `/api/instructor-applications/notify`; everything else hits `auth.protect()`. The
   matcher also covers `/(api|trpc)(.*)`, so any unlisted `/api` route needs a session too. The
   notify route is public because signed-out applicants post to it; it defends itself (same-origin
-  check, IP rate limits, field caps) — public ≠ undefended. `proxy.ts` is also where the
+  check, IP rate limits, field caps) — public ≠ undefended. `/maintenance` is public for the same
+  reason (it is shown to signed-out people) and is additionally the route the maintenance gate
+  rewrites to; see rule 10. `proxy.ts` is also where the
   per-request CSP is attached; see rule 8.
 - **Never hand-edit `convex/_generated/*`.** If types are stale (e.g. a new module like
   `rateLimit` missing from `api.d.ts`), run `npx convex dev` to regenerate. Until then the code

@@ -80,6 +80,16 @@ describe("the maintenance gate is wired into proxy.ts", () => {
     expect(proxy).toContain("503");
   });
 
+  test("Retry-After is set on the page rewrite, not only on the JSON branch", () => {
+    // It is passed through the `ResponseInit` on both paths, because
+    // `Response.status`/`headers` cannot be assigned after construction. Asserted
+    // because a `Retry-After` that only reaches `/api` callers leaves crawlers
+    // hitting a page with no back-off signal.
+    expect(proxy).toMatch(
+      /withContentSecurityPolicy\(request, '\/maintenance', 503, \{ 'Retry-After': retryAfter \}\)/,
+    );
+  });
+
   test("gives API callers JSON, not the HTML page", () => {
     // A `fetch()` handed the outage page's HTML where it expected JSON turns a
     // clean outage into an unhandled parse error in client code.
@@ -92,7 +102,9 @@ describe("the maintenance gate is wired into proxy.ts", () => {
     // no nonce: the outage page would be the only page on the site with no CSP,
     // and would not hydrate.
     expect(proxy).toContain("NextResponse.rewrite");
-    expect(proxy).toMatch(/withContentSecurityPolicy\(request, '\/maintenance', 503\)/);
+    expect(proxy).toMatch(
+      /withContentSecurityPolicy\(request, '\/maintenance', 503, \{ 'Retry-After': retryAfter \}\)/,
+    );
   });
 
   test("does not exempt a class of users the module does not define", () => {
@@ -113,6 +125,19 @@ describe("the maintenance page is reachable and the gate's destination is allowl
         allowInstructorApplications: false,
       }),
     ).toBe(true);
+  });
+
+  test("/maintenance is public to auth, not just to the maintenance gate", () => {
+    // Two separate maps, and it has to be in both. Allowing it in
+    // `MAINTENANCE_ALLOWED_ROUTES` stops the gate from rewriting it to itself;
+    // allowing it in `isPublicRoute` stops `auth.protect()` from redirecting the
+    // outage page to sign-in. Missing the second one means the notice is
+    // unreachable for exactly the signed-out visitors it exists for.
+    const publicBlock = proxy.slice(
+      proxy.indexOf("const isPublicRoute"),
+      proxy.indexOf("export default clerkMiddleware("),
+    );
+    expect(publicBlock).toMatch(/'\/maintenance'/);
   });
 
   test("the page exists, and reads the note without a client round-trip", () => {

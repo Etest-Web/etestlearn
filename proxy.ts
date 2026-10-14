@@ -33,8 +33,17 @@ import {
  * gets the same treatment as the page it replaced — including the *request*
  * half of the policy, without which the rendered `/maintenance` markup would
  * carry no nonce and hydrate as a dead page.
+ *
+ * `extraHeaders` rides along because the rewrite branch sets `Retry-After` and
+ * it has to be in the `ResponseInit`: the status is passed here rather than
+ * assigned afterwards, since `Response.status` is read-only.
  */
-function withContentSecurityPolicy(request: NextRequest, rewriteTo?: string, status = 200) {
+function withContentSecurityPolicy(
+  request: NextRequest,
+  rewriteTo?: string,
+  status = 200,
+  extraHeaders?: Record<string, string>,
+) {
   const nonce = generateNonce();
   const csp = buildContentSecurityPolicy(nonce);
 
@@ -45,6 +54,7 @@ function withContentSecurityPolicy(request: NextRequest, rewriteTo?: string, sta
   const init = {
     request: { headers: requestHeaders },
     status,
+    ...(extraHeaders ? { headers: extraHeaders } : {}),
   };
 
   const response = rewriteTo
@@ -69,6 +79,8 @@ function withContentSecurityPolicy(request: NextRequest, rewriteTo?: string, sta
  *   /sign-in, /sign-up   auth entry points — must load signed out
  *   /courses(.*)         catalog is browsable without an account
  *   /verify(.*)          certificate verification is meant for outsiders
+ *   /become-instructor   an applicant with no account can still apply
+ *   /maintenance         the outage notice, which is aimed at signed-out people
  *
  * API routes (public):
  *   /api/instructor-applications/notify
@@ -96,6 +108,12 @@ const isPublicRoute = createRouteMatcher([
   '/courses(.*)',
   '/verify(.*)',
   '/become-instructor',
+  // The maintenance page must load signed out, for the same reason the gate has
+  // to allow it at all: it is shown to people who by definition have no session
+  // (and to staff, who do). Without this entry `auth.protect()` redirects the
+  // outage page to sign-in, so a visitor who bookmarks it gets a login form
+  // during the outage — the one moment the notice matters most.
+  '/maintenance',
   '/robots.txt',
   '/sitemap.xml',
   '/manifest.json',
@@ -269,7 +287,7 @@ function maintenanceResponse(request: NextRequest) {
   // Rewrite, not redirect: the visitor keeps the URL they asked for (so a
   // bookmark or a shared link still resolves once the site returns) and the
   // address bar does not fill with a page they never navigated to.
-  return withContentSecurityPolicy(request, '/maintenance', 503);
+  return withContentSecurityPolicy(request, '/maintenance', 503, { 'Retry-After': retryAfter });
 }
 
 export default clerkMiddleware(async (auth, req) => {

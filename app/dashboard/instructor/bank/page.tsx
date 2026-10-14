@@ -59,6 +59,10 @@ export default function BankDetailsPage() {
   const [bankFilter, setBankFilter] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [justVerified, setJustVerified] = useState<{
+    accountName: string;
+    accountNumberMasked: string;
+  } | null>(null);
 
   const selectedBank = useMemo(
     () => BANKS.find((bank) => bank.code === bankCode) ?? null,
@@ -103,14 +107,18 @@ export default function BankDetailsPage() {
         accountNumber: accountNumberValue,
         bankCode: selectedBank.code,
       });
-      // The resolved name is the proof the check happened — showing it closes
-      // the loop the instructor opened by pressing "verify".
-      toast.success(
-        `Verified: ${result.accountName} (${result.accountNumberMasked})`,
-      );
+      // The resolved name is the proof the check happened — show it
+      // immediately while the query catches up.
+      setJustVerified({
+        accountName: result.accountName,
+        accountNumberMasked: result.accountNumberMasked,
+      });
       setAccountNumber("");
       setBankCode("");
       setBankFilter("");
+      // Clear the toast state after the user sees it; the query will
+      // render the full VerifiedAccount view once it updates.
+      setTimeout(() => setJustVerified(null), 3000);
     } catch (error) {
       // Server messages are written for humans (rate limit, already saved,
       // Paystack's own reason), so they are shown verbatim.
@@ -144,6 +152,11 @@ export default function BankDetailsPage() {
             "—"
           }
           updatedAt={bankInfo.updatedAt}
+        />
+      ) : justVerified ? (
+        <JustVerified
+          accountName={justVerified.accountName}
+          accountNumberMasked={justVerified.accountNumberMasked}
         />
       ) : (
         <Card>
@@ -183,7 +196,15 @@ export default function BankDetailsPage() {
                       className="h-10 w-full"
                       aria-label="Bank"
                     >
-                      <SelectValue placeholder="Select your bank" />
+                      <SelectValue
+                        placeholder="Select your bank"
+                        children={(value) =>
+                          value
+                            ? BANKS.find((bank) => bank.code === value)?.name ??
+                              value
+                            : "Select your bank"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {visibleBanks.map((bank) => (
@@ -251,6 +272,40 @@ export default function BankDetailsPage() {
         </Card>
       )}
     </PageShell>
+  );
+}
+
+function JustVerified({
+  accountName,
+  accountNumberMasked,
+}: {
+  accountName: string;
+  accountNumberMasked: string;
+}) {
+  return (
+    <Card className="border-success">
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center gap-3 rounded-xl bg-success/5 p-4">
+          <BadgeCheck className="size-6 text-success" aria-hidden />
+          <div>
+            <p className="font-semibold text-success">Account verified</p>
+            <p className="text-sm text-muted-foreground">
+              Paystack confirmed this account belongs to <strong>{accountName}</strong>
+            </p>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-surface-sunken p-4 text-center">
+          <p className="text-sm text-muted-foreground">Account number</p>
+          <p className="tabular text-2xl font-semibold text-foreground">
+            {accountNumberMasked}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground text-center">
+          This will be your payout destination. The page will refresh shortly with
+          the full details.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

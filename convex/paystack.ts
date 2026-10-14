@@ -18,7 +18,10 @@ function secretKey(): string {
 
 // ─── Ask Paystack for a hosted checkout URL (secret key stays server-side) ──
 export const initializeCheckout = action({
-  args: { reference: v.string() },
+  args: { 
+    reference: v.string(),
+    currency: v.optional(v.string()),
+  },
   handler: async (ctx, args): Promise<{ authorizationUrl: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
@@ -41,6 +44,34 @@ export const initializeCheckout = action({
     }
     const callbackUrl = `${appUrl}/courses/paid/${args.reference}`;
 
+    // --- Multi-currency Calculation ---
+    let finalAmount = purchase.amount;
+    let finalCurrency = purchase.currency;
+
+    if (args.currency && args.currency !== purchase.currency) {
+      try {
+        // Use the same exchange rate logic as the client. 
+        // Since we are in a "use node" action, we can fetch the rates.
+        const res = await fetch(`https://open.er-api.com/v6/latest/${purchase.currency}`);
+        const data = await res.json();
+        
+        if (data.result === 'success') {
+          const rate = data.rates[args.currency];
+          if (rate) {
+            // purchase.amount is in base currency cents (e.g. kobo)
+            // Convert base cents to target units, then to target cents
+            const baseUnits = purchase.amount / 100;
+            const targetUnits = baseUnits * rate;
+            finalAmount = Math.round(targetUnits * 100);
+            finalCurrency = args.currency;
+          }
+        }
+      } catch (e) {
+        console.error("Exchange rate error during checkout:", e);
+        // Fallback to base currency if conversion fails
+      }
+    }
+
     const res = await fetch(`${PAYSTACK_BASE}/transaction/initialize`, {
       method: "POST",
       headers: {
@@ -49,8 +80,8 @@ export const initializeCheckout = action({
       },
       body: JSON.stringify({
         email: purchase.email,
-        amount: purchase.amount,
-        currency: purchase.currency,
+        amount: finalAmount,
+        currency: finalCurrency,
         reference: args.reference,
         metadata: { userId: purchase.userId, courseId: purchase.courseId },
         callback_url: callbackUrl,

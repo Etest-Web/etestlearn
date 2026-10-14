@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
@@ -19,17 +19,15 @@ import Image from "next/image";
 import { ArrowLeft, ListChecks, Loader2, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
-
-function formatNaira(kobo?: number) {
-  if (!kobo || kobo <= 0) return "Free";
-  return `₦${(kobo / 100).toLocaleString("en-NG")}`;
-}
+import { useLocalization } from "@/components/localization-provider";
 
 export default function CoursePage() {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
   const { isSignedIn } = useUser();
+  const { currency, formatPrice } = useLocalization();
+  const [displayPrice, setDisplayPrice] = useState<string>("...");
 
   const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
   const hasAccess = useQuery(
@@ -41,14 +39,27 @@ export default function CoursePage() {
 
   const [isPaying, setIsPaying] = useState(false);
 
+  useEffect(() => {
+    async function updatePrice() {
+      if (data?.course) {
+        const formatted = await formatPrice(data.course.price, data.course.currency ?? "NGN");
+        setDisplayPrice(formatted);
+      }
+    }
+    updatePrice();
+  }, [data, formatPrice]);
+
   async function handlePay() {
     if (!data) return;
     setIsPaying(true);
     try {
       // Step 1: create pending purchase record
       const { reference } = await createPendingPurchase({ courseId: data.course._id });
-      // Step 2: get Paystack checkout URL and redirect
-      const { authorizationUrl } = await initializeCheckout({ reference });
+      // Step 2: get Paystack checkout URL and redirect, passing the localized currency
+      const { authorizationUrl } = await initializeCheckout({ 
+        reference,
+        currency: currency 
+      });
       window.location.href = authorizationUrl;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Payment failed to start");
@@ -96,7 +107,7 @@ export default function CoursePage() {
             </>
           ) : (
             <>
-              <Lock /> Pay {formatNaira(course.price)} with Paystack
+              <Lock /> Pay {displayPrice} with Paystack
             </>
           )}
         </Button>
@@ -123,9 +134,6 @@ export default function CoursePage() {
         }}
       />
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:py-12">
-      {/* Kept outside PageHeader rather than in its `actions` slot: that slot
-          sits beside the title on desktop but *below* it on mobile, and "Back"
-          has to stay above the title at every width. */}
       <Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => router.back()}>
         <ArrowLeft /> Back
       </Button>
@@ -135,16 +143,12 @@ export default function CoursePage() {
         description={course.description}
         actions={renderCta()}
       >
-        {/* Fixed square so it sits inline with the badges — w-full in a
-            flex-wrap row claimed a whole line at 1:1 on phones. */}
         <div className="flex flex-wrap items-center gap-2">
           <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-sm object-cover" />
           {course.category && <Badge variant="secondary">{course.category}</Badge>}
           {course.level && <Badge variant="outline">{course.level}</Badge>}
-          {/* Price is a number a buyer scans for, so it is set as a price rather
-              than as a 10px chip. `tabular` stops it reflowing as digits change. */}
           <span className="tabular text-[15px] font-semibold text-foreground">
-            {formatNaira(course.price)}
+            {displayPrice}
           </span>
         </div>
       </PageHeader>
@@ -174,7 +178,7 @@ export default function CoursePage() {
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.contentType}
                       </p>
-                    </div>
+                    </div}
                     {lesson.durationMinutes && (
                       <span className="tabular text-xs text-muted-foreground">
                         {lesson.durationMinutes} min

@@ -5,7 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next"
 import { cn } from "@/lib/utils";
-import { TooltipProvider, ThemeProvider } from "@/components/ui";
+import { LocalizationProvider } from "@/components/localization-provider";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
 import { Navbar } from "@/components/navbar";
 import { EnsureCurrentUser } from "@/components/ensure-current-user";
@@ -100,22 +100,24 @@ export default async function RootLayout({
           className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
         >
           <Analytics/>
-          <ThemeProvider
-            nonce={nonce}
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ClerkProvider>
-              <ConvexClientProvider>
-                <EnsureCurrentUser />
-                <Navbar/>
-                <TooltipProvider>{children}</TooltipProvider>
-                <Toaster richColors position="top-right" />
-              </ConvexClientProvider>
-            </ClerkProvider>
-          </ThemeProvider>
+          <LocalizationProvider>
+            <ThemeProvider
+              nonce={nonce}
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <ClerkProvider>
+                <ConvexClientProvider>
+                  <EnsureCurrentUser />
+                  <Navbar/>
+                  <TooltipProvider>{children}</TooltipProvider>
+                  <Toaster richColors position="top-right" />
+                </ConvexClientProvider>
+              </ClerkProvider>
+            </ThemeProvider>
+          </LocalizationProvider>
         </body>
       </html>
       <ScriptOrg organization={organization} />

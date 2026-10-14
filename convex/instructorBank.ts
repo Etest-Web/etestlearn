@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireUser } from "./helpers/auth";
+import { isStaff, requireUser } from "./helpers/auth";
 import { logAudit } from "./helpers/audit";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
@@ -13,7 +13,7 @@ import {
 import { supportEmail } from "../lib/support";
 
 /**
- * Instructor payout bank details.
+ * Payout account details for staff (instructors and admins).
  *
  * Verification runs against Paystack's account-resolution endpoint, which
  * lives in `bankVerification.ts` ("use node" — the default runtime has no
@@ -23,13 +23,18 @@ import { supportEmail } from "../lib/support";
  * transaction, and the client can never store an account without Paystack
  * having confirmed the name first.
  *
- * Policy, stated once: **verification is one-shot per instructor.** After the
- * first success the mutation refuses further saves and points at support.
+ * Policy, stated once: **verification is one-shot per staff member.** After
+ * the first success the mutation refuses further saves and points at support.
  * That is a deliberate product decision, not a technical limit — a payout
  * destination is the one field worth making hard to change quietly, so
  * changing it is a human process. If that ever softens, the only code to
  * touch is the `already saved` branch in `persistVerifiedAccount` and the
  * copy in `components/bank-setup-modal.tsx`.
+ *
+ * Every role check in here is `isStaff`, never `role === "instructor"`. An
+ * admin may teach and therefore earn, and the console already lets them into
+ * the instructor mode, so gating the payout account on the narrower role
+ * would leave an admin's earnings with nowhere to go.
  */
 
 /** Result shape the Earnings receipt renders. Never includes the raw number. */
@@ -91,15 +96,20 @@ export const getBankInfo = query({
  *
  * A separate query from `getBankInfo` so the banner — which renders for
  * students, instructors and admins alike on the shared dashboard — can ask
- * "is this person an instructor still missing payout details?" without
- * dragging the rest of the bank view into that subscription. Returning
- * `null` for everyone else is what makes the banner invisible to learners.
+ * "is this member of staff still missing payout details?" without dragging
+ * the rest of the bank view into that subscription. Returning `false` for
+ * everyone else is what makes the banner invisible to learners.
+ *
+ * Staff, not instructors: an admin may teach and therefore earn (the console
+ * lets them into the instructor mode, and `courses.createCourse` does not
+ * stop at the role), so an admin with no account on file is in exactly the
+ * position this nudge describes.
  */
 export const needsPayoutSetup = query({
   args: {},
   handler: async (ctx): Promise<boolean> => {
     const user = await requireUser(ctx);
-    return user.role === "instructor" && !user.bankVerified;
+    return isStaff(user) && !user.bankVerified;
   },
 });
 
@@ -117,7 +127,7 @@ export const ensurePayoutNudge = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-    if (user.role !== "instructor" || user.bankVerified) return { created: false };
+    if (!isStaff(user) || user.bankVerified) return { created: false };
 
     const existing = await ctx.db
       .query("notifications")
@@ -161,8 +171,11 @@ export const persistVerifiedAccount = internalMutation({
   },
   handler: async (ctx, args): Promise<SavedBankView> => {
     const user = await requireUser(ctx);
-    if (user.role !== "instructor") {
-      throw new Error("Only instructors can save payout bank details");
+    // Staff, not instructors. An admin who teaches earns like an instructor
+    // does, and refusing here while letting them publish and price a course
+    // would leave the money with nowhere to go.
+    if (!isStaff(user)) {
+      throw new Error("Only instructors and admins can save payout details");
     }
 
     if (user.bankVerified) {

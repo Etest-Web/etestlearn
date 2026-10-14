@@ -14,9 +14,9 @@ import { useBankSetup } from "@/components/bank-setup-modal";
  *
  * Deliberately styled unlike the calm platform `AnnouncementBanner` on the
  * learner dashboard: destructive border, a filled tint and a shield glyph,
- * because this is the one banner that gates money. An instructor who ignores
- * it still teaches, but never gets paid, so quiet chrome would be a lie about
- * how urgent it is.
+ * because this is the one banner that gates money. A staff member who
+ * ignores it still teaches, but never gets paid, so quiet chrome would be a
+ * lie about how urgent it is.
  *
  * The button opens the setup dialog rather than navigating anywhere. Setup is
  * a dialog now (see `bank-setup-modal.tsx`), and this banner is the re-entry
@@ -24,9 +24,9 @@ import { useBankSetup } from "@/components/bank-setup-modal";
  * and can be closed, so without this the second attempt would have no home.
  *
  * Two subscriptions, both narrow on purpose:
- * · `needsPayoutSetup` answers "instructor, not yet verified" — false for
- *   students and admins, so the banner never renders for them and their
- *   client never learns anything about payouts.
+ * · `needsPayoutSetup` answers "staff member, not yet verified" — false for
+ *   learners, so the banner never renders for them and their client never
+ *   learns anything about payouts.
  * · `ensurePayoutNudge` writes the matching inbox notification **once**. The
  *   guard is server-side and idempotent (it finds the existing unread row and
  *   returns), so React StrictMode's double-effect and every future login are

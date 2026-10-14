@@ -7,12 +7,13 @@ consoles behind them.
 ## Language
 
 **Payout account**:
-The verified Nigerian bank account an instructor's course earnings are sent
-to. Set exactly once; later changes go through support.
+The verified Nigerian bank account a staff member's (instructor or admin)
+course earnings are sent to. Set exactly once; later changes go through
+support.
 _Avoid_: bank details, payout bank details, payment account
 
 **Payout nudge**:
-The single unread inbox notification an instructor without a payout account
+The single unread inbox notification a staff member without a payout account
 receives. Idempotent, so repeat logins do not stack rows.
 _Avoid_: reminder, prompt
 

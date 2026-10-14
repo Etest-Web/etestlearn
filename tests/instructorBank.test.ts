@@ -17,8 +17,9 @@ import {
 } from "../convex/helpers/encryption";
 
 /**
- * Instructor payout bank details: one-shot verification, encrypted at rest,
- * rate-limited before it reaches Paystack.
+ * Payout account details for staff: one-shot verification, encrypted at
+ * rest, rate-limited before it reaches Paystack. An admin who teaches earns
+ * like an instructor does, so both roles save through the same path.
  *
  * The store path is tested through `internal.instructorBank.persistVerifiedAccount`
  * (what the action calls) rather than only through the action, because that is
@@ -41,6 +42,7 @@ type TestDataModel = DataModelFromSchemaDefinition<typeof schema>;
 type TestCtx = GenericMutationCtx<TestDataModel>;
 
 const INSTRUCTOR = "clerk_bank_instructor";
+const ADMIN = "clerk_bank_admin";
 const STUDENT = "clerk_bank_student";
 const ACCOUNT_NUMBER = "0123456789";
 const BANK_CODE = "058"; // Guaranty Trust Bank
@@ -81,11 +83,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function seedUser(
-  t: any,
-  subject: string,
-  role: "student" | "instructor",
-) {
+/** A staff role can save a payout account; a student cannot. */
+type BankRole = "student" | "instructor" | "admin";
+
+async function seedUser(t: any, subject: string, role: BankRole) {
   return t.run(async (ctx: TestCtx) =>
     ctx.db.insert("users", {
       clerkId: subject,
@@ -98,7 +99,7 @@ async function seedUser(
 }
 
 /** A fresh instance bound to `subject`'s identity, with their row seeded. */
-async function as(subject: string, role: "student" | "instructor") {
+async function as(subject: string, role: BankRole) {
   const t = convexTest(testSchema, modules).withIdentity({
     subject,
     tokenIdentifier: subject,
@@ -275,7 +276,46 @@ describe("persistVerifiedAccount", () => {
         bankCode: BANK_CODE,
         accountName: "Ada Obi",
       }),
-    ).rejects.toThrow(/Only instructors/);
+    ).rejects.toThrow(/Only instructors and admins/);
+    const row = await userRow(t, STUDENT);
+    expect(row?.bankVerified).toBeFalsy();
+  });
+
+  // An admin may teach and therefore earn, and the console lets them into
+  // instructor mode, so the payout account is not the instructor-only field
+  // the role gate used to imply.
+  test("saves for an admin, and applies the same one-shot rule", async () => {
+    const t = await as(ADMIN, "admin");
+    const args = {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+      accountName: "Ada Obi",
+    };
+
+    await t.mutation(internal.instructorBank.persistVerifiedAccount, args);
+    const row = await userRow(t, ADMIN);
+    expect(row?.bankVerified).toBe(true);
+    expect(await decryptAccountNumber(row!.bankAccountEncrypted!)).toBe(
+      ACCOUNT_NUMBER,
+    );
+
+    // One-shot is one-shot: a second save still goes through support.
+    await expect(
+      t.mutation(internal.instructorBank.persistVerifiedAccount, {
+        ...args,
+        accountNumber: "9988776655",
+      }),
+    ).rejects.toThrow(/already saved/);
+  });
+
+  test("nudges an admin who has not set an account", async () => {
+    const t = await as(ADMIN, "admin");
+    expect(
+      (await t.mutation(api.instructorBank.ensurePayoutNudge, {})).created,
+    ).toBe(true);
+
+    // ...and reports the gap to the banner that opens the dialog.
+    expect(await t.query(api.instructorBank.needsPayoutSetup, {})).toBe(true);
   });
 
   test.each([["12345"], ["12345678901"], ["123456789a"], [""]])(
@@ -361,22 +401,30 @@ describe("ensurePayoutNudge", () => {
     ).toBe("/dashboard/instructor/earnings#payout-account");
   });
 
-  test("skips students and instructors who already verified", async () => {
+  test("skips students and staff who already verified", async () => {
     const student = await as(STUDENT, "student");
     expect(
       (await student.mutation(api.instructorBank.ensurePayoutNudge, {}))
         .created,
     ).toBe(false);
 
-    const t = await as(INSTRUCTOR, "instructor");
-    await t.mutation(internal.instructorBank.persistVerifiedAccount, {
-      accountNumber: ACCOUNT_NUMBER,
-      bankCode: BANK_CODE,
-      accountName: "Ada Obi",
-    });
-    expect(
-      (await t.mutation(api.instructorBank.ensurePayoutNudge, {})).created,
-    ).toBe(false);
+    for (const [subject, role] of [
+      [INSTRUCTOR, "instructor"],
+      [ADMIN, "admin"],
+    ] as const) {
+      const t = await as(subject, role);
+      await t.mutation(internal.instructorBank.persistVerifiedAccount, {
+        accountNumber: ACCOUNT_NUMBER,
+        bankCode: BANK_CODE,
+        accountName: "Ada Obi",
+      });
+      expect(
+        (await t.mutation(api.instructorBank.ensurePayoutNudge, {})).created,
+      ).toBe(false);
+      expect(await t.query(api.instructorBank.needsPayoutSetup, {})).toBe(
+        false,
+      );
+    }
   });
 });
 

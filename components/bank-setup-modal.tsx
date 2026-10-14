@@ -82,8 +82,8 @@ export function useBankSetup(): BankSetupContextValue {
 }
 
 export function BankSetupProvider({ children }: { children: ReactNode }) {
-  // False for everyone who is not an instructor without a saved account, so
-  // this subscription never opens the dialog for anyone else.
+  // False for everyone who is not staff without a saved account, so this
+  // subscription never opens the dialog for a learner.
   const needsSetup = useQuery(api.instructorBank.needsPayoutSetup);
 
   // Open state is derived, not driven by an effect. Three inputs:

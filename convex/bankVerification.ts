@@ -12,7 +12,7 @@ import { renderEmail } from "../lib/emails/templates";
 import { supportEmail } from "../lib/support";
 
 /**
- * Paystack account resolution for instructor payouts.
+ * Paystack account resolution for staff payout accounts.
  *
  * "use node" because the default Convex runtime has no outbound `fetch` —
  * same reason `paystack.ts` (checkout) and `certificateArtifacts.ts` (PDF +

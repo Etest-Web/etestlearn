@@ -24,13 +24,14 @@ export default defineSchema({
     // resolves identity through the shared helper refuses them platform-wide
     // without any data being deleted — unsuspending restores everything.
     suspendedAt: v.optional(v.number()),
-    // ── Payout bank details (instructors) ─────────────────────────────────────
-    // Filled once, by `instructorBank.persistBankInfo`, after Paystack has
-    // resolved the account and confirmed the account name. Verification is
-    // deliberately a one-shot per instructor: `bankVerified` flips to true on
-    // the first success and later attempts are refused with a "contact
-    // support" error, so changing the account on file is a support action
-    // rather than a self-service toggle a hijacked session could exploit.
+    // ── Payout account details (staff) ───────────────────────────────────────
+    // Filled once, by `instructorBank.persistVerifiedAccount`, after Paystack
+    // has resolved the account and confirmed the account name. Verification is
+    // deliberately a one-shot per staff member (instructor or admin):
+    // `bankVerified` flips to true on the first success and later attempts are
+    // refused with a "contact support" error, so changing the account on file
+    // is a support action rather than a self-service toggle a hijacked session
+    // could exploit.
     //
     // The raw account number is NEVER stored — only its AES-256-GCM ciphertext
     // (see `convex/helpers/encryption.ts`, keyed by the BANK_ENCRYPTION_KEY

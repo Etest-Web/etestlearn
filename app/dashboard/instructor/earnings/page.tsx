@@ -63,8 +63,8 @@ function EarningsSkeleton() {
  *
  * This is the read-only receipt that used to live on its own page. The setup
  * dialog (`components/bank-setup-modal.tsx`) is one-shot, so after the save
- * there is nothing left to *do* here, but there is something to *read*: an
- * instructor asking "which account is being paid?" gets an answer without
+ * there is nothing left to *do* here, but there is something to *read*: a
+ * staff member asking "which account is being paid?" gets an answer without
  * writing to support. That is the whole reason this is a section rather than
  * a page that was deleted outright.
  *
@@ -539,7 +539,7 @@ export default function InstructorEarningsPage() {
           <p className="max-w-[70ch] text-sm leading-[1.7] text-muted-foreground">
             These figures are what your courses have <em>earned</em>. Money
             collected through Paystack settles to the platform account, and
-            payouts to instructors are arranged manually — nothing here is
+            payouts to teaching staff are arranged manually — nothing here is
             transferred automatically. A refunded purchase is excluded from
             earnings the moment an admin marks it, so the number can go down
             after you have seen it. If a figure looks wrong, the{" "}

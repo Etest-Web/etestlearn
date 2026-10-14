@@ -45,9 +45,26 @@ export default function BecomeInstructorPage() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // Pre-fill from Clerk user data. These are the values the inputs display,
+    // so they are also what the submit handler has to read: `formData` stays
+    // empty for a field the applicant never retyped, and validating that alone
+    // made a correctly filled form fail with "please fill in all required
+    // fields".
+    const effectiveFullName = formData.fullName || user?.fullName || "";
+    const effectiveEmail = formData.email || user?.primaryEmailAddress?.emailAddress || "";
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.fullName || !formData.email || !formData.expertise || !formData.bio || !formData.motivation) {
+        const payload = {
+            fullName: effectiveFullName.trim(),
+            email: effectiveEmail.trim(),
+            expertise: formData.expertise.trim(),
+            bio: formData.bio.trim(),
+            portfolioUrl: formData.portfolioUrl.trim(),
+            motivation: formData.motivation.trim(),
+        };
+
+        if (!payload.fullName || !payload.email || !payload.expertise || !payload.bio || !payload.motivation) {
             toast.error("Please fill in all required fields.");
             return;
         }
@@ -55,18 +72,21 @@ export default function BecomeInstructorPage() {
         setIsSubmitting(true);
         try {
             await submitApplication({
-                fullName: formData.fullName,
-                email: formData.email,
-                expertise: formData.expertise,
-                bio: formData.bio,
-                portfolioUrl: formData.portfolioUrl || undefined,
-                motivation: formData.motivation,
+                fullName: payload.fullName,
+                email: payload.email,
+                expertise: payload.expertise,
+                bio: payload.bio,
+                portfolioUrl: payload.portfolioUrl || undefined,
+                motivation: payload.motivation,
             });
             toast.success("Application submitted! We'll review it and get back to you.");
+            // The same trimmed payload the mutation got, so the admin
+            // notification cannot carry a blank name or email for a field the
+            // applicant left as prefilled.
             fetch("/api/instructor-applications/notify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             }).catch(notifyError => {
                 console.warn("Failed to send instructor application notification:", notifyError);
             });
@@ -77,10 +97,6 @@ export default function BecomeInstructorPage() {
             setIsSubmitting(false);
         }
     };
-
-    // Pre-fill from Clerk user data
-    const effectiveFullName = formData.fullName || user?.fullName || "";
-    const effectiveEmail = formData.email || user?.primaryEmailAddress?.emailAddress || "";
 
     // Already an instructor/admin
     if (dbUser && (dbUser.role === "instructor" || dbUser.role === "admin")) {

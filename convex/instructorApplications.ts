@@ -68,6 +68,23 @@ export const submitApplication = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // The confirmation, keyed on the application id so a retry of this
+    // mutation cannot mail the applicant twice. Scheduled rather than sent
+    // inline: the form fires the admin notification too, and neither should
+    // hold the transaction open on a network round trip. If mail is down the
+    // applicant still has their in-app status card — delivery never blocks the
+    // application itself.
+    await ctx.scheduler.runAfter(
+      0,
+      sendInstructorApplicationReceivedRef,
+      {
+        applicationId,
+        email: args.email,
+        fullName: args.fullName,
+        submittedAt: now,
+      },
+    );
   },
 });
 

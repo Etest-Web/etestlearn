@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
-import { CheckCircle2, Clock, GraduationCap, Loader2, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, GraduationCap, Loader2, ShieldCheck, Video, Wallet, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -79,7 +79,7 @@ export default function BecomeInstructorPage() {
                 portfolioUrl: payload.portfolioUrl || undefined,
                 motivation: payload.motivation,
             });
-            toast.success("Application submitted! We'll review it and get back to you.");
+            toast.success("Application submitted. We'll email you once it's been read.");
             // The same trimmed payload the mutation got, so the admin
             // notification cannot carry a blank name or email for a field the
             // applicant left as prefilled.
@@ -105,15 +105,15 @@ export default function BecomeInstructorPage() {
                 {/* EmptyState owns an h3; the h1 keeps this branch's page title
                     in the document outline the same way the form branch's
                     PageHeader does. */}
-                <h1 className="sr-only">You&apos;re already an instructor</h1>
+                <h1 className="sr-only">You already teach here</h1>
                 <EmptyState
                     icon={CheckCircle2}
                     tone="brand"
-                    title="You're already an instructor!"
-                    description="You already have instructor access. Head to your Instructor Dashboard to create and manage courses."
+                    title="You already teach here"
+                    description="Instructor access is already on your account. Courses and students live in the instructor dashboard."
                     action={
                         <Button onClick={() => router.push("/dashboard/instructor")}>
-                            Go to Instructor Dashboard
+                            Go to instructor dashboard
                         </Button>
                     }
                 />
@@ -140,8 +140,8 @@ export default function BecomeInstructorPage() {
                                     Application Under Review
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">
-                                    Thanks for applying, {myApplication.fullName}! Our team is reviewing your
-                                    application. We&apos;ll update your account once a decision is made.
+                                    Thanks for applying, {myApplication.fullName}. A person on the team
+                                    reads every application, and you get an email once it&apos;s decided.
                                 </CardDescription>
                             </>
                         )}
@@ -151,11 +151,11 @@ export default function BecomeInstructorPage() {
                                     <CheckCircle2 className="h-6 w-6" />
                                 </div>
                                 <CardTitle className="display-subheading text-center text-2xl">
-                                    Application Approved! 🎉
+                                    Application approved
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">
-                                    Congratulations! You&apos;ve been approved as an instructor. You can now access
-                                    the Instructor Dashboard and start creating courses.
+                                    You can build and publish courses now. Earnings show up in your
+                                    dashboard and go to your bank once you add a payout account.
                                 </CardDescription>
                             </>
                         )}
@@ -165,13 +165,14 @@ export default function BecomeInstructorPage() {
                                     <XCircle className="h-6 w-6" />
                                 </div>
                                 <CardTitle className="display-subheading text-center text-2xl">
-                                    Application Not Approved
+                                    Application not approved
                                 </CardTitle>
                                 <CardDescription className="mx-auto mt-2 max-w-md text-center">
-                                    Unfortunately, your application wasn&apos;t approved at this time.
+                                    We didn&apos;t take this one. You&apos;re welcome to apply again once you
+                                    have more to show.
                                     {myApplication.reviewNote && (
                                         <span className="mt-2 block font-medium text-foreground">
-                                            &ldquo;{myApplication.reviewNote}&rdquo;
+                                            &quot;{myApplication.reviewNote}&quot;
                                         </span>
                                     )}
                                 </CardDescription>
@@ -220,7 +221,7 @@ export default function BecomeInstructorPage() {
                 </div>
                 <PageHeader
                     title="Become an Instructor"
-                    description="Share your expertise with thousands of learners. Apply to join our instructor community, and once approved, start creating and publishing courses on Glypha Learning."
+                    description="Tell us what you want to teach. A person on the team reads every application, and you get an email either way."
                 />
             </div>
 
@@ -229,24 +230,24 @@ export default function BecomeInstructorPage() {
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {[
                     {
-                        icon: "🎯",
-                        title: "Reach Learners",
-                        desc: "Publish to a growing community of motivated students.",
+                        icon: ShieldCheck,
+                        title: "Read by a person",
+                        desc: "Not a filter. A person on the team reads your bio and portfolio, usually within a week.",
                     },
                     {
-                        icon: "🛠️",
-                        title: "Powerful Tools",
-                        desc: "Create video, article, and quiz-based lessons with ease.",
+                        icon: Wallet,
+                        title: "Paid per enrollment",
+                        desc: "Prices are in naira and payouts go to your bank account. A free course stays free if you want reach instead.",
                     },
                     {
-                        icon: "📊",
-                        title: "Track Impact",
-                        desc: "See enrollment stats and student progress on your courses.",
+                        icon: Video,
+                        title: "Teach however suits you",
+                        desc: "Video, written lessons and quizzes, mixed however you like.",
                     },
                 ].map(benefit => (
                     <Card key={benefit.title} variant="sunken">
                         <CardContent className="space-y-2">
-                            <span aria-hidden className="text-2xl">{benefit.icon}</span>
+                            <benefit.icon aria-hidden className="h-5 w-5 text-primary" />
                             <h3 className="text-sm font-semibold">{benefit.title}</h3>
                             <p className="text-xs text-muted-foreground">{benefit.desc}</p>
                         </CardContent>
@@ -261,13 +262,13 @@ export default function BecomeInstructorPage() {
                 </div>
             ) : !user ? (
                 <EmptyState
-                    icon={Sparkles}
+                    icon={GraduationCap}
                     tone="brand"
                     title="Sign in to apply"
-                    description="You need an Glypha Learning account before you can submit your instructor application."
+                    description="Applications are tied to an account, so we can email you the decision and show your status here."
                     action={
                         <Button onClick={() => router.push("/sign-in")}>
-                            Sign in to get started
+                            Sign in
                         </Button>
                     }
                 />
@@ -276,30 +277,26 @@ export default function BecomeInstructorPage() {
                 <Card>
                     <form onSubmit={handleSubmit}>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Sparkles className="h-5 w-5 text-brand" />
-                                Instructor Application
-                            </CardTitle>
+                            <CardTitle>Instructor application</CardTitle>
                             <CardDescription>
-                                Tell us about yourself and why you&apos;d like to teach on our platform. Fields
-                                marked * are required.
+                                Tell us what you&apos;d like to teach and why. The portfolio link is
+                                optional; everything else is required and marked with a *.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="fullName">Full Name *</Label>
+                                    <Label htmlFor="fullName">Full name *</Label>
                                     <Input
                                         id="fullName"
                                         name="fullName"
-                                        placeholder="Your full name"
                                         value={effectiveFullName}
                                         onChange={handleChange}
                                         required
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address *</Label>
+                                    <Label htmlFor="email">Email address *</Label>
                                     <Input
                                         id="email"
                                         name="email"
@@ -313,11 +310,11 @@ export default function BecomeInstructorPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="expertise">Area of Expertise *</Label>
+                                <Label htmlFor="expertise">Area of expertise *</Label>
                                 <Input
                                     id="expertise"
                                     name="expertise"
-                                    placeholder="e.g. Web Development, Graphic Design, Data Science"
+                                    placeholder="e.g. Web development, graphic design, data science"
                                     value={formData.expertise}
                                     onChange={handleChange}
                                     required
@@ -325,12 +322,12 @@ export default function BecomeInstructorPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="bio">Professional Bio *</Label>
+                                <Label htmlFor="bio">Bio *</Label>
                                 <Textarea
                                     id="bio"
                                     name="bio"
                                     rows={4}
-                                    placeholder="Tell us about your background, experience, and qualifications..."
+                                    placeholder="What you've built or taught, and where."
                                     value={formData.bio}
                                     onChange={handleChange}
                                     required
@@ -338,24 +335,23 @@ export default function BecomeInstructorPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="portfolioUrl">Portfolio / Website URL (optional)</Label>
+                                <Label htmlFor="portfolioUrl">Portfolio or website (optional)</Label>
                                 <Input
                                     id="portfolioUrl"
                                     name="portfolioUrl"
                                     type="url"
-                                    placeholder="https://your-portfolio.com"
                                     value={formData.portfolioUrl}
                                     onChange={handleChange}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="motivation">Why do you want to teach on Glypha Learning? *</Label>
+                                <Label htmlFor="motivation">Why do you want to teach on Glypha Learn? *</Label>
                                 <Textarea
                                     id="motivation"
                                     name="motivation"
                                     rows={3}
-                                    placeholder="What motivates you to create courses and share your knowledge?"
+                                    placeholder="One or two sentences is plenty."
                                     value={formData.motivation}
                                     onChange={handleChange}
                                     required
@@ -369,7 +365,7 @@ export default function BecomeInstructorPage() {
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <Loader2 className="animate-spin" />}
-                                Submit Application
+                                Submit application
                             </Button>
                         </CardFooter>
                     </form>

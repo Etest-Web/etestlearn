@@ -40,10 +40,10 @@ export default defineSchema({
     // Paystack bank code (e.g. "058" for GTBank), not the bank name.
     bankCode: v.optional(v.string()),
     // The account name Paystack resolved, stored verbatim as verification
-    // proof and shown back to the instructor on the payout page.
+    // proof and shown back to the instructor on the Earnings receipt.
     bankAccountName: v.optional(v.string()),
     bankVerified: v.optional(v.boolean()),
-    // When the payout account was saved — shown on the bank page so an
+    // When the payout account was saved — shown on the Earnings receipt so an
     // instructor can see the detail is not from some older era. Kept separate
     // from a generic `updatedAt`, which the users table does not have (and
     // should not grow just for this).

@@ -651,7 +651,11 @@ describe("instructorApplicationDecision", () => {
     expect(approved.subject).toContain("approved");
     expect(approved.html).toContain("approved");
     expect(approved.html).toContain(`${SITE_URL}/dashboard/instructor`);
-    expect(approved.html).toContain(`${SITE_URL}/dashboard/instructor/bank`);
+    // The payout setup dialog has no route; the link lands on the receipt
+    // section on Earnings, which holds the button that opens the dialog.
+    expect(approved.html).toContain(
+      `${SITE_URL}/dashboard/instructor/earnings#payout-account`,
+    );
     expect(approved.html).not.toContain("not approved");
   });
 

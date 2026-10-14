@@ -313,7 +313,9 @@ describe("persistVerifiedAccount", () => {
       (n) => n.type === "bank_details_added",
     );
     expect(confirmation).toBeTruthy();
-    expect(confirmation?.href).toBe("/dashboard/instructor/bank");
+    expect(confirmation?.href).toBe(
+      "/dashboard/instructor/earnings#payout-account",
+    );
 
     const audit = await t.run(async (ctx: TestCtx) =>
       ctx.db
@@ -354,9 +356,9 @@ describe("ensurePayoutNudge", () => {
     expect(
       rows.filter((row) => row.type === "bank_info_required"),
     ).toHaveLength(1);
-    expect(rows.find((row) => row.type === "bank_info_required")?.href).toBe(
-      "/dashboard/instructor/bank",
-    );
+    expect(
+      rows.find((row) => row.type === "bank_info_required")?.href,
+    ).toBe("/dashboard/instructor/earnings#payout-account");
   });
 
   test("skips students and instructors who already verified", async () => {

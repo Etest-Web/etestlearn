@@ -2,8 +2,8 @@
  * The address instructors (and learners) write to when they need a human.
  *
  * Centralised because it appears in three places that must not drift: the
- * bank page's "cannot change this myself" copy, the server-side error the
- * save mutation throws, and the confirmation email. One function, so a
+ * Earnings receipt's "cannot change this myself" copy, the server-side error
+ * the save mutation throws, and the confirmation email. One function, so a
  * change of address is a one-line edit.
  *
  * Env override (`SUPPORT_EMAIL`) lets an operator redirect mail without a

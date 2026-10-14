@@ -29,10 +29,10 @@ import { supportEmail } from "../lib/support";
  * destination is the one field worth making hard to change quietly, so
  * changing it is a human process. If that ever softens, the only code to
  * touch is the `already saved` branch in `persistVerifiedAccount` and the
- * copy on the bank page.
+ * copy in `components/bank-setup-modal.tsx`.
  */
 
-/** Result shape the bank page renders. Never includes the raw number. */
+/** Result shape the Earnings receipt renders. Never includes the raw number. */
 export interface BankInfoView {
   /** True once a Paystack-verified account is on file. */
   verified: boolean;
@@ -71,7 +71,7 @@ export const getBankInfo = query({
         await decryptAccountNumber(user.bankAccountEncrypted),
       );
     } catch {
-      // A key rotation (or a corrupted row) must not break the payout page:
+      // A key rotation (or a corrupted row) must not break the receipt:
       // the account stays "verified" and support can read the ciphertext.
       accountNumberMasked = null;
     }
@@ -132,9 +132,12 @@ export const ensurePayoutNudge = mutation({
     await createNotification(ctx, {
       userId: user._id,
       type: "bank_info_required",
-      title: "Add your payout bank details",
+      title: "Add your payout account",
       body: "We need a verified Nigerian bank account before we can pay out your earnings.",
-      href: "/dashboard/instructor/bank",
+      // Anchored to the receipt section on Earnings, which carries the
+      // "Add payout account" button. The setup dialog has no route of its
+      // own, so a notification has to land on a page.
+      href: "/dashboard/instructor/earnings#payout-account",
     });
 
     return { created: true };
@@ -218,7 +221,8 @@ export const persistVerifiedAccount = internalMutation({
       type: "bank_details_added",
       title: "Payout account verified",
       body: `${accountName} — we'll send your earnings here.`,
-      href: "/dashboard/instructor/bank",
+      // Same anchor as the nudge: the read-only receipt on Earnings.
+      href: "/dashboard/instructor/earnings#payout-account",
     });
 
     return {

@@ -123,7 +123,7 @@ export const sendBankConfirmationEmail = internalAction({
       accountName: args.accountName,
       accountNumberMasked: args.accountNumberMasked,
       supportEmail: supportEmail(),
-      dashboardUrl: `${siteUrl()}/dashboard/instructor/bank`,
+      dashboardUrl: `${siteUrl()}/dashboard/instructor`,
     });
 
     try {

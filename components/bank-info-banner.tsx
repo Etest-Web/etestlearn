@@ -1,21 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { Banknote, ShieldAlert } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
+import { Button } from "@/components/ui/button";
+import { useBankSetup } from "@/components/bank-setup-modal";
 
 /**
- * "You have no bank details yet" — the red banner at the top of the instructor
- * console.
+ * "You have no payout account yet" — the red banner at the top of the
+ * instructor console.
  *
  * Deliberately styled unlike the calm platform `AnnouncementBanner` on the
  * learner dashboard: destructive border, a filled tint and a shield glyph,
  * because this is the one banner that gates money. An instructor who ignores
  * it still teaches, but never gets paid, so quiet chrome would be a lie about
  * how urgent it is.
+ *
+ * The button opens the setup dialog rather than navigating anywhere. Setup is
+ * a dialog now (see `bank-setup-modal.tsx`), and this banner is the re-entry
+ * point for anyone who dismissed it: the dialog auto-opens once per page load
+ * and can be closed, so without this the second attempt would have no home.
  *
  * Two subscriptions, both narrow on purpose:
  * · `needsPayoutSetup` answers "instructor, not yet verified" — false for
@@ -35,6 +41,7 @@ import { api } from "@/convex/_generated/api";
 export function BankInfoBanner() {
   const needsSetup = useQuery(api.instructorBank.needsPayoutSetup);
   const ensureNudge = useMutation(api.instructorBank.ensurePayoutNudge);
+  const { openBankSetup } = useBankSetup();
 
   useEffect(() => {
     if (needsSetup !== true) return;
@@ -60,7 +67,7 @@ export function BankInfoBanner() {
 
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-destructive">
-          Add your bank details to receive payouts
+          Add your payout account to receive payouts
         </p>
         <p className="mt-0.5 text-sm text-muted-foreground">
           Earnings from your courses are held until a verified Nigerian bank
@@ -68,13 +75,14 @@ export function BankInfoBanner() {
         </p>
       </div>
 
-      <Link
-        href="/dashboard/instructor/bank"
-        className="inline-flex shrink-0 items-center gap-2 rounded-sm bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-95"
+      <Button
+        variant="destructive"
+        onClick={openBankSetup}
+        className="shrink-0"
       >
         <Banknote className="h-4 w-4" aria-hidden />
-        Add bank details
-      </Link>
+        Add payout account
+      </Button>
     </div>
   );
 }

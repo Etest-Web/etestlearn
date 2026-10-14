@@ -3,9 +3,11 @@
 import { ReactNode } from "react";
 
 import { InstructorGuard } from "@/components/role-guard";
+import { BankSetupProvider } from "@/components/bank-setup-modal";
 
 /**
- * The instructor console's frame: the role gate and nothing else.
+ * The instructor console's frame: the role gate, the payout-account dialog,
+ * and nothing else.
  *
  * This used to carry a five-tab horizontal nav strip — Overview, Courses,
  * Earnings, Analytics, New Course — under an "Instructor Panel" eyebrow. The
@@ -23,5 +25,9 @@ import { InstructorGuard } from "@/components/role-guard";
  * a button rather than a fifth destination competing with the four sections.
  */
 export default function InstructorLayout({ children }: { children: ReactNode }) {
-    return <InstructorGuard>{children}</InstructorGuard>;
+    return (
+        <BankSetupProvider>
+            <InstructorGuard>{children}</InstructorGuard>
+        </BankSetupProvider>
+    );
 }

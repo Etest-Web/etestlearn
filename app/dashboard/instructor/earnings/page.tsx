@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { BANKS } from "@/lib/banks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,8 +18,10 @@ import {
   StatTile,
 } from "@/components/instructor-console";
 import { formatNaira } from "@/lib/instructor-earnings";
-import { formatAbsoluteDate, pluralize } from "@/lib/utils";
-import { ArrowRight, Banknote, Download, Percent, Receipt, Wallet } from "lucide-react";
+import { formatAbsoluteDate, formatRelativeTime, pluralize } from "@/lib/utils";
+import { supportEmail, supportMailto } from "@/lib/support";
+import { useBankSetup } from "@/components/bank-setup-modal";
+import { ArrowRight, Banknote, BadgeCheck, Download, Lock, Percent, Receipt, Wallet } from "lucide-react";
 
 /**
  * Earnings — the money page.
@@ -52,6 +55,117 @@ function EarningsSkeleton() {
       <Skeleton className="h-80" />
       <Skeleton className="h-64" />
     </PageShell>
+  );
+}
+
+/**
+ * Where the money goes, shown next to the money.
+ *
+ * This is the read-only receipt that used to live on its own page. The setup
+ * dialog (`components/bank-setup-modal.tsx`) is one-shot, so after the save
+ * there is nothing left to *do* here, but there is something to *read*: an
+ * instructor asking "which account is being paid?" gets an answer without
+ * writing to support. That is the whole reason this is a section rather than
+ * a page that was deleted outright.
+ *
+ * Rendered in both states on purpose. Before setup it is the third path into
+ * the form (after the auto-opening dialog and the Overview banner), and it is
+ * the only one that is not a nag. `id="payout-account"` is the anchor the
+ * nudge notification and the confirmation email link to.
+ */
+function PayoutAccountSection() {
+  const bankInfo = useQuery(api.instructorBank.getBankInfo);
+  const { openBankSetup } = useBankSetup();
+
+  if (bankInfo === undefined) return <Skeleton className="h-40" />;
+
+  if (!bankInfo.verified) {
+    return (
+      <Card id="payout-account">
+        <CardHeader>
+          <CardTitle>Payout account</CardTitle>
+          <CardDescription>
+            Where these earnings are sent once a payout account is on file.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-[52ch] text-sm leading-[1.7] text-muted-foreground">
+            No payout account yet. Earnings are held until a verified Nigerian
+            bank account is on file, and the account can only be set once.
+          </p>
+          <Button onClick={openBankSetup}>
+            <Banknote className="h-4 w-4" />
+            Add payout account
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const bankName =
+    BANKS.find((bank) => bank.code === bankInfo.bankCode)?.name ??
+    bankInfo.bankCode ??
+    "—";
+
+  return (
+    <Card id="payout-account">
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BadgeCheck className="size-5 text-success" aria-hidden />
+              Payout account
+            </CardTitle>
+            <CardDescription>
+              Earnings are paid to this account.
+              {bankInfo.updatedAt
+                ? ` Saved ${formatRelativeTime(bankInfo.updatedAt)}.`
+                : ""}
+            </CardDescription>
+          </div>
+          <Badge>Verified</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+          <div>
+            <dt className="eyebrow">Account holder</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">
+              {bankInfo.accountName ?? "Your account"}
+            </dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Bank</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">
+              {bankName}
+            </dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Account number</dt>
+            <dd className="tabular mt-1 text-sm font-medium text-foreground">
+              {bankInfo.accountNumberMasked ?? "********"}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="flex items-start gap-3 rounded-xl border border-rule bg-surface-sunken p-3.5">
+          <Lock
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <p className="text-sm leading-[1.5] text-muted-foreground">
+            This account is locked in place. To change it, email{" "}
+            <a
+              href={supportMailto("Change my payout bank account")}
+              className="font-medium text-brand link-quiet"
+            >
+              {supportEmail()}
+            </a>{" "}
+            from the address on your account.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -411,6 +525,8 @@ export default function InstructorEarningsPage() {
           )}
         </CardContent>
       </Card>
+
+      <PayoutAccountSection />
 
       <Card variant="sunken">
         <CardContent className="flex flex-col gap-3 p-5">

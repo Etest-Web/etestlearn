@@ -15,7 +15,6 @@
  */
 import {
     Award,
-    Banknote,
     BarChart3,
     BookOpen,
     ClipboardList,
@@ -126,11 +125,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/instructor", label: "Overview", icon: LayoutDashboard },
             { href: "/dashboard/instructor/courses", label: "Courses", icon: LayoutList },
             { href: "/dashboard/instructor/earnings", label: "Earnings", icon: Wallet },
-            // The payout destination behind those earnings. Lives in the
-            // sidebar because the banner, the inbox nudge and the confirmation
-            // email all link here — a route that three surfaces point at
-            // should be somewhere you can also just walk to.
-            { href: "/dashboard/instructor/bank", label: "Bank details", icon: Banknote },
             { href: "/dashboard/instructor/analytics", label: "Analytics", icon: BarChart3 },
         ],
     },

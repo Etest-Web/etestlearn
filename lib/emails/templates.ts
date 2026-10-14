@@ -240,8 +240,12 @@ function instructorUrl(): string {
   return `${siteUrl()}/dashboard/instructor`;
 }
 
+/**
+ * The read-only receipt on Earnings, anchored to it. The setup dialog has no
+ * route of its own, so every link out of an email lands here.
+ */
 function bankUrl(): string {
-  return `${siteUrl()}/dashboard/instructor/bank`;
+  return `${siteUrl()}/dashboard/instructor/earnings#payout-account`;
 }
 
 /* -------------------------------------------------------------------------- */

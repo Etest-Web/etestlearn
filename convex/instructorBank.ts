@@ -156,7 +156,7 @@ export const persistVerifiedAccount = internalMutation({
     bankCode: v.string(),
     accountName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<SavedBankView> => {
     const user = await requireUser(ctx);
     if (user.role !== "instructor") {
       throw new Error("Only instructors can save payout bank details");
@@ -231,6 +231,22 @@ export const persistVerifiedAccount = internalMutation({
 });
 
 /**
+ * Result shape of `persistVerifiedAccount` — mask and provenance only,
+ * never the raw number.
+ *
+ * Named explicitly because `confirmBankAccount` reads it back through
+ * `internal.instructorBank.persistVerifiedAccount`, and letting TypeScript
+ * infer that cycle (mutation → generated api → this module → mutation)
+ * collapses the whole export to `any` (TS7022).
+ */
+export interface SavedBankView {
+  accountNumberMasked: string;
+  bankCode: string;
+  accountName: string;
+  updatedAt: number;
+}
+
+/**
  * Public wrapper around the internal persist — called after the instructor
  * has seen the resolved name and clicks "Save". This mutation does the
  * encryption, audit, notification and email (via the same action pattern,
@@ -246,7 +262,7 @@ export const confirmBankAccount = mutation({
     accountName: v.string(),
   },
   handler: async (ctx, args) => {
-    const saved = await ctx.runMutation(
+    const saved: SavedBankView = await ctx.runMutation(
       internal.instructorBank.persistVerifiedAccount,
       args,
     );

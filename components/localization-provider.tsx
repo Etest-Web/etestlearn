@@ -12,7 +12,7 @@ type LocalizationSettings = {
 interface LocalizationContextType extends LocalizationSettings {
   setCurrency: (currency: string) => void;
   setLocale: (locale: string) => void;
-  formatPrice: (amountKobo: number | null | undefined, baseCurrency: string = "NGN") => Promise<string>;
+  formatPrice: (amountKobo: number | null | undefined, baseCurrency?: string) => Promise<string>;
 }
 
 const LocalizationContext = createContext<LocalizationContextType | undefined>(undefined);

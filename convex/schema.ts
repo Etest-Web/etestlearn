@@ -24,6 +24,30 @@ export default defineSchema({
     // resolves identity through the shared helper refuses them platform-wide
     // without any data being deleted — unsuspending restores everything.
     suspendedAt: v.optional(v.number()),
+    // ── Payout bank details (instructors) ─────────────────────────────────────
+    // Filled once, by `instructorBank.persistBankInfo`, after Paystack has
+    // resolved the account and confirmed the account name. Verification is
+    // deliberately a one-shot per instructor: `bankVerified` flips to true on
+    // the first success and later attempts are refused with a "contact
+    // support" error, so changing the account on file is a support action
+    // rather than a self-service toggle a hijacked session could exploit.
+    //
+    // The raw account number is NEVER stored — only its AES-256-GCM ciphertext
+    // (see `convex/helpers/encryption.ts`, keyed by the BANK_ENCRYPTION_KEY
+    // env var). The plaintext number is not kept anywhere; the UI reads back a
+    // last-four mask produced by decrypting and masking at read time.
+    bankAccountEncrypted: v.optional(v.string()),
+    // Paystack bank code (e.g. "058" for GTBank), not the bank name.
+    bankCode: v.optional(v.string()),
+    // The account name Paystack resolved, stored verbatim as verification
+    // proof and shown back to the instructor on the payout page.
+    bankAccountName: v.optional(v.string()),
+    bankVerified: v.optional(v.boolean()),
+    // When the payout account was saved — shown on the bank page so an
+    // instructor can see the detail is not from some older era. Kept separate
+    // from a generic `updatedAt`, which the users table does not have (and
+    // should not grow just for this).
+    bankDetailsUpdatedAt: v.optional(v.number()),
     // Permanent share code, generated lazily by `referrals.ensureMyCode` rather
     // than by the Clerk webhook: a code is only needed when someone opens the
     // referral page, so new and existing accounts share one generation path and
@@ -527,6 +551,52 @@ export default defineSchema({
     .index("by_actor", ["actorId"])
     .index("by_action", ["action"]),
 
+  // One row per lifecycle email we set out to deliver. This is the
+  // idempotency primitive for scheduled sending: Convex retries a failed action,
+  // and a retry that cannot tell whether it already sent will send twice.
+  // `dedupeKey` is the claim ticket (e.g. "welcome:<userId>",
+  // "courseStalled:<enrollmentId>:day7"); `emailDeliveries.claim` is a mutation,
+  // and mutations are serializable, so the check-then-insert is atomic.
+  //
+  // `dataJson` is kept deliberately short-lived: it records what was rendered
+  // so a support question can be answered, but it is NOT the audit record for
+  // money or access — those live in `purchases` and `certificates`. Rows are
+  // retained rather than deleted so "did we email them?" is answerable.
+  emailDeliveries: defineTable({
+    dedupeKey: v.string(),
+    templateId: v.string(),
+    // Denormalized from the template so the admin log can be filtered by group
+    // without joining anything.
+    group: v.string(),
+    category: v.union(
+      v.literal("transactional"),
+      v.literal("nudge"),
+      v.literal("broadcast"),
+    ),
+    status: v.union(
+      v.literal("claimed"),
+      v.literal("sent"),
+      v.literal("skipped"),
+      v.literal("failed"),
+    ),
+    // Why a skip or failure happened, e.g. "no email on file",
+    // "marketing opt-out", "already finished the course".
+    reason: v.optional(v.string()),
+    recipient: v.string(),
+    userId: v.optional(v.id("users")),
+    // Resend's message id, or SMTP's messageId, for tracing a delivery.
+    providerMessageId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    // What the email was about, so a failed send can be re-run or audited.
+    dataJson: v.optional(v.string()),
+    claimedAt: v.number(),
+    sentAt: v.optional(v.number()),
+  })
+    .index("by_dedupe_key", ["dedupeKey"])
+    .index("by_user_claimed", ["userId", "claimedAt"])
+    .index("by_status", ["status"])
+    .index("by_template", ["templateId"]),
+
   // User learning goals for achievement tracking.
   // Supports multiple goal types with progress tracking towards targets.
   userGoals: defineTable({
@@ -646,6 +716,11 @@ export default defineSchema({
       // they would otherwise have no way of knowing about.
       v.literal("referral_converted"),
       v.literal("referral_reward"),
+      // Payout onboarding. `bank_info_required` is the nudge written once when
+      // an instructor opens their console without bank details on file;
+      // `bank_details_added` confirms a successful Paystack verification.
+      v.literal("bank_info_required"),
+      v.literal("bank_details_added"),
     ),
     title: v.string(),
     body: v.optional(v.string()),
@@ -868,6 +943,37 @@ export default defineSchema({
     sortOrder: v.number(),
     createdAt: v.number(),
   }).index("by_name", ["name"]).index("by_slug", ["slug"]).index("by_category", ["categoryId"]),
+
+  /**
+   * Singleton row holding the platform's maintenance switch.
+   *
+   * One row rather than a column on `users` or an env var because the whole
+   * point is that an admin flips it without a deploy, and because the request
+   * gate in `proxy.ts` has to be able to read the answer without a Clerk
+   * session. `lib/maintenance.ts` owns the policy (which routes survive, the
+   * message, its ceiling); this table only stores the state.
+   *
+   * Created lazily on first save and read through `by_updatedAt`, so a fresh
+   * deployment is simply "off" with no migration step — the same shape
+   * `referralSettings` uses, and for the same reason: a gate that is off until
+   * someone turns it on is the only safe default.
+   */
+  maintenanceMode: defineTable({
+    enabled: v.boolean(),
+    // The note visitors are shown. Always normalized through
+    // `normalizeMaintenanceMessage` at write time, so it is already collapsed
+    // and capped by the time it lands here.
+    message: v.string(),
+    // When false, `/become-instructor` is served the maintenance page too and
+    // this feature is a full outage rather than an intake-only one.
+    allowInstructorApplications: v.boolean(),
+    // When the site last went *down*, kept apart from `updatedAt` so the admin
+    // console can show the duration of the current outage without replaying
+    // every toggle. Undefined while maintenance has never been switched on.
+    enabledAt: v.optional(v.number()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+  }).index("by_updatedAt", ["updatedAt"]),
 
   courseReviewRequests: defineTable({
     courseId: v.id("courses"),

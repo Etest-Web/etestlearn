@@ -1,6 +1,13 @@
 import type { DatabaseWriter } from "../_generated/server";
+import { makeFunctionReference, type GenericMutationCtx } from "convex/server";
 import type { Id } from "../_generated/dataModel";
 import type { NotificationType } from "../inbox";
+
+// Named rather than imported from `_generated/api`, which does not list the
+// email modules until codegen has run. Same wire name either way.
+const sendNotificationEmailRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendNotificationEmail",
+);
 
 export interface CreateNotificationArgs {
   userId: Id<"users">;
@@ -23,7 +30,7 @@ export interface CreateNotificationArgs {
  *  - Deduplicates pending unread friend_request from the same actor.
  */
 export async function createNotification(
-  ctx: { db: DatabaseWriter },
+  ctx: { db: DatabaseWriter; scheduler: GenericMutationCtx<any>["scheduler"] },
   args: CreateNotificationArgs,
 ): Promise<Id<"notifications"> | null> {
   const recipient = await ctx.db.get(args.userId);
@@ -113,7 +120,7 @@ export async function createNotification(
     }
   }
 
-  return await ctx.db.insert("notifications", {
+  const id = await ctx.db.insert("notifications", {
     userId: args.userId,
     type: args.type,
     title,
@@ -122,4 +129,36 @@ export async function createNotification(
     actorId: args.actorId,
     createdAt: now,
   });
+
+  // Mirror the notification types worth an email into the delivery pipeline.
+  //
+  // Scheduled, not sent inline: every caller of this helper is inside a
+  // transaction that must not wait on a network round trip, and the scheduled
+  // action also re-checks the recipient before it does anything.
+  //
+  // `course_reminder` is deliberately absent. The email drip owns that cadence,
+  // and scheduling one from here as well would mail the same learner twice for
+  // the same nudge. The in-app row is still written.
+  if (EMAIL_NOTIFICATION_TYPES.has(args.type)) {
+    const recipient = await ctx.db.get(args.userId);
+    if (recipient?.email && recipient.suspendedAt === undefined) {
+      await ctx.scheduler.runAfter(
+        0,
+        sendNotificationEmailRef,
+        { notificationId: id },
+      );
+    }
+  }
+
+  return id;
 }
+
+/**
+ * Which notification types are worth interrupting someone's inbox for.
+ *
+ * Read here and in `sendNotificationEmail` rather than inferred, so adding a
+ * type here does not silently start emailing.
+ */
+const EMAIL_NOTIFICATION_TYPES = new Set<NotificationType>([
+  "discussion_reply",
+]);

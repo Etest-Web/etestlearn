@@ -1,0 +1,148 @@
+/**
+ * Maintenance mode — the policy, in one place.
+ * ===========================================
+ * Everything about "what does the site serve while it is down?" is decided here
+ * and nowhere else: the copy, its length ceiling, and the set of routes that
+ * survive. This is the same single-source shape `lib/publishing.ts` (the
+ * unpublish rule) and `lib/certificates.ts` (the completion rule) already have,
+ * and for the same reason — the rule is consulted from three runtimes that
+ * cannot see each other (`proxy.ts` in the Edge runtime, `convex/maintenance.ts`
+ * on the deployment, and the maintenance page itself). A copy of the allow-list
+ * living in each would drift the first time somebody added a route to one of
+ * them, and the failure is a site that is either unreachable or half-open during
+ * an outage.
+ *
+ * It is imported by `convex/`, so nothing here may reach for a Next-only API.
+ */
+
+/** What a visitor is told when an admin has not written their own note. */
+export const DEFAULT_MAINTENANCE_MESSAGE =
+  "We’re carrying out scheduled maintenance and will be back shortly.";
+
+/**
+ * Ceiling on the admin-authored note.
+ *
+ * Long enough for "we're migrating the database and expect to be back by 6pm,
+ * your enrollment and progress are safe", short enough that the maintenance
+ * page cannot be used as a landing page for arbitrary content. Collapses
+ * internal whitespace first so a pasted paragraph cannot pad its way past the
+ * limit with invisible characters.
+ */
+export const MAX_MAINTENANCE_MESSAGE_LENGTH = 280;
+
+/**
+ * Trims, collapses runs of whitespace, and hard-caps the admin's note.
+ *
+ * Called from the mutation rather than only at render time so the stored string
+ * is already in its final form — a note that renders as 280 characters should
+ * not be sitting in the database as 4,000.
+ */
+export function normalizeMaintenanceMessage(raw: string): string {
+  return raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_MAINTENANCE_MESSAGE_LENGTH);
+}
+
+/**
+ * Routes that stay reachable while maintenance mode is on, whatever the
+ * instructor-application setting.
+ *
+ * Grouped by *why*, because "add one more" is only safe while the reason is
+ * still true:
+ *
+ *   · `/sign-in`, `/sign-up`, `/sso-callback` — the only way to reach the
+ *     application form at all, since submitting one requires an account. An
+ *     outage that blocks sign-in silently swallows every application too.
+ *   · `/become-instructor` — the one thing the outage is *for* (see
+ *     `MAINTENANCE_APPLICATION_ROUTES`).
+ *   · `/maintenance` — where the gate itself rewrites to. Omitting this is an
+ *     infinite rewrite loop.
+ *   · `/api/instructor-applications/notify` — where that form posts. Allowing
+ *     the page without the endpoint would give applicants a form that appears
+ *     to succeed and notifies nobody.
+ *   · `robots.txt`, `sitemap.xml`, `manifest.json`, `llms.txt` — crawler
+ *     surfaces. A 503 on robots.txt is read as "disallow everything"; serving
+ *     the sitemap while the pages themselves answer 503 is the correct signal
+ *     for a temporary outage (revisit later, do not deindex).
+ *
+ * A `(.*)` suffix means "this path and everything under it".
+ */
+export const MAINTENANCE_ALLOWED_ROUTES: readonly string[] = [
+  "/maintenance",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/sso-callback(.*)",
+  "/api/instructor-applications/notify",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/manifest.json",
+  "/llms.txt",
+];
+
+/**
+ * Reachable only while `allowInstructorApplications` is on.
+ *
+ * Kept separate from the list above so the setting can be turned off during a
+ * genuine emergency (the reason the field exists) without anyone having to edit
+ * a route array in the middleware at 3am. When it is off, `/become-instructor`
+ * is served the maintenance page like every other page — which is honest: the
+ * form still works, so leaving it open would promise a queue nobody is reading.
+ */
+export const MAINTENANCE_APPLICATION_ROUTES: readonly string[] = [
+  "/become-instructor",
+];
+
+/**
+ * Matches one allow-list entry against a pathname.
+ *
+ * Segment-aware on purpose: `pathname.startsWith(prefix)` would let
+ * `/become-instructor-report` slip through an entry for `/become-instructor`,
+ * and `startsWith("/sign-in")` would match `/sign-in-help`. A suffix must be a
+ * real path boundary (`/` or end of string), which is the same rule
+ * `isCurrentPath` applies to the dashboard nav.
+ */
+function matchesRoute(route: string, pathname: string): boolean {
+  if (!route.endsWith("(.*)")) return pathname === route;
+  const prefix = route.slice(0, -"(.*)".length);
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/** The input to {@link isPathAllowedDuringMaintenance}. */
+export type MaintenanceAllowlistOptions = {
+  allowInstructorApplications: boolean;
+};
+
+/**
+ * Whether this request may be served normally while maintenance mode is on.
+ *
+ * The single predicate `proxy.ts` asks. It takes the setting rather than
+ * reading it so the decision stays pure and testable — `lib/maintenance.test.ts`
+ * is one of the two globs the suite actually runs, and a route list that cannot
+ * be unit-tested is a route list that will grow a typo nobody notices until an
+ * outage.
+ */
+export function isPathAllowedDuringMaintenance(
+  pathname: string,
+  options: MaintenanceAllowlistOptions,
+): boolean {
+  const routes = options.allowInstructorApplications
+    ? [...MAINTENANCE_ALLOWED_ROUTES, ...MAINTENANCE_APPLICATION_ROUTES]
+    : MAINTENANCE_ALLOWED_ROUTES;
+  return routes.some((route) => matchesRoute(route, pathname));
+}
+
+/**
+ * True for Next.js API routes.
+ *
+ * They are blocked like everything else during maintenance, but they must be
+ * answered with a JSON 503 rather than the rewritten HTML page — handing a
+ * `fetch()` an HTML body where it expected JSON turns a clean outage into a
+ * parse error in somebody's client code.
+ */
+export function isApiPath(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+/** Seconds advertised in `Retry-After` on the 503. */
+export const MAINTENANCE_RETRY_AFTER_SECONDS = 3600;

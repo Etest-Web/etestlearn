@@ -1,10 +1,22 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { makeFunctionReference, type GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
+import type { DatabaseWriter } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { computeProgress } from "../lib/progress";
 import { createNotification } from "./helpers/notifications";
 import { getCurrentUser, requireUser } from "./helpers/auth";
+
+// Called by hand rather than through `internal` from `_generated/api`, which
+// does not list the email modules until codegen has run. The wire names are the
+// same either way.
+const scheduleDripRef = makeFunctionReference<"mutation">(
+  "emailCampaignsData:scheduleDrip",
+);
+const sendEnrollmentConfirmationRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendEnrollmentConfirmation",
+);
 
 export const enrollInCourse = mutation({
   args: { courseId: v.id("courses") },
@@ -64,6 +76,22 @@ export const enrollInCourse = mutation({
       courseId: args.courseId,
       createdAt: now,
     });
+
+    // Confirmation plus the unfinished-course drip.
+    //
+    // The drip is queued here rather than at purchase time because a free
+    // enrollment never touches `payments.ts`, and both paths must end up with
+    // the same reminder cadence. Both are keyed on the enrollment id, so this
+    // running twice is harmless.
+    await ctx.runMutation(scheduleDripRef, {
+      enrollmentId: id,
+    });
+
+    await ctx.scheduler.runAfter(
+      0,
+      sendEnrollmentConfirmationRef,
+      { enrollmentId: id },
+    );
 
     // Increment course enrollment goals
     await ctx.runMutation(internal.goals.incrementGoalProgress, {
@@ -230,14 +258,24 @@ export const completeLesson = mutation({
   },
 });
 
+/**
+ * In-app nudge for a learner who has gone quiet on an unfinished course.
+ *
+ * Writes `course_reminder` notifications only. It deliberately does NOT email:
+ * the drip in `emailCampaignsData.scheduleDrip` owns the email cadence for the
+ * same situation, and having both would mail a learner twice for one gap.
+ *
+ * Called from `updateProfile` and from the Clerk sync path, so it takes the
+ * scheduler-bearing ctx that `createNotification` needs.
+ */
 export async function checkUserInactivityReminders(
-  ctx: { db: any },
+  ctx: { db: DatabaseWriter; scheduler: GenericMutationCtx<any>["scheduler"] },
   userId: Id<"users">,
 ) {
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const enrollments = await ctx.db
     .query("enrollments")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
 
   for (const enrollment of enrollments) {

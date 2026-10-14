@@ -1,8 +1,18 @@
 import { mutation, query } from "./_generated/server";
+import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { logAudit, type AuditEntry } from "./helpers/audit";
 import { createNotification } from "./helpers/notifications";
 import { requireAdmin } from "./helpers/auth";
+
+// Named rather than imported from `_generated/api`, which does not list the
+// email modules until codegen has run. Same wire name either way.
+const sendInstructorApplicationDecisionRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendInstructorApplicationDecision",
+);
+const sendInstructorApplicationReceivedRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendInstructorApplicationReceived",
+);
 
 // ─── Submit an instructor application ───────────────────────────────
 export const submitApplication = mutation({
@@ -46,7 +56,7 @@ export const submitApplication = mutation({
     }
 
     const now = Date.now();
-    return await ctx.db.insert("instructorApplications", {
+    const applicationId = await ctx.db.insert("instructorApplications", {
       userId: user._id,
       fullName: args.fullName,
       email: args.email,
@@ -183,6 +193,24 @@ export const reviewApplication = mutation({
       targetId: args.applicationId,
       details,
     });
+
+    // The decision by email, keyed on the application id. The in-app
+    // notification below covers somebody who is already using the product; this
+    // reaches the applicant, who signed up for this and may not have opened the
+    // app since.
+    await ctx.scheduler.runAfter(
+      0,
+      sendInstructorApplicationDecisionRef,
+      {
+        applicationId: args.applicationId,
+        email: application.email,
+        fullName: application.fullName,
+        decision: args.decision,
+        ...(args.reviewNote?.trim()
+          ? { reviewNote: args.reviewNote.trim() }
+          : {}),
+      },
+    );
 
     // Tell the applicant. Promotion is otherwise silent — they would find out
     // only by noticing a console appeared, which is exactly the kind of thing

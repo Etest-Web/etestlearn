@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const sendMail = vi.fn();
 vi.mock("@/lib/mail", () => ({
   sendMail,
-  isSmtpConfigured: () => true,
+  isMailConfigured: () => true,
   escapeHtml: (v: string) =>
     v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
 }));

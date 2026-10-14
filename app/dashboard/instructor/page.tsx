@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PageShell } from "@/components/dashboard-shell";
+import { BankInfoBanner } from "@/components/bank-info-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActivityFeed,
@@ -473,6 +474,9 @@ export default function InstructorOverviewPage() {
 
   return (
     <PageShell>
+      {/* Above the header, as on the learner dashboard's announcement: this is
+          the one thing on the page that gates money. */}
+      <BankInfoBanner />
       <PageHeader
         title="Overview"
         description="What you have earned, how your learners are doing, and what needs fixing today."

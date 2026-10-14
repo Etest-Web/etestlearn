@@ -15,6 +15,7 @@
  */
 import {
     Award,
+    Banknote,
     BarChart3,
     BookOpen,
     ClipboardList,
@@ -33,6 +34,7 @@ import {
     Users,
     UserRound,
     Wallet,
+    Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -53,8 +55,21 @@ export type DashboardMode = Role;
 /** Ordered least- to most-privileged. Index order is the visibility rule. */
 const MODES: readonly DashboardMode[] = ["student", "instructor", "admin"];
 
-/** A pending count the sidebar can badge this link with. */
-export type NavBadge = "unread" | "friendRequests" | "pendingApplications" | "pendingUnpublish";
+/**
+ * A pending count the sidebar can badge this link with.
+ *
+ * `maintenanceOn` is not a count — it resolves to 0 or 1 and is there so the
+ * outage switch is *findable by state* rather than only by name: an admin
+ * arriving at the console needs to see at a glance that the site is already down
+ * without opening a page, because every other page will be lying to them about
+ * why it looks wrong.
+ */
+export type NavBadge =
+    | "unread"
+    | "friendRequests"
+    | "pendingApplications"
+    | "pendingUnpublish"
+    | "maintenanceOn";
 
 export type NavItem = {
     href: string;
@@ -111,6 +126,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/instructor", label: "Overview", icon: LayoutDashboard },
             { href: "/dashboard/instructor/courses", label: "Courses", icon: LayoutList },
             { href: "/dashboard/instructor/earnings", label: "Earnings", icon: Wallet },
+            // The payout destination behind those earnings. Lives in the
+            // sidebar because the banner, the inbox nudge and the confirmation
+            // email all link here — a route that three surfaces point at
+            // should be somewhere you can also just walk to.
+            { href: "/dashboard/instructor/bank", label: "Bank details", icon: Banknote },
             { href: "/dashboard/instructor/analytics", label: "Analytics", icon: BarChart3 },
         ],
     },
@@ -132,6 +152,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/admin/discussions", label: "Moderation", icon: MessagesSquare },
             { href: "/dashboard/admin/categories", label: "Categories", icon: Tags },
             { href: "/dashboard/admin/announcements", label: "Announcements", icon: Megaphone },
+            // The platform-wide outage switch. It has to be a sidebar entry, not a
+            // card buried on the overview: it is the one admin control somebody
+            // needs at 2am, and reaching it should not depend on remembering
+            // which page holds it. `proxy.ts` exempts staff from the gate, so this
+            // route stays reachable while the site is down.
+            { href: "/dashboard/admin/maintenance", label: "Maintenance", icon: Wrench, badge: "maintenanceOn" },
             { href: "/dashboard/admin/unpublish-requests", label: "Unpublish requests", icon: EyeOff, badge: "pendingUnpublish" },
             { href: "/dashboard/admin/audit", label: "Audit log", icon: ScrollText },
         ],

@@ -11,6 +11,7 @@ import { createNotification } from "./helpers/notifications";
 import { consumeGrant } from "./referrals";
 import { settleSale } from "../lib/settlement";
 import { applyDiscount, chargedAmountFor } from "../lib/referrals";
+import { formatNaira } from "../lib/instructor-earnings";
 
 /**
  * References to `internal.referrals.*`, built by hand.
@@ -33,6 +34,17 @@ const getMyAvailableGrantRef = makeFunctionReference<"query">(
 );
 const convertReferralRef = makeFunctionReference<"mutation">(
   "referrals:convertReferral",
+);
+
+// The receipt and the drip queue, named rather than imported. Same reasoning as
+// the referral block: `internal` from `_generated/api` does not list these
+// modules, and calling them by name is what makes the code compile before
+// codegen has caught up. `npx convex dev` leaves these working unchanged.
+const sendPaymentReceiptRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendPaymentReceipt",
+);
+const scheduleDripRef = makeFunctionReference<"mutation">(
+  "emailCampaignsData:scheduleDrip",
 );
 
 // ─── Step 1: create a pending purchase record and return its reference ────
@@ -297,8 +309,10 @@ export const markPurchasePaid = internalMutation({
       )
       .unique();
 
+    let newEnrollmentId: import("./_generated/dataModel").Id<"enrollments"> | undefined;
+
     if (!existing) {
-      await ctx.db.insert("enrollments", {
+      newEnrollmentId = await ctx.db.insert("enrollments", {
         userId: purchase.userId,
         courseId: purchase.courseId,
         progressPercent: 0,
@@ -309,6 +323,38 @@ export const markPurchasePaid = internalMutation({
 
     const course = await ctx.db.get(purchase.courseId);
     const buyer = await ctx.db.get(purchase.userId);
+
+    // Receipt. Scheduled, not sent inline, because this mutation settles a real
+    // payment and must not be at the mercy of a mail provider. Keyed on the
+    // purchase id, so a webhook replay cannot bill the reader twice.
+    if (buyer?.email && course) {
+      await ctx.scheduler.runAfter(
+        0,
+        sendPaymentReceiptRef,
+        {
+          purchaseId: purchase._id,
+          userId: purchase.userId,
+          email: buyer.email,
+          ...(buyer.name ? { name: buyer.name } : {}),
+          courseTitle: course.title,
+          courseSlug: course.slug,
+          amountFormatted: formatNaira(purchase.amount),
+          reference: purchase.paystackReference,
+          paidAt: now,
+          method: "Card",
+        },
+      );
+    }
+
+    // A purchase creates the enrollment, so the enrollment drip and
+    // confirmation are queued here too. Re-running this mutation returns early
+    // on `status === "paid"`, so neither can fire twice.
+    if (newEnrollmentId) {
+      await ctx.runMutation(scheduleDripRef, {
+        enrollmentId: newEnrollmentId,
+      });
+    }
+
     if (course) {
       await createNotification(ctx, {
         userId: purchase.userId,

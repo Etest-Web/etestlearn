@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { escapeHtml, isSmtpConfigured, sendMail } from "@/lib/mail";
+import { escapeHtml, isMailConfigured, sendMail } from "@/lib/mail";
+import {
+  emailKeyValueRows,
+  emailLayout,
+  emailParagraph,
+} from "@/lib/emails/layout";
 import { consumeDurableRateLimit } from "@/lib/durable-rate-limit";
 
 type InstructorApplicationPayload = {
@@ -216,9 +221,9 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!isSmtpConfigured()) {
+  if (!isMailConfigured()) {
     return NextResponse.json(
-      { error: "SMTP settings are not configured." },
+      { error: "Email delivery is not configured." },
       { status: 500 }
     );
   }
@@ -232,27 +237,34 @@ export async function POST(request: Request) {
     ["Motivation", application.motivation],
   ];
 
-  const tableRows = fields
-    .map(
-      ([label, value]) =>
-        `<tr>` +
-        `<td style="padding:8px 12px;border:1px solid #E8E3E9;font-weight:600;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td>` +
-        `<td style="padding:8px 12px;border:1px solid #E8E3E9;">${escapeHtml(value)}</td>` +
-        `</tr>`
-    )
-    .join("");
+  const bodyHtml =
+    emailParagraph(
+      `${escapeHtml(application.fullName)} applied to teach on Glypha Learn. ` +
+        "Reply straight to this email to answer them.",
+    ) + emailKeyValueRows(fields);
 
   try {
     await sendMail({
+      group: "instructors",
       to: destinationEmail,
+      // Replies go to the applicant, so an admin can answer from their inbox
+      // without opening the review queue.
       replyTo: application.email,
-      subject: `New Instructor Application — ${application.fullName}`,
-      text: fields
-        .map(([label, value]) => `${label}: ${value}`)
-        .join("\n"),
-      html:
-        `<p>A new instructor application was submitted on Glypha Learn:</p>` +
-        `<table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">${tableRows}</table>`,
+      subject: `Instructor application: ${application.fullName}`,
+      text: [
+        `New instructor application from ${application.fullName}.`,
+        "",
+        ...fields.map(([label, value]) => `${label}: ${value}`),
+        "",
+        `Reply to this email to reach ${application.email}.`,
+      ].join("\n"),
+      html: emailLayout({
+        preheader: `${application.fullName} wants to teach on Glypha Learn`,
+        eyebrow: "Instructor application",
+        heading: `${application.fullName} applied to teach`,
+        body: bodyHtml,
+        footnote: `Sent to the review inbox. The applicant's address is set as the reply-to.`,
+      }),
     });
   } catch (error) {
     console.error(

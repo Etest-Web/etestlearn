@@ -19,7 +19,7 @@ certificates with PDF/email/public verification, Paystack payments, instructor &
 | Language | TypeScript 5, `strict: true` | Path alias `@/*` → project root |
 | Tests | **Vitest 4** + `convex-test` | Node environment only, no DOM/component tests |
 | Package manager | **pnpm 10** | CI pins Node 22 |
-| Other | `pdf-lib` (certificates), `nodemailer` (email), `svix` (Clerk webhooks), `recharts`, `gsap`, `sonner` | |
+| Other | `pdf-lib` (certificates), `resend` (email), `nodemailer` (email fallback), `svix` (Clerk webhooks), `recharts`, `gsap`, `sonner` | |
 
 ### Key commands
 
@@ -68,7 +68,7 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
 ## 3. Architecture rules (read before changing anything)
 
 1. **All domain logic belongs in `convex/`.** Next route handlers are the exception and exist only
-   when you need Node-side SMTP/nodemailer or in-memory state (currently just
+   when you need a Node runtime for third-party SDKs or in-memory state (currently just
    `app/api/instructor-applications/notify/route.ts`).
 2. **Server-side authorization is mandatory.** Client role checks (`useQuery(api.users.getCurrentUser)`,
    `components/instructor-guard.tsx`, `app/dashboard/layout.tsx`) are UX only. Every Convex function
@@ -226,8 +226,12 @@ Set Next-side vars in `.env` / `.env.local` (gitignored). Set Convex-side vars w
 | `CLERK_WEBHOOK_SECRET` | `convex/http.ts` svix verification |
 | `CLERK_SYNC_TOKEN` | `convex/users.ts` `syncFromClerk` (fail-closed) |
 | `NOTIFY_RATE_LIMIT_TOKEN` | `convex/rateLimit.ts`, `lib/durable-rate-limit.ts` |
-| `PAYSTACK_SECRET_KEY` | `convex/http.ts` (webhook HMAC), `convex/paystack.ts` |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | `lib/mail.ts` |
+| `PAYSTACK_SECRET_KEY` | `convex/http.ts` (webhook HMAC), `convex/paystack.ts`, `convex/bankVerification.ts` (payout account resolve) |
+| `BANK_ENCRYPTION_KEY` | `convex/helpers/encryption.ts` — AES-256-GCM key for instructor payout account numbers. Convex-side only, fail-closed; generate 32 random bytes base64-encoded and never lose it (stored numbers become unreadable) |
+| `SUPPORT_EMAIL` / `NEXT_PUBLIC_SUPPORT_EMAIL` | `lib/support.ts` — the "contact support" address in payout emails, errors and the bank page. Default `noreply@glypha.com.ng`; the first name is read server-side (Convex), the `NEXT_PUBLIC_` one in the browser |
+| `RESEND_API_KEY` / `RESEND_FROM` | `lib/mail.ts` — preferred mail provider. `RESEND_FROM` is the fallback From for any group left unset. Needs `npx convex env set` too: `convex/certificateArtifacts.ts` and `convex/emailCampaigns.ts` send from inside `"use node"` actions |
+| `MAIL_FROM_ACCOUNT` / `_COURSES` / `_BILLING` / `_CERTIFICATES` / `_NOTIFICATIONS` / `_INSTRUCTORS` / `_UPDATES` | `lib/mail-senders.ts` — one From per email category. See `docs/email-senders.md` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | `lib/mail.ts` — fallback provider, used only when Resend is not fully configured |
 | `INSTRUCTOR_APPLICATION_EMAIL` | notify route |
 | `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_SITE_URL` | `convex dev` CLI / Convex site URL |
 | `VIDEO_PLAYBACK_SECRET` | `lib/video-playback-token.ts` (token HMAC, fail-closed), `convex/http.ts` playback gate |
@@ -239,12 +243,54 @@ Set Next-side vars in `.env` / `.env.local` (gitignored). Set Convex-side vars w
 
 Missing-from-env-but-required-by-code checklist: `PAYSTACK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`,
 `CLERK_SYNC_TOKEN`, `NOTIFY_RATE_LIMIT_TOKEN`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`,
-`NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`, `VIDEO_PLAYBACK_SECRET`, `APP_ORIGIN`, `UPLOADTHING_TOKEN`.
+`NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`, `VIDEO_PLAYBACK_SECRET`, `APP_ORIGIN`, `UPLOADTHING_TOKEN`,
+`RESEND_API_KEY` (or the `SMTP_*` set), `INSTRUCTOR_APPLICATION_EMAIL`, `BANK_ENCRYPTION_KEY`.
+The seven
+`MAIL_FROM_*` variables are optional individually; `RESEND_FROM` covers any that are unset.
 
 ---
 
 ## 7. Gotchas & do-not-touch
 
+- **`lib/mail.ts` is provider-aware: Resend first, SMTP fallback.** `activeMailProvider()`
+  decides per send; both providers satisfy the same `sendMail` contract, so call sites never
+  branch on it. Three things to preserve if you touch it:
+  - `isResendConfigured()` requires **both** `RESEND_API_KEY` and `RESEND_FROM`. A key without a
+    verified sender is treated as *not* configured, because `isMailConfigured()` gates the notify
+    route and the certificate action — reporting ready and then throwing per send is the failure
+    mode worth avoiding.
+  - Resend reports API failures in the response body of a resolved promise; it does not throw.
+    `sendViaResend` checks `result.error` and rethrows. Dropping that check makes the notify route
+    return `200` for mail that was never sent.
+  - Mail env must exist in **two** runtimes. `.env.local` covers the Next route handler;
+    `npx convex env set RESEND_API_KEY …` is what `convex/certificateArtifacts.ts` and
+    `convex/emailCampaigns.ts` read, since they send from `"use node"` actions. Setting only
+    the first leaves certificate and drip mail silently skipped (they log a warning and
+    return, deliberately — mail never blocks issuance).
+- **Lifecycle email (`lib/emails/`, `convex/emailCampaigns*.ts`).** Every send needs three
+  things, and the order matters:
+  1. A `dedupeKey`, claimed via `internal.emailDeliveries.claim` **before** the network call.
+     Convex retries failed actions and a retried mutation can schedule a drip step twice, so
+     without the claim a flaky provider becomes a duplicate email. `claimed` rows are honoured
+     for 10 minutes; `sent` and `skipped` are final; `failed` is retryable on purpose (a lost
+     receipt costs real money).
+  2. A template in `lib/emails/templates.ts`, rendered with `renderEmail(id, data)`.
+  3. A sender group. `sendMail` **requires** `group`, so there is no way to send from an
+     ungrouped address; `lib/mail-senders.ts` owns the seven groups and resolves
+     `MAIL_FROM_<GROUP>` → `RESEND_FROM` → `SMTP_FROM`.
+  Delivery never blocks its trigger: `deliver()` swallows provider errors after recording them,
+  so a purchase stays settled and a certificate stays issued when mail is down.
+- **The drip has one owner.** `emailCampaignsData.scheduleDrip` queues
+  `courseNotStarted` / `courseStalled` / `courseAlmostDone` / `courseStalledFinal` at days
+  2 / 7 / 12 / 21 from the enrollment, guarded by a `dripScheduled:<id>` ledger row. The
+  in-app `checkUserInactivityReminders` in `convex/enrollments.ts` deliberately does NOT email
+  the same situation — adding it would mail a learner twice for one gap. Likewise
+  `helpers/notifications.ts` mirrors only `discussion_reply` into email.
+- **Actions call each other by name, not through `internal`.** `emailCampaigns.ts` is itself
+  in `_generated/api`, so importing `internal` from there to reach its own siblings makes
+  TypeScript infer a return type from a cycle it sits inside and collapses the file to `any`
+  (TS7022). Those calls use `makeFunctionReference` with explicit arg/result types, the same
+  workaround `lib/durable-rate-limit.ts` uses. Keep it.
 - **`proxy.ts` at the repo root is the Next 16 middleware** (Next renamed `middleware.ts` →
   `proxy.ts`). There is **no** `middleware.ts` — do not "fix" this by adding one; you'd run two
   handlers. Public routes: `/sign-in`, `/sign-up`, `/`, `/courses(.*)`, `/verify(.*)` and the one
@@ -269,19 +315,32 @@ Missing-from-env-but-required-by-code checklist: `PAYSTACK_SECRET_KEY`, `CLERK_W
   `app/globals.css` (see `components.json`, style `base-vega`, extra `@react-bits` registry).
 - **Payments:** prices are stored in **kobo** (`courses.price`, integer) with `currency`.
   Paystack webhook is idempotent (`internal.payments.markPurchasePaid`).
+- **Instructor payout bank details are one-shot and encrypted.** `convex/instructorBank.ts`
+  owns the policy: an instructor saves an account exactly once, verified via Paystack's
+  `/bank/resolve` from the `"use node"` action `convex/bankVerification.ts` (the default
+  runtime has no `fetch`). The raw number is stored only as AES-256-GCM ciphertext
+  (`convex/helpers/encryption.ts`, keyed by `BANK_ENCRYPTION_KEY`); the UI reads a
+  last-four mask derived at read time. Changes go through support (`lib/support.ts`), never a
+  self-service edit — do not add an "edit bank details" path without re-reading that comment.
+  The bank dropdown is `lib/banks.ts`, generated by `node scripts/generate-banks.mjs` from
+  Paystack's `/bank?country=nigeria`; re-run the script to refresh it.
 - **Video lessons are URL-based** (YouTube/Vimeo/MP4) — direct video upload is intentionally
   unsupported.
 - **Lesson authoring uses Markdown** (`react-markdown` + `remark-gfm`), not a rich-text editor.
 - Naming: components kebab-case (`video-player.tsx`); Convex modules camelCase domain names
   (`certificateTemplates.ts`); internal functions camelCase verbs (`issueIfEligible`,
   `markPurchasePaid`).
+- `convex/emailCampaignsData.ts` holds the reads the mail actions need, because a `"use node"`
+  module may only export actions. Keep it `internal` only.
 - Prefer changing existing docs over creating new Markdown files (because of the `*.md` ignore).
+  `docs/*.md` is force-added (`git add -f`) when a doc is genuinely needed.
 
 ---
 
 ## 8. Existing docs (read these for depth)
 
 - `docs/CERTIFICATES.md` — authoritative doc on issuance, templates, artifacts, verification.
+- `docs/email-senders.md` — the seven sender groups and the `MAIL_FROM_*` variables.
 - `COMPLETION_PLAN.md` — roadmap status: phases 0–5 done, phase 6 (testing) mostly done
   (Playwright E2E deferred), phase 7 (production launch: Vercel + Convex prod + live keys) pending.
 - `implementation_plan.md`, `lms-platform-nextjs-plan_2d6de771.plan.md` — historical planning

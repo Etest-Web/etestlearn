@@ -337,6 +337,11 @@ export function DashboardSidebar() {
         api.courses.countPendingUnpublishRequests,
         isAdmin ? {} : "skip",
     );
+    // Not gated on `isAdmin`: the gate in `proxy.ts` exempts *staff*, and this
+    // badge is how an instructor finds out the site they are working on is not
+    // publicly reachable. `getStatus` is public and reads one row, so there is no
+    // role check to skip.
+    const maintenance = useQuery(api.maintenance.getStatus);
 
     // One query drives both header counts rather than two, so the header costs a
     // single subscription.
@@ -346,6 +351,7 @@ export function DashboardSidebar() {
         unread: (unread?.messages ?? 0) + (unread?.notifications ?? 0),
         pendingApplications: pendingApplications ?? 0,
         pendingUnpublish: pendingUnpublish ?? 0,
+        maintenanceOn: maintenance?.enabled ? 1 : 0,
     };
 
     /**

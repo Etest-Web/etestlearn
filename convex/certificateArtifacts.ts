@@ -10,15 +10,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { renderCertificatePdf } from "../lib/certificate-pdf";
-import {
-  button,
-  emailShell,
-  escapeHtml,
-  isSmtpConfigured,
-  sendMail,
-  siteUrl,
-} from "../lib/mail";
-import { formatCertificateDate } from "../lib/certificates";
+import { siteUrl } from "../lib/mail";
 
 export const issueCertificateArtifacts = internalAction({
   args: {
@@ -76,39 +68,10 @@ export const issueCertificateArtifacts = internalAction({
       console.error("Failed to render certificate PDF:", error);
     }
 
-    if (!args.holderEmail) return;
-    if (!isSmtpConfigured()) {
-      console.warn(
-        "SMTP is not configured — skipping certificate email for",
-        args.holderEmail,
-      );
-      return;
-    }
-
-    try {
-      await sendMail({
-        to: args.holderEmail,
-        subject: `Your certificate for ${args.courseTitle}`,
-        text: [
-          `Congratulations ${args.holderName},`,
-          ``,
-          `You completed ${args.courseTitle} on Glypha Learn.`,
-          `Certificate ID: ${args.serial}`,
-          `Completed on: ${formatCertificateDate(args.issuedAt)}`,
-          ``,
-          `View and verify your certificate: ${verifyUrl}`,
-        ].join("\n"),
-        html: emailShell(
-          `<p>Congratulations ${escapeHtml(args.holderName)},</p>` +
-            `<p>You have completed <strong>${escapeHtml(args.courseTitle)}</strong> ` +
-            `on ${escapeHtml(formatCertificateDate(args.issuedAt))}. Your certificate is ready to view, download, and share.</p>` +
-            `<p style="margin:24px 0;">${button("View my certificate", verifyUrl)}</p>` +
-            `<p style="font-size:13px;color:#6B6570;">Certificate ID ${escapeHtml(args.serial)}</p>`,
-        ),
-      });
-    } catch (error) {
-      console.error("Failed to send certificate email:", error);
-    }
+    // The notice itself is not sent from here. It goes through
+    // `emailCampaigns.sendCertificateIssued` so it uses the shared template and
+    // the dedupe ledger, keyed on the certificate id. Hand-rolled here it would
+    // be a second copy of the same email with no duplicate protection.
   },
 });
 

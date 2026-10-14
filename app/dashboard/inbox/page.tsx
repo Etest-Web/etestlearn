@@ -186,6 +186,18 @@ const NOTIFICATION_ICONS: Record<
     tint: "text-success bg-success/10",
     verb: "Referral reward earned",
   },
+  bank_info_required: {
+    icon: PencilLine,
+    // Something the reader has to go do, so it wears the same tint as the other
+    // actionable notices rather than the success one it eventually earns.
+    tint: "text-info bg-info/10",
+    verb: "Payout details needed",
+  },
+  bank_details_added: {
+    icon: BadgeCheck,
+    tint: "text-success bg-success/10",
+    verb: "Payout account verified",
+  },
 };
 
 // ─── Small shared pieces ────────────────────────────────────────────────────

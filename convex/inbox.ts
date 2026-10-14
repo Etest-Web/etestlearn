@@ -192,6 +192,11 @@ export const NOTIFICATION_TYPES = [
   // course"); `referral_reward` is the account credit that came with it.
   "referral_converted",
   "referral_reward",
+  // Payout onboarding (see `convex/instructorBank.ts`). The nudge fires once
+  // for an instructor whose console has no bank details on file; the
+  // confirmation fires when Paystack verification succeeds.
+  "bank_info_required",
+  "bank_details_added",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -213,6 +218,8 @@ export const notificationTypeValidator = v.union(
   v.literal("instructor_application_reviewed"),
   v.literal("referral_converted"),
   v.literal("referral_reward"),
+  v.literal("bank_info_required"),
+  v.literal("bank_details_added"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

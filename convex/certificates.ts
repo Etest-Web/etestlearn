@@ -191,7 +191,6 @@ async function issueForUser(
       certificateId,
       serial,
       holderName,
-      holderEmail: holder?.email ?? undefined,
       courseTitle: course.title,
       issuerName,
       issuedAt,
@@ -200,6 +199,26 @@ async function issueForUser(
       templateId: templateId ?? undefined,
     },
   );
+
+  // The learner-facing notice, as its own scheduled action so it goes through
+  // the shared template and the dedupe ledger. Separate from the PDF action on
+  // purpose: the PDF is a best-effort artifact, while this one carries the
+  // verify link, and neither should be able to fail the other.
+  if (holder?.email) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.emailCampaigns.sendCertificateIssued,
+      {
+        certificateId,
+        userId: user._id,
+        email: holder.email,
+        ...(holder.name ? { name: holder.name } : {}),
+        courseTitle: course.title,
+        serial,
+        issuedAt,
+      },
+    );
+  }
 
   return certificateId;
 }

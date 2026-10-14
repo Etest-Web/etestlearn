@@ -1,18 +1,73 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { Resend } from "resend";
+import {
+  envVarForGroup,
+  MAIL_SENDER_GROUPS,
+  senderForGroup,
+  type MailSenderGroup,
+} from "./mail-senders";
 
 /**
- * Shared SMTP transport. Previously inlined in the instructor-application API
- * route; certificate issuance needs the same transport, and duplicating env
- * handling in two places invites drift.
+ * Shared outbound mail transport. Previously inlined in the instructor-
+ * application API route; certificate issuance needs the same transport, and
+ * duplicating env handling in two places invites drift.
+ *
+ * Resend is the preferred provider. SMTP (nodemailer) is kept as a fallback so
+ * an environment that has not moved its keys over yet still delivers mail
+ * instead of silently dropping it. Both providers satisfy the same
+ * `sendMail` contract, so no call site knows which one actually ran.
  */
 
+export type MailProvider = "resend" | "smtp";
+
+/**
+ * Resend needs an API key and at least one usable From address. A per-group
+ * address counts, so a deployment that sets `MAIL_FROM_COURSES` but no global
+ * `RESEND_FROM` is still configured.
+ */
+export function isResendConfigured(): boolean {
+  if (!process.env.RESEND_API_KEY) return false;
+  return MAIL_SENDER_GROUPS.some((group) => senderForGroup(group) !== null);
+}
+
 export function isSmtpConfigured(): boolean {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return Boolean(
+    process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS,
+  );
+}
+
+/**
+ * True when at least one provider can actually deliver. Call sites gate on this
+ * before doing the work of building a message.
+ */
+export function isMailConfigured(): boolean {
+  return isResendConfigured() || isSmtpConfigured();
+}
+
+/** Which provider would handle the next send, or null if none can. */
+export function activeMailProvider(): MailProvider | null {
+  if (isResendConfigured()) return "resend";
+  if (isSmtpConfigured()) return "smtp";
+  return null;
+}
+
+let cachedResend: Resend | null = null;
+
+function getResend(): Resend {
+  if (cachedResend) return cachedResend;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("Resend is not configured. Set RESEND_API_KEY.");
+  }
+
+  cachedResend = new Resend(apiKey);
+  return cachedResend;
 }
 
 let cached: Transporter | null = null;
 
-export function getTransporter(): Transporter {
+function getTransporter(): Transporter {
   if (cached) return cached;
 
   const host = process.env.SMTP_HOST;
@@ -54,43 +109,74 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export async function sendMail(options: {
+export type SendMailOptions = {
+  /** Which sender identity this email is sent as. See `lib/mail-senders.ts`. */
+  group: MailSenderGroup;
   to: string;
   subject: string;
   text: string;
   html: string;
   replyTo?: string;
-}): Promise<void> {
-  const user = process.env.SMTP_USER;
+};
+
+export async function sendMail(options: SendMailOptions): Promise<void> {
+  const provider = activeMailProvider();
+
+  if (provider === "resend") return sendViaResend(options);
+  if (provider === "smtp") {
+    // A half-set-up Resend key is worth a warning: mail still goes out, but
+    // from the SMTP identity the operator may not expect.
+    if (process.env.RESEND_API_KEY) {
+      console.warn(
+        "RESEND_API_KEY is set but RESEND_FROM is missing or empty — falling back to SMTP.",
+      );
+    }
+    return sendViaSmtp(options);
+  }
+
+  throw new Error(
+    "No mail provider is configured. Set RESEND_API_KEY and RESEND_FROM, or SMTP_HOST, SMTP_USER and SMTP_PASS.",
+  );
+}
+
+async function sendViaResend(options: SendMailOptions): Promise<void> {
+  const from = senderForGroup(options.group);
+  if (!from) {
+    throw new Error(
+      `No From address is configured for the "${options.group}" group. Set ${envVarForGroup(options.group)} or RESEND_FROM.`,
+    );
+  }
+
+  const { error } = await getResend().emails.send({
+    from,
+    to: options.to,
+    subject: options.subject,
+    text: options.text,
+    html: options.html,
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+  });
+
+  // Resend reports API failures in the response body and still resolves, so an
+  // unchecked call would look like a successful send to every caller.
+  if (error) {
+    throw new Error(
+      `Resend rejected the message: ${error.message}${
+        error.name ? ` (${error.name})` : ""
+      }`,
+    );
+  }
+}
+
+async function sendViaSmtp(options: SendMailOptions): Promise<void> {
+  const from = senderForGroup(options.group) ?? process.env.SMTP_USER;
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || user,
-    ...options,
+    from,
+    to: options.to,
+    subject: options.subject,
+    text: options.text,
+    html: options.html,
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
   });
-}
-
-/** Card wrapper so learner-facing mail matches the rest of the product. */
-export function emailShell(inner: string): string {
-  return (
-    `<div style="background:#F7F5F8;padding:24px 0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#1F1B1D;">` +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">` +
-    `<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #E8E3E9;border-radius:16px;">` +
-    `<tr><td style="padding:28px 32px 8px;">` +
-    `<span style="font-size:18px;font-weight:700;color:#945DA3;">Glypha Learn</span>` +
-    `</td></tr>` +
-    `<tr><td style="padding:8px 32px 32px;line-height:1.6;font-size:15px;">${inner}</td></tr>` +
-    `<tr><td style="padding:0 32px 28px;font-size:12px;color:#6B6570;border-top:1px solid #F0EDF2;">` +
-    `You are receiving this because you completed a course on Glypha Learn.` +
-    `</td></tr>` +
-    `</table></td></tr></table></div>`
-  );
-}
-
-export function button(label: string, href: string): string {
-  return (
-    `<a href="${escapeHtml(href)}" style="display:inline-block;background:#945DA3;color:#FFFFFF;` +
-    `text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:15px;">` +
-    `${escapeHtml(label)}</a>`
-  );
 }

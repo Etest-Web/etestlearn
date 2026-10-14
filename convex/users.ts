@@ -1,7 +1,15 @@
 import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { makeFunctionReference } from "convex/server";
 import { logAudit } from "./helpers/audit";
 import { checkUserInactivityReminders } from "./enrollments";
+
+// Named rather than taken from `internal`, which does not list the email
+// modules until codegen has run. Same wire name either way.
+const sendWelcomeRef = makeFunctionReference<"action">(
+  "emailCampaigns:sendWelcome",
+);
 
 /**
  * Constant-time string compare. A plain `!==` on a shared secret leaks its
@@ -46,12 +54,27 @@ export const upsertFromClerk = internalMutation({
       return;
     }
 
-    await ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       clerkId: args.clerkId,
       ...profile,
       role: "student",
       createdAt: Date.now(),
     });
+
+    // Welcome mail, scheduled rather than sent inline: this mutation is the
+    // Clerk webhook's write path, and it must not wait on a mail provider. The
+    // scheduled action is keyed on the user id, so a webhook redelivery (which
+    // would land on the `existing` branch above and return early) cannot
+    // produce a second welcome.
+    await ctx.scheduler.runAfter(
+      0,
+      sendWelcomeRef,
+      {
+        userId,
+        ...(profile.email !== undefined ? { email: profile.email } : {}),
+        ...(profile.name !== undefined ? { name: profile.name } : {}),
+      },
+    );
   },
 });
 

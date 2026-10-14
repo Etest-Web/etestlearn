@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requireUser } from "./helpers/auth";
 import { logAudit } from "./helpers/audit";
 import { requireRateLimit } from "./helpers/rateLimit";
@@ -226,6 +227,39 @@ export const persistVerifiedAccount = internalMutation({
       accountName,
       updatedAt: now,
     };
+  },
+});
+
+/**
+ * Public wrapper around the internal persist — called after the instructor
+ * has seen the resolved name and clicks "Save". This mutation does the
+ * encryption, audit, notification and email (via the same action pattern,
+ * but the email is fire-and-forget from here since the action already ran).
+ *
+ * The action flow is: verifyBankAccount (action) → confirmBankAccount (mutation).
+ * This split lets the UI show the resolved name before the instructor commits.
+ */
+export const confirmBankAccount = mutation({
+  args: {
+    accountNumber: v.string(),
+    bankCode: v.string(),
+    accountName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const saved = await ctx.runMutation(
+      internal.instructorBank.persistVerifiedAccount,
+      args,
+    );
+    // The persist mutation returns the mask etc., but we also need to send
+    // the confirmation email. Since we're in a mutation (no fetch), we schedule
+    // the email action.
+    await ctx.scheduler.runAfter(0, internal.bankVerification.sendBankConfirmationEmail, {
+      accountNumber: args.accountNumber,
+      bankCode: args.bankCode,
+      accountName: args.accountName,
+      accountNumberMasked: saved.accountNumberMasked,
+    });
+    return saved;
   },
 });
 

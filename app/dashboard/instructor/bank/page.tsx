@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import { BadgeCheck, Lock, Search, ShieldAlert } from "lucide-react";
+import { BadgeCheck, Lock, Search, ShieldAlert, X } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import { BANKS } from "@/lib/banks";
@@ -34,34 +34,34 @@ import { PageShell } from "@/components/dashboard-shell";
 /**
  * Instructor payout details — the one page that decides where money goes.
  *
- * Two states, deliberately not one: the **form** while nothing is on file,
- * and a **read-only summary** afterwards. The absence of an edit button is
- * the product decision from `convex/instructorBank.ts` made visible — the
- * account is one-shot, so this page's job after saving is to display the
- * verified detail and point at support for changes, not to invite a second
- * attempt that the server would refuse anyway. Showing the disabled truth is
- * better than showing a form that fails on submit.
+ * Three states:
+ * 1. **Form** — enter bank + account number, click "Verify" to resolve the
+ *    account name via Paystack (no save yet).
+ * 2. **Confirm** — Paystack returned the account name; the instructor reviews
+ *    it and clicks "Save" to commit.
+ * 3. **Verified** — read-only summary with the support link for changes.
  *
  * The bank list is `lib/banks.ts`, a generated snapshot of Paystack's
  * directory (see `scripts/generate-banks.mjs`), so the dropdown works even
- * when Paystack is only needed for the actual resolve call on submit.
+ * when Paystack is only needed for the actual resolve call on verify.
  */
 
 const ACCOUNT_NUMBER_PATTERN = /^\d{10}$/;
 
 export default function BankDetailsPage() {
   const bankInfo = useQuery(api.instructorBank.getBankInfo);
-  const verifyAndSave = useAction(
-    api.bankVerification.verifyAndSaveBankAccount,
-  );
+  const verify = useAction(api.bankVerification.verifyBankAccount);
+  const confirm = useMutation(api.instructorBank.confirmBankAccount);
 
   const [bankCode, setBankCode] = useState("");
   const [bankFilter, setBankFilter] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [justVerified, setJustVerified] = useState<{
+  const [verifying, setVerifying] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [verifiedPreview, setVerifiedPreview] = useState<{
     accountName: string;
-    accountNumberMasked: string;
+    accountNumber: string;
+    bankCode: string;
   } | null>(null);
 
   const selectedBank = useMemo(
@@ -88,7 +88,7 @@ export default function BankDetailsPage() {
     return matches;
   }, [bankFilter, bankCode]);
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleVerify(event: React.FormEvent) {
     event.preventDefault();
 
     const accountNumberValue = accountNumber.trim();
@@ -101,35 +101,54 @@ export default function BankDetailsPage() {
       return;
     }
 
-    setSubmitting(true);
+    setVerifying(true);
     try {
-      const result = await verifyAndSave({
+      const result = await verify({
         accountNumber: accountNumberValue,
         bankCode: selectedBank.code,
       });
-      // The resolved name is the proof the check happened — show it
-      // immediately while the query catches up.
-      setJustVerified({
+      // Store the resolved details for the confirm step.
+      setVerifiedPreview({
         accountName: result.accountName,
-        accountNumberMasked: result.accountNumberMasked,
+        accountNumber: accountNumberValue,
+        bankCode: selectedBank.code,
       });
-      setAccountNumber("");
-      setBankCode("");
-      setBankFilter("");
-      // Clear the toast state after the user sees it; the query will
-      // render the full VerifiedAccount view once it updates.
-      setTimeout(() => setJustVerified(null), 3000);
     } catch (error) {
-      // Server messages are written for humans (rate limit, already saved,
-      // Paystack's own reason), so they are shown verbatim.
       toast.error(
         error instanceof Error
           ? error.message
           : "We could not verify that account. Please try again.",
       );
     } finally {
-      setSubmitting(false);
+      setVerifying(false);
     }
+  }
+
+  async function handleConfirm() {
+    if (!verifiedPreview) return;
+
+    setSaving(true);
+    try {
+      await confirm(verifiedPreview);
+      // Clear form; the query will render the full VerifiedAccount view.
+      setVerifiedPreview(null);
+      setAccountNumber("");
+      setBankCode("");
+      setBankFilter("");
+      toast.success("Bank details saved");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not save the account. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setVerifiedPreview(null);
   }
 
   return (
@@ -153,10 +172,17 @@ export default function BankDetailsPage() {
           }
           updatedAt={bankInfo.updatedAt}
         />
-      ) : justVerified ? (
-        <JustVerified
-          accountName={justVerified.accountName}
-          accountNumberMasked={justVerified.accountNumberMasked}
+      ) : verifiedPreview ? (
+        <ConfirmAccount
+          accountName={verifiedPreview.accountName}
+          accountNumber={verifiedPreview.accountNumber}
+          bankName={
+            BANKS.find((bank) => bank.code === verifiedPreview.bankCode)?.name ??
+            verifiedPreview.bankCode
+          }
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+          saving={saving}
         />
       ) : (
         <Card>
@@ -168,7 +194,7 @@ export default function BankDetailsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleVerify} className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="bank-select">Bank</Label>
                 <div className="flex flex-col gap-2">
@@ -183,13 +209,13 @@ export default function BankDetailsPage() {
                       placeholder="Search banks…"
                       className="pl-9"
                       aria-label="Filter banks"
-                      disabled={submitting}
+                      disabled={verifying}
                     />
                   </div>
                   <Select
                     value={bankCode}
                     onValueChange={(value) => setBankCode(value ?? "")}
-                    disabled={submitting}
+                    disabled={verifying}
                   >
                     <SelectTrigger
                       id="bank-select"
@@ -237,7 +263,7 @@ export default function BankDetailsPage() {
                   placeholder="10 digits"
                   className="tabular"
                   maxLength={10}
-                  disabled={submitting}
+                  disabled={verifying}
                 />
               </div>
 
@@ -262,9 +288,9 @@ export default function BankDetailsPage() {
                 </p>
                 <Button
                   type="submit"
-                  disabled={submitting || !bankCode || accountNumber.length !== 10}
+                  disabled={verifying || !bankCode || accountNumber.length !== 10}
                 >
-                  {submitting ? "Verifying…" : "Verify & save"}
+                  {verifying ? "Verifying…" : "Verify account"}
                 </Button>
               </div>
             </form>
@@ -275,35 +301,67 @@ export default function BankDetailsPage() {
   );
 }
 
-function JustVerified({
+function ConfirmAccount({
   accountName,
-  accountNumberMasked,
+  accountNumber,
+  bankName,
+  onConfirm,
+  onCancel,
+  saving,
 }: {
   accountName: string;
-  accountNumberMasked: string;
+  accountNumber: string;
+  bankName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  saving: boolean;
 }) {
+  // Mask: keep only last 4 digits
+  const masked = accountNumber.length > 4
+    ? "*".repeat(accountNumber.length - 4) + accountNumber.slice(-4)
+    : "*".repeat(accountNumber.length);
+
   return (
     <Card className="border-success">
       <CardContent className="flex flex-col gap-4">
-        <div className="flex items-center gap-3 rounded-xl bg-success/5 p-4">
-          <BadgeCheck className="size-6 text-success" aria-hidden />
-          <div>
-            <p className="font-semibold text-success">Account verified</p>
-            <p className="text-sm text-muted-foreground">
-              Paystack confirmed this account belongs to <strong>{accountName}</strong>
-            </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 rounded-xl bg-success/5 p-4">
+            <BadgeCheck className="size-6 text-success" aria-hidden />
+            <div>
+              <p className="font-semibold text-success">Account verified</p>
+              <p className="text-sm text-muted-foreground">
+                Paystack confirmed this account belongs to <strong>{accountName}</strong>
+              </p>
+            </div>
           </div>
+          <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Cancel">
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-        <div className="rounded-lg border bg-surface-sunken p-4 text-center">
-          <p className="text-sm text-muted-foreground">Account number</p>
-          <p className="tabular text-2xl font-semibold text-foreground">
-            {accountNumberMasked}
+
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+          <div>
+            <dt className="eyebrow">Account holder</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">{accountName}</dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Bank</dt>
+            <dd className="mt-1 text-sm font-medium text-foreground">{bankName}</dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Account number</dt>
+            <dd className="tabular mt-1 text-sm font-medium text-foreground">{masked}</dd>
+          </div>
+        </dl>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Please confirm these details are correct. This can only be done once.
           </p>
+          <Button onClick={onConfirm} disabled={saving}>
+            {saving ? "Saving…" : "Save account"}
+          </Button>
         </div>
-        <p className="text-xs text-muted-foreground text-center">
-          This will be your payout destination. The page will refresh shortly with
-          the full details.
-        </p>
       </CardContent>
     </Card>
   );

@@ -390,18 +390,18 @@ describe("consumeVerifyAttempt", () => {
   });
 });
 
-describe("verifyAndSaveBankAccount action", () => {
-  test("resolves via Paystack, saves, and returns the mask", async () => {
+describe("verifyBankAccount action + confirmBankAccount mutation", () => {
+  test("verify resolves via Paystack, then confirm saves and returns the mask", async () => {
     const t = await as(INSTRUCTOR, "instructor");
     const fetchMock = stubFetch(() => resolveOk("Ada Obi"));
 
-    const result = await t.action(
-      api.bankVerification.verifyAndSaveBankAccount,
+    // Step 1: verify
+    const verifyResult = await t.action(
+      api.bankVerification.verifyBankAccount,
       { accountNumber: ` ${ACCOUNT_NUMBER} `, bankCode: BANK_CODE },
     );
 
-    expect(result.accountName).toBe("Ada Obi");
-    expect(result.accountNumberMasked).toBe("******6789");
+    expect(verifyResult.accountName).toBe("Ada Obi");
 
     // The call went where it should, with the secret in the header.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -414,25 +414,38 @@ describe("verifyAndSaveBankAccount action", () => {
     const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer sk_test_dummy_for_unit_tests");
 
-    const row = await userRow(t, INSTRUCTOR);
+    // Nothing saved yet
+    let row = await userRow(t, INSTRUCTOR);
+    expect(row?.bankVerified).toBeFalsy();
+
+    // Step 2: confirm
+    const confirmResult = await t.mutation(
+      api.instructorBank.confirmBankAccount,
+      { accountNumber: ACCOUNT_NUMBER, bankCode: BANK_CODE, accountName: "Ada Obi" },
+    );
+
+    expect(confirmResult.accountName).toBe("Ada Obi");
+    expect(confirmResult.accountNumberMasked).toBe("******6789");
+
+    row = await userRow(t, INSTRUCTOR);
     expect(row?.bankVerified).toBe(true);
     expect(await decryptAccountNumber(row!.bankAccountEncrypted!)).toBe(
       ACCOUNT_NUMBER,
     );
   });
 
-  test("rejects malformed input before any network call", async () => {
+  test("verify rejects malformed input before any network call", async () => {
     const t = await as(INSTRUCTOR, "instructor");
     const fetchMock = stubFetch(() => resolveOk("Ada Obi"));
 
     await expect(
-      t.action(api.bankVerification.verifyAndSaveBankAccount, {
+      t.action(api.bankVerification.verifyBankAccount, {
         accountNumber: "12345",
         bankCode: BANK_CODE,
       }),
     ).rejects.toThrow(/10 digits/);
     await expect(
-      t.action(api.bankVerification.verifyAndSaveBankAccount, {
+      t.action(api.bankVerification.verifyBankAccount, {
         accountNumber: ACCOUNT_NUMBER,
         bankCode: "abc",
       }),
@@ -443,12 +456,12 @@ describe("verifyAndSaveBankAccount action", () => {
     expect(row?.bankVerified).toBeFalsy();
   });
 
-  test("surfaces Paystack's reason and saves nothing", async () => {
+  test("verify surfaces Paystack's reason and saves nothing", async () => {
     const t = await as(INSTRUCTOR, "instructor");
     stubFetch(() => resolveFail("Account does not exist"));
 
     await expect(
-      t.action(api.bankVerification.verifyAndSaveBankAccount, {
+      t.action(api.bankVerification.verifyBankAccount, {
         accountNumber: ACCOUNT_NUMBER,
         bankCode: BANK_CODE,
       }),
@@ -468,14 +481,38 @@ describe("verifyAndSaveBankAccount action", () => {
     ).rejects.toThrow(/Too many requests/);
   });
 
-  test("requires a signed-in caller", async () => {
+  test("verify requires a signed-in caller", async () => {
     const t = convexTest(testSchema, modules);
     stubFetch(() => resolveOk("Ada Obi"));
     await expect(
-      t.action(api.bankVerification.verifyAndSaveBankAccount, {
+      t.action(api.bankVerification.verifyBankAccount, {
         accountNumber: ACCOUNT_NUMBER,
         bankCode: BANK_CODE,
       }),
     ).rejects.toThrow(/Not authenticated/);
+  });
+
+  test("confirm rejects if account already verified", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    // First verify + confirm
+    const fetchMock = stubFetch(() => resolveOk("Ada Obi"));
+    await t.action(api.bankVerification.verifyBankAccount, {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+    });
+    await t.mutation(api.instructorBank.confirmBankAccount, {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+      accountName: "Ada Obi",
+    });
+
+    // Second confirm should fail
+    await expect(
+      t.mutation(api.instructorBank.confirmBankAccount, {
+        accountNumber: "9988776655",
+        bankCode: BANK_CODE,
+        accountName: "Different Name",
+      }),
+    ).rejects.toThrow(/already saved/);
   });
 });

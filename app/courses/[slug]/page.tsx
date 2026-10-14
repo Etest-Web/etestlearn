@@ -178,7 +178,7 @@ export default function CoursePage() {
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.contentType}
                       </p>
-                    </div}
+                    </div>
                     {lesson.durationMinutes && (
                       <span className="tabular text-xs text-muted-foreground">
                         {lesson.durationMinutes} min

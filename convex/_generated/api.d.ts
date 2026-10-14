@@ -40,6 +40,7 @@ import type * as inbox from "../inbox.js";
 import type * as instructorApplications from "../instructorApplications.js";
 import type * as instructorBank from "../instructorBank.js";
 import type * as instructorStats from "../instructorStats.js";
+import type * as maintenance from "../maintenance.js";
 import type * as payments from "../payments.js";
 import type * as paystack from "../paystack.js";
 import type * as quizzes from "../quizzes.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   instructorApplications: typeof instructorApplications;
   instructorBank: typeof instructorBank;
   instructorStats: typeof instructorStats;
+  maintenance: typeof maintenance;
   payments: typeof payments;
   paystack: typeof paystack;
   quizzes: typeof quizzes;

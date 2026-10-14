@@ -324,6 +324,27 @@ describe("nav data", () => {
     expect(badged).toContain("pendingUnpublish");
   });
 
+  it("keeps the maintenance switch in the admin sidebar", () => {
+    // It has to be a link, not a card on the overview: it is the one admin
+    // control somebody needs at 2am, and while maintenance is on every other
+    // page is showing a notice instead of the console. `maintenanceOn` badges it
+    // so an arriving admin can see the state without opening the page.
+    const item = adminGroup.items.find((i) => i.href === "/dashboard/admin/maintenance");
+    expect(item).toBeDefined();
+    expect(item!.label).toBe("Maintenance");
+    expect(item!.badge).toBe("maintenanceOn");
+  });
+
+  it("resolves the maintenance route to itself, not to a parent", () => {
+    const allItems = groupsForRole("admin").flatMap((g) => g.items);
+    expect(currentItemHref("/dashboard/admin/maintenance", allItems)).toBe(
+      "/dashboard/admin/maintenance",
+    );
+    expect(matchingItem("/dashboard/admin/maintenance", groupsForRole("admin"))?.badge).toBe(
+      "maintenanceOn",
+    );
+  });
+
   it("gives the learner console a Search entry", () => {
     // /dashboard/search previously lit up nothing in the sidebar.
     expect(learnGroup.items.map((i) => i.href)).toContain("/dashboard/search");

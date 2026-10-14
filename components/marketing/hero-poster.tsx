@@ -75,7 +75,7 @@ export function HeroPoster() {
       {/* A wash at a third of the strength the previous section used. Under
           the wave it only needs to stop the plane being a flat value. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-48 -top-56 h-[38rem] w-[38rem] rounded-full bg-brand/6 blur-3xl" />
+        <div className="absolute -left-48 -top-56 h-152 w-152 rounded-full bg-brand/6 blur-3xl" />
         <div className="absolute -bottom-64 -right-40 h-[30rem] w-[30rem] rounded-full bg-brand/5 blur-3xl" />
       </div>
 

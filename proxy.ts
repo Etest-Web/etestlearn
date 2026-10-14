@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher, type ClerkMiddlewareAuth } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
@@ -211,7 +211,18 @@ async function readMaintenanceStatus(): Promise<MaintenanceStatus> {
  * blocked, so its cost — a token mint plus an authenticated query — is paid
  * only during an outage.
  */
-async function isStaffRequest(auth: ClerkMiddlewareAuth): Promise<boolean> {
+/**
+ * The one capability this needs. Narrowed structurally rather than to Clerk's
+ * session-auth type: the handler's `auth` is typed as `AuthFn` (the
+ * server-component shape), which does not declare `getToken`, so naming it
+ * would force a cast at the call site. Declaring the surface actually used means
+ * the compiler checks the call rather than the assertion.
+ */
+type TokenBearer = {
+  getToken(): Promise<string | null>;
+};
+
+async function isStaffRequest(auth: TokenBearer): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) return false;
 
@@ -273,7 +284,14 @@ export default clerkMiddleware(async (auth, req) => {
     // Staff fall through rather than returning early — they must still meet
     // `auth.protect()` on protected routes below, exactly as they would with
     // the switch off.
-    if (!(await isStaffRequest(auth))) {
+    //
+    // The cast is because Clerk types the middleware handler's `auth` as the
+    // *server-component* `auth()` shape (`AuthFn`, a callable with `protect`),
+    // while the value actually handed to a middleware handler is the resolved
+    // session object, which does carry `getToken` — `clerkMiddleware.js` passes
+    // `requestState.toAuth()` straight through. Narrowing to the one method used
+    // here keeps the assumption in one place instead of spreading `any`.
+    if (!(await isStaffRequest(auth as unknown as TokenBearer))) {
       return maintenanceResponse(req);
     }
   }

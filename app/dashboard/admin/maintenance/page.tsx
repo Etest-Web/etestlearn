@@ -37,6 +37,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
+    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -111,12 +112,11 @@ function MaintenanceBody() {
     // The switch sends `enabled` alone. `setMode` treats an omitted `message` as
     // "leave as it is", which is what stops the toggle from writing back a copy
     // of the note captured before somebody else edited it.
-    const setEnabled = async (next: boolean) => {
+    const setEnabled = async (next: boolean): Promise<boolean> =>
         await run(
             () => setMode({ enabled: next }),
             next ? "Maintenance mode is on" : "Maintenance mode is off",
         );
-    };
 
     const saveDetails = async () => {
         const ok = await run(

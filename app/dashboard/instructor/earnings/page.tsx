@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useState, type FormEvent } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { BANKS } from "@/lib/banks";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,18 @@ import { formatAbsoluteDate, formatRelativeTime, pluralize } from "@/lib/utils";
 import { supportEmail, supportMailto } from "@/lib/support";
 import { useBankSetup } from "@/components/bank-setup-modal";
 import { ArrowRight, Banknote, BadgeCheck, Download, Lock, Percent, Receipt, Wallet } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 /**
  * Earnings — the money page.
@@ -153,19 +165,102 @@ function PayoutAccountSection() {
             className="mt-0.5 size-4 shrink-0 text-muted-foreground"
             aria-hidden
           />
-          <p className="text-sm leading-[1.5] text-muted-foreground">
-            This account is locked in place. To change it, email{" "}
-            <a
-              href={supportMailto("Change my payout bank account")}
-              className="font-medium text-brand link-quiet"
-            >
-              {supportEmail()}
-            </a>{" "}
-            from the address on your account.
-          </p>
+          <div className="flex-1 text-sm leading-[1.5] text-muted-foreground">
+            <p>
+              This account is locked in place. You can request a change below,
+              or email{" "}
+              <a
+                href={supportMailto("Change my payout bank account")}
+                className="font-medium text-brand link-quiet"
+              >
+                {supportEmail()}
+              </a>{" "}
+              from the address on your account.
+            </p>
+            <BankChangeRequestButton />
+          </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function BankChangeRequestButton() {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const request = useMutation(api.instructorBank.requestBankChange);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = reason.trim();
+    if (trimmed.length < 10) {
+      toast.error("Please provide at least 10 characters explaining the change");
+      return;
+    }
+    if (trimmed.length > 1000) {
+      toast.error("Reason must be 1000 characters or less");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await request({ reason: trimmed });
+      toast.success("Bank change request submitted. We'll reach out soon.");
+      setOpen(false);
+      setReason("");
+    } catch (error) {
+      toast.error((error as Error)?.message ?? "Failed to submit request");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={<Button variant="outline" size="sm" className="mt-3" />}
+      >
+        Request a change
+      </DialogTrigger>
+      <DialogContent>
+        <form onSubmit={submit} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>Request bank account change</DialogTitle>
+            <DialogDescription>
+              Tell us what needs to change (e.g., new bank, new account number, or correction).
+              We will follow up from support.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="bank-change-reason">Reason</Label>
+            <Textarea
+              id="bank-change-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Please explain what needs to change and why"
+              rows={4}
+              required
+              minLength={10}
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">{reason.trim().length}/1000 characters</p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Submitting..." : "Submit request"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

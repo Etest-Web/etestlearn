@@ -419,7 +419,7 @@ export function DashboardSidebar() {
                 <ModeSwitcher role={role} />
             </SidebarHeader>
 
-            <SidebarContent className="px-3 gap-4">
+            <SidebarContent data-tour="sidebar-nav" className="px-3 gap-4">
                 {railMode ? (
                     // Flat rail: every item as an icon, each with its label on
                     // hover. Group structure has no 48px to live in. Still only

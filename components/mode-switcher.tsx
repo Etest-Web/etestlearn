@@ -105,6 +105,7 @@ export function ModeSwitcher({ role }: { role: Role | null | undefined }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
+                data-tour="mode-switcher"
                 aria-label={`Switch console — currently ${modeLabel(active)}`}
                 className={cn(
                     "group/mode flex items-center gap-2 rounded-sm border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground transition-colors",

@@ -49,6 +49,7 @@ import type * as referrals from "../referrals.js";
 import type * as skills from "../skills.js";
 import type * as statistics from "../statistics.js";
 import type * as tasks from "../tasks.js";
+import type * as tutorial from "../tutorial.js";
 import type * as users from "../users.js";
 import type * as videoAssets from "../videoAssets.js";
 import type * as videoTranscode from "../videoTranscode.js";
@@ -101,6 +102,7 @@ declare const fullApi: ApiFromModules<{
   skills: typeof skills;
   statistics: typeof statistics;
   tasks: typeof tasks;
+  tutorial: typeof tutorial;
   users: typeof users;
   videoAssets: typeof videoAssets;
   videoTranscode: typeof videoTranscode;

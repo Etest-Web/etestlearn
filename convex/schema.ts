@@ -54,6 +54,15 @@ export default defineSchema({
     // referral page, so new and existing accounts share one generation path and
     // no backfill migration is needed. Indexed for code lookup at checkout.
     referralCode: v.optional(v.string()),
+    // ── Product tour (first-run onboarding) ─────────────────────────────────
+    // Stamped the first time a user finishes OR dismisses the guided tour, and
+    // absent until then — which is exactly what auto-opens it. Because the
+    // field is new, that means every existing account sees the tour once, on
+    // its first dashboard visit after deploy; from then on it is only ever
+    // re-run by hand. A timestamp rather than a boolean so a future "show it
+    // again after N months" rule has something to compare against without a
+    // migration. Re-runnable at any time from Settings.
+    tourCompletedAt: v.optional(v.number()),
     createdAt: v.number(),
     // Customization & accessibility preferences
     preferences: v.optional(v.object({

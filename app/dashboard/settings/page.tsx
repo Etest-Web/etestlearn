@@ -16,7 +16,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/dashboard-shell";
-import { Loader2, Save, Upload, User, Palette, Accessibility, Bell, Shield, Eye } from "lucide-react";
+import { useTour } from "@/components/product-tour";
+import { Loader2, Save, Upload, User, Palette, Accessibility, Bell, Shield, Eye, Compass } from "lucide-react";
 import { toast } from "sonner";
 
 /** Decodable by `createImageBitmap`; anything else (SVG, HEIC) is passed
@@ -63,6 +64,9 @@ export default function SettingsPage() {
   const { user } = useUser();
   const currentUser = useQuery(api.users.getCurrentUser);
   const updateProfile = useMutation(api.users.updateProfile);
+  // Reopens the dashboard tour. The tour runs from the dashboard layout, so
+  // this only works because Settings renders inside it.
+  const { start: startTour } = useTour();
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -646,6 +650,22 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Product tour</CardTitle>
+          <CardDescription>
+            A short guided walkthrough of the dashboard. It opens once for a new
+            account — replay it whenever you like.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={startTour}>
+            <Compass className="h-4 w-4" />
+            Show the tour again
+          </Button>
+        </CardContent>
+      </Card>
     </PageShell>
   );
 }

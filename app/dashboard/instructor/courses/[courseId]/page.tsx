@@ -23,6 +23,7 @@ import { slugify } from "@/lib/slug";
 import { CertificatesPanel } from "@/components/course-certificates-panel";
 import { CourseAnnouncementsManager } from "@/components/course-announcements-manager";
 import { CourseCouponsManager } from "@/components/course-coupons-manager";
+import { BulkLessonImport } from "@/components/bulk-lesson-import";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -566,6 +567,8 @@ export default function CourseEditPage() {
                   <CardTitle>Curriculum</CardTitle>
                   <CardDescription>Manage the modules and lessons for this course.</CardDescription>
                 </div>
+              <div className="flex items-center gap-2">
+                <BulkLessonImport courseId={courseData.course._id as Id<"courses">} />
                 <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
                   <DialogTrigger render={
                     <Button size="sm" type="button">
@@ -635,6 +638,7 @@ export default function CourseEditPage() {
                     </form>
                   </DialogContent>
                 </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

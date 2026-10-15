@@ -27,7 +27,8 @@ export function parseCsv(text: string): Record<string, string | undefined>[] {
   return rows;
 }
 
-/** Splits CSV text into logical lines, respecting quoted newlines. */
+/** Splits CSV text into logical lines, respecting quoted newlines.
+ *  Preserves raw characters (including quotes) so parseCsvLine can handle them. */
 function splitCsvLines(text: string): string[] {
   const lines: string[] = [];
   let current = "";
@@ -38,17 +39,12 @@ function splitCsvLines(text: string): string[] {
     const next = text[i + 1];
 
     if (ch === '"') {
-      if (inQuotes && next === '"') {
-        // Escaped quote
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
+      inQuotes = !inQuotes;
+      current += ch;
     } else if (ch === "\n" && !inQuotes) {
       lines.push(current);
       current = "";
-    } else if (ch === "\r" && next === "\n") {
+    } else if (ch === "\r" && next === "\n" && !inQuotes) {
       // Skip \r in \r\n — we'll hit the \n next
     } else {
       current += ch;

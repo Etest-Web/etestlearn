@@ -138,6 +138,9 @@ export default defineSchema({
   }).index("by_slug", ["slug"])
     .index("by_instructor", ["instructorId"])
     .index("by_published", ["published"])
+    // Serves the public instructor profile: "this instructor's live listings",
+    // without reading their drafts and filtering in memory.
+    .index("by_instructor_published", ["instructorId", "published"])
     // Serves the admin featured picker and the catalog's featured-first sort.
     .index("by_featured", ["featured"])
     // Enables fast filtering of published courses by category name.

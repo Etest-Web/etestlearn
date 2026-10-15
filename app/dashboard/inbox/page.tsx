@@ -198,6 +198,13 @@ const NOTIFICATION_ICONS: Record<
     tint: "text-success bg-success/10",
     verb: "Payout account verified",
   },
+  bank_change_requested: {
+    icon: PencilLine,
+    // A request the reader made is pending a human; neutral info, same as the
+    // "details needed" nudge rather than the success plate.
+    tint: "text-info bg-info/10",
+    verb: "Payout change requested",
+  },
 };
 
 // ─── Small shared pieces ────────────────────────────────────────────────────

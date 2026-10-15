@@ -197,6 +197,8 @@ export const NOTIFICATION_TYPES = [
   // confirmation fires when Paystack verification succeeds.
   "bank_info_required",
   "bank_details_added",
+  // Payout change request initiated by an instructor.
+  "bank_change_requested",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -220,6 +222,7 @@ export const notificationTypeValidator = v.union(
   v.literal("referral_reward"),
   v.literal("bank_info_required"),
   v.literal("bank_details_added"),
+  v.literal("bank_change_requested"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

@@ -27,9 +27,12 @@ import { supportEmail } from "../lib/support";
  * the first success the mutation refuses further saves and points at support.
  * That is a deliberate product decision, not a technical limit — a payout
  * destination is the one field worth making hard to change quietly, so
- * changing it is a human process. If that ever softens, the only code to
- * touch is the `already saved` branch in `persistVerifiedAccount` and the
- * copy in `components/bank-setup-modal.tsx`.
+ * changing it is a human process. `requestBankChange` is the self-service
+ * *front door* to that process: it records the request, confirms it in-app and
+ * emails support, but it never touches the stored account. It is deliberately
+ * not an edit path. If the one-shot rule ever softens, the code to touch is the
+ * `already saved` branch in `persistVerifiedAccount` and the copy in
+ * `components/bank-setup-modal.tsx`.
  *
  * Every role check in here is `isStaff`, never `role === "instructor"`. An
  * admin may teach and therefore earn, and the console already lets them into
@@ -181,8 +184,8 @@ export const persistVerifiedAccount = internalMutation({
     if (user.bankVerified) {
       throw new Error(
         "Your bank details are already saved and cannot be changed here. " +
-          `To update your payout account, email ${supportEmail()} ` +
-          "from the address on your account.",
+          "Request a change from your Earnings page, or email " +
+          `${supportEmail()} from the address on your account.`,
       );
     }
 
@@ -293,6 +296,96 @@ export const confirmBankAccount = mutation({
       accountNumberMasked: saved.accountNumberMasked,
     });
     return saved;
+  },
+});
+
+/**
+ * Request a payout account change. Instructors can trigger this when their
+ * verified account needs updating; changes are handled through support, not
+ * self-service, per the one-shot verification policy.
+ */
+export const requestBankChange = mutation({
+  args: {
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Only staff (instructors/admins) who have bank details can request a change.
+    if (!isStaff(user)) {
+      throw new Error("Only instructors and admins can request payout account changes");
+    }
+
+    if (!user.bankVerified) {
+      throw new Error("You need a verified payout account first");
+    }
+
+    const reason = args.reason.trim();
+    if (reason.length < 10) {
+      throw new Error("Please provide a bit more detail about what needs to change");
+    }
+    if (reason.length > 1000) {
+      throw new Error("Reason must be 1000 characters or less");
+    }
+
+    // Rate limit change requests to prevent abuse.
+    await requireRateLimit(ctx, `bankChangeRequest:${user._id}`, 3, 24 * 60 * 60 * 1000);
+
+    await logAudit(ctx, {
+      actorId: user._id,
+      action: "user.request_bank_change",
+      targetType: "user",
+      targetId: user._id,
+      details: {
+        reasonPreview: reason.slice(0, 200),
+      },
+    });
+
+    // Create an in-app confirmation for the requester.
+    await createNotification(ctx, {
+      userId: user._id,
+      type: "bank_change_requested",
+      title: "Bank change request submitted",
+      body: "Support will review your request and get back to you soon.",
+      href: "/dashboard/instructor/earnings#payout-account",
+    });
+
+    // Gather masked bank info if available for context.
+    let bankInfo: {
+      accountName?: string;
+      bankCode?: string;
+      accountNumberMasked?: string;
+    } | undefined;
+
+    if (user.bankAccountEncrypted) {
+      try {
+        const masked = maskAccountNumber(
+          await decryptAccountNumber(user.bankAccountEncrypted),
+        );
+        bankInfo = {
+          accountName: user.bankAccountName ?? undefined,
+          bankCode: user.bankCode ?? undefined,
+          accountNumberMasked: masked,
+        };
+      } catch {
+        bankInfo = {
+          accountName: user.bankAccountName ?? undefined,
+          bankCode: user.bankCode ?? undefined,
+        };
+      }
+    }
+
+    const identity = await ctx.auth.getUserIdentity();
+
+    await ctx.scheduler.runAfter(0, internal.bankVerification.sendBankChangeRequestEmail, {
+      reason,
+      userId: user._id,
+      userName: user.name ?? identity?.name ?? undefined,
+      userEmail: user.email ?? identity?.email ?? undefined,
+      bankInfo,
+    });
+
+    return { success: true };
   },
 });
 

@@ -566,3 +566,120 @@ describe("verifyBankAccount action + confirmBankAccount mutation", () => {
     ).rejects.toThrow(/already saved/);
   });
 });
+
+describe("requestBankChange", () => {
+  const REASON = "I switched banks and need payouts sent to my new account.";
+
+  test("requires a signed-in caller", async () => {
+    const t = convexTest(testSchema, modules);
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, { reason: REASON }),
+    ).rejects.toThrow(/Not authenticated/);
+  });
+
+  test("rejects students", async () => {
+    const t = await as(STUDENT, "student");
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, { reason: REASON }),
+    ).rejects.toThrow(/Only instructors and admins/);
+  });
+
+  test("refuses staff with no verified account on file", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, { reason: REASON }),
+    ).rejects.toThrow(/verified payout account first/);
+  });
+
+  test("rejects a reason that is too short or too long", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    await t.mutation(internal.instructorBank.persistVerifiedAccount, {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+      accountName: "Ada Obi",
+    });
+
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, { reason: "too short" }),
+    ).rejects.toThrow(/more detail/);
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, {
+        reason: "x".repeat(1001),
+      }),
+    ).rejects.toThrow(/1000 characters/);
+  });
+
+  test("writes a confirmation notification and an audit row", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    const user = await userRow(t, INSTRUCTOR);
+    await t.mutation(internal.instructorBank.persistVerifiedAccount, {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+      accountName: "Ada Obi",
+    });
+
+    const result = await t.mutation(api.instructorBank.requestBankChange, {
+      reason: REASON,
+    });
+    expect(result).toEqual({ success: true });
+
+    const notifications = await t.run(async (ctx: TestCtx) =>
+      ctx.db
+        .query("notifications")
+        .withIndex("by_user_unread", (q: any) =>
+          q.eq("userId", user!._id).eq("readAt", undefined),
+        )
+        .collect(),
+    );
+    const confirmation = notifications.find(
+      (n) => n.type === "bank_change_requested",
+    );
+    expect(confirmation).toBeTruthy();
+    expect(confirmation?.href).toBe(
+      "/dashboard/instructor/earnings#payout-account",
+    );
+
+    const audit = await t.run(async (ctx: TestCtx) =>
+      ctx.db
+        .query("auditLogs")
+        .withIndex("by_actor", (q: any) => q.eq("actorId", user!._id))
+        .collect(),
+    );
+    const entry = audit.find((row) => row.action === "user.request_bank_change");
+    expect(entry).toBeTruthy();
+    expect(entry!.details).toContain("switched banks");
+    // The raw account number must never reach the audit trail.
+    expect(entry!.details).not.toContain(ACCOUNT_NUMBER);
+  });
+
+  test("rate limits to three requests a day", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    await t.mutation(internal.instructorBank.persistVerifiedAccount, {
+      accountNumber: ACCOUNT_NUMBER,
+      bankCode: BANK_CODE,
+      accountName: "Ada Obi",
+    });
+
+    for (let i = 0; i < 3; i++) {
+      await t.mutation(api.instructorBank.requestBankChange, { reason: REASON });
+    }
+    await expect(
+      t.mutation(api.instructorBank.requestBankChange, { reason: REASON }),
+    ).rejects.toThrow(/Too many requests/);
+  });
+
+  test("the support-ticket action is a no-op when mail is unconfigured", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    // No mail provider is set in this suite, so the action must return rather
+    // than throw — a mail outage must not roll back a request that is already
+    // committed.
+    await expect(
+      t.action(internal.bankVerification.sendBankChangeRequestEmail, {
+        reason: REASON,
+        userId: "user_123",
+        userName: "Ada Obi",
+        userEmail: "ada@test.com",
+      }),
+    ).resolves.toBeNull();
+  });
+});

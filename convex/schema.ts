@@ -722,6 +722,9 @@ export default defineSchema({
       // `bank_details_added` confirms a successful Paystack verification.
       v.literal("bank_info_required"),
       v.literal("bank_details_added"),
+      // Payout change request initiated by the instructor; notification to the
+      // requester confirms receipt and admins/support get an email.
+      v.literal("bank_change_requested"),
     ),
     title: v.string(),
     body: v.optional(v.string()),

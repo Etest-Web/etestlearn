@@ -7,8 +7,14 @@ import {
   sendMail,
   siteUrl,
   isMailConfigured,
+  escapeHtml,
 } from "../lib/mail";
 import { renderEmail } from "../lib/emails/templates";
+import {
+  emailKeyValueRows,
+  emailLayout,
+  emailParagraph,
+} from "../lib/emails/layout";
 import { supportEmail } from "../lib/support";
 
 /**
@@ -136,6 +142,86 @@ export const sendBankConfirmationEmail = internalAction({
       });
     } catch (error) {
       console.error("Failed to send bank confirmation email:", error);
+    }
+  },
+});
+
+/**
+ * Internal action to email support about a bank change request from an instructor.
+ */
+export const sendBankChangeRequestEmail = internalAction({
+  args: {
+    reason: v.string(),
+    userId: v.string(),
+    userName: v.optional(v.string()),
+    userEmail: v.optional(v.string()),
+    bankInfo: v.optional(
+      v.object({
+        accountName: v.optional(v.string()),
+        bankCode: v.optional(v.string()),
+        accountNumberMasked: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (!isMailConfigured()) {
+      console.warn("No mail provider configured — skipping bank change request email");
+      return;
+    }
+
+    const reason = args.reason.trim();
+    const fields: Array<[string, string]> = [
+      ["User ID", args.userId],
+      ["Name", args.userName ?? "(not set)"],
+      ["Email", args.userEmail ?? "(not available from identity)"],
+    ];
+
+    if (args.bankInfo) {
+      if (args.bankInfo.accountName) {
+        fields.push(["Current account holder", args.bankInfo.accountName]);
+      }
+      if (args.bankInfo.bankCode) {
+        fields.push(["Current bank code", args.bankInfo.bankCode]);
+      }
+      if (args.bankInfo.accountNumberMasked) {
+        fields.push(["Current account number", args.bankInfo.accountNumberMasked]);
+      }
+    }
+
+    const bodyHtml =
+      emailParagraph(
+        "A staff member has requested a payout bank account change. " +
+          "Payout accounts are one-shot, so this has to be handled by hand.",
+      ) +
+      emailKeyValueRows(fields) +
+      emailParagraph(`Reason given: ${escapeHtml(reason)}`);
+
+    try {
+      await sendMail({
+        group: "instructors",
+        to: supportEmail(),
+        // Replies reach the instructor directly, so support can resolve the
+        // change from their inbox without a lookup.
+        ...(args.userEmail ? { replyTo: args.userEmail } : {}),
+        subject: `Payout account change request: ${args.userName ?? args.userId}`,
+        text: [
+          "A staff member has requested a payout bank account change.",
+          "",
+          ...fields.map(([label, value]) => `${label}: ${value}`),
+          "",
+          `Reason given: ${reason}`,
+        ].join("\n"),
+        html: emailLayout({
+          preheader: `${args.userName ?? args.userId} requested a payout account change`,
+          eyebrow: "Payout account change",
+          heading: "Payout account change request",
+          body: bodyHtml,
+          footnote:
+            "Payout accounts are one-shot. Verify the request before updating the account.",
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to send bank change request email:", error);
     }
   },
 });

@@ -8,6 +8,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Pa
 import { useRouter, useParams } from "next/navigation";
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
+import { CourseAnnouncementsList } from "@/components/course-announcements-list";
 
 export default function DashboardCoursePage() {
   const router = useRouter();
@@ -192,6 +193,11 @@ export default function DashboardCoursePage() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Gated on enrollment: the query requires course access, and a visitor
+          deciding whether to enroll should not be shown a notice meant for the
+          cohort. */}
+      {enrollment ? <CourseAnnouncementsList courseId={course._id} /> : null}
 
       <section className="space-y-3">
         <h2 className="rule-heading eyebrow">Lesson outline</h2>

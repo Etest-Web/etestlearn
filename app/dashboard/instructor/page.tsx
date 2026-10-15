@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PageShell } from "@/components/dashboard-shell";
 import { BankInfoBanner } from "@/components/bank-info-banner";
+import { AnnouncementBanner } from "@/components/announcement-banner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActivityFeed,
@@ -474,8 +475,11 @@ export default function InstructorOverviewPage() {
 
   return (
     <PageShell>
-      {/* Above the header, as on the learner dashboard's announcement: this is
-          the one thing on the page that gates money. */}
+      {/* Both banners sit above the header. The bank notice is the one thing on
+          the page that gates money; the platform announcement is where an
+          instructor-only notice (audience "instructors") reaches staff, since
+          learners never land on this console. */}
+      <AnnouncementBanner />
       <BankInfoBanner />
       <PageHeader
         title="Overview"

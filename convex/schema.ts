@@ -925,10 +925,43 @@ export default defineSchema({
     title: v.string(),
     body: v.string(),
     active: v.optional(v.boolean()),
+    // Who the banner is for. Optional because rows written before audiences
+    // existed have no field, and those notices went to everybody — absent
+    // therefore reads as "everyone" (`normalizeAudience`). Deliberately not
+    // indexed on its own: the reader looks at the handful of *active* rows and
+    // picks the newest one addressed to the caller, so a second index would
+    // only add write cost for the same bounded scan.
+    audience: v.optional(
+      v.union(
+        v.literal("everyone"),
+        v.literal("instructors"),
+        v.literal("students"),
+      ),
+    ),
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_active", ["active"]),
+
+  // Course-scoped announcements: a notice an instructor posts to one cohort
+  // rather than to the whole platform. Its audience is the enrollment, so it
+  // has no `audience` field — access is checked against the course instead.
+  // `published` separates a draft the author is still writing from a notice
+  // learners can read; only published rows are served to non-staff.
+  courseAnnouncements: defineTable({
+    courseId: v.id("courses"),
+    authorId: v.id("users"),
+    title: v.string(),
+    body: v.string(),
+    published: v.boolean(),
+    // Set when the notice goes live, kept apart from `updatedAt` so editing a
+    // published post does not reorder the learner-facing list.
+    publishedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_course", ["courseId"])
+    .index("by_course_published", ["courseId", "published"]),
 
   categories: defineTable({
     name: v.string(),

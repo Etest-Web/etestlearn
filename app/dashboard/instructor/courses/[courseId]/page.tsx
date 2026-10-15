@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
 import { CertificatesPanel } from "@/components/course-certificates-panel";
+import { CourseAnnouncementsManager } from "@/components/course-announcements-manager";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -366,6 +367,7 @@ export default function CourseEditPage() {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="content">Curriculum</TabsTrigger>
           <TabsTrigger value="certificates">Certificates</TabsTrigger>
+          <TabsTrigger value="announcements">Announcements</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-6">
           <div className="flex flex-col gap-6">
@@ -685,6 +687,11 @@ export default function CourseEditPage() {
         </TabsContent>
         <TabsContent value="certificates" className="pt-6">
           <CertificatesPanel courseId={courseData.course._id as Id<"courses">} />
+        </TabsContent>
+        <TabsContent value="announcements" className="pt-6">
+          <CourseAnnouncementsManager
+            courseId={courseData.course._id as Id<"courses">}
+          />
         </TabsContent>
       </Tabs>
     </PageShell>

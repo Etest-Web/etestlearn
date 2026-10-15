@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {  } from "@/components/role-guard";
 import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
@@ -17,20 +18,35 @@ import {
   EmptyState,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Textarea,
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Megaphone } from "lucide-react";
 import { toast } from "sonner";
+import {
+  ANNOUNCEMENT_AUDIENCES,
+  ANNOUNCEMENT_LIMITS,
+  audienceLabel,
+  normalizeAudience,
+  type AnnouncementAudience,
+} from "@/lib/announcements";
 
 function AnnouncementsBody() {
   const announcements = useQuery(api.announcements.listAll);
   const create = useMutation(api.announcements.create);
   const setActive = useMutation(api.announcements.setActive);
+  const setAudience = useMutation(api.announcements.setAudience);
   const remove = useMutation(api.announcements.remove);
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  // Named `setAudienceChoice` to leave `setAudience` to the mutation above.
+  const [audience, setAudienceChoice] = useState<AnnouncementAudience>("everyone");
 
   if (announcements === undefined) {
     return <Skeleton className="h-96 w-full rounded-2xl" />;
@@ -38,12 +54,26 @@ function AnnouncementsBody() {
 
   async function handleCreate(activate: boolean) {
     try {
-      await create({ title, body, activate });
-      toast.success(activate ? "Announcement published" : "Announcement saved as inactive");
+      await create({ title, body, activate, audience });
+      toast.success(
+        activate
+          ? `Announcement published to ${audienceLabel(audience).toLowerCase()}`
+          : "Announcement saved as inactive",
+      );
       setTitle("");
       setBody("");
+      setAudienceChoice("everyone");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create announcement");
+    }
+  }
+
+  async function handleAudienceChange(id: Id<"announcements">, next: AnnouncementAudience) {
+    try {
+      await setAudience({ announcementId: id, audience: next });
+      toast.success(`Now shown to ${audienceLabel(next).toLowerCase()}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not change the audience");
     }
   }
 
@@ -54,7 +84,8 @@ function AnnouncementsBody() {
           <Megaphone className="h-4 w-4 text-brand" /> New announcement
         </CardTitle>
         <CardDescription className="mt-1">
-          Shows as a banner on the learner dashboard while active.
+          Shows as a banner on the dashboards of whoever the audience covers,
+          while active.
         </CardDescription>
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
@@ -63,7 +94,7 @@ function AnnouncementsBody() {
               id="announcement-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              maxLength={120}
+              maxLength={ANNOUNCEMENT_LIMITS.title}
               placeholder="Maintenance window on Sunday"
             />
           </div>
@@ -73,11 +104,37 @@ function AnnouncementsBody() {
               id="announcement-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              maxLength={2000}
+              maxLength={ANNOUNCEMENT_LIMITS.body}
               rows={5}
               placeholder="What learners should know…"
             />
-            <p className="text-xs text-muted-foreground">{body.length}/2000</p>
+            <p className="text-xs text-muted-foreground">
+              {body.length}/{ANNOUNCEMENT_LIMITS.body}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="announcement-audience">Audience</Label>
+            <Select
+              value={audience}
+              onValueChange={(value) => setAudienceChoice(normalizeAudience(value))}
+            >
+              <SelectTrigger id="announcement-audience">
+                <SelectValue placeholder="Select an audience" />
+              </SelectTrigger>
+              <SelectContent>
+                {ANNOUNCEMENT_AUDIENCES.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {
+                ANNOUNCEMENT_AUDIENCES.find((option) => option.value === audience)
+                  ?.description
+              }
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={() => handleCreate(true)} disabled={!title.trim() || !body.trim()}>
@@ -99,7 +156,10 @@ function AnnouncementsBody() {
           <CardTitle>
             All announcements (<span className="tabular">{announcements.length}</span>)
           </CardTitle>
-          <CardDescription>The dashboard banner shows the newest active one.</CardDescription>
+          <CardDescription>
+            Each dashboard shows the newest active announcement its audience
+            covers.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <ul className="divide-y divide-rule">
@@ -118,6 +178,31 @@ function AnnouncementsBody() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {new Date(announcement.createdAt).toLocaleString("en-NG")}
                   </p>
+                  <div className="mt-2 max-w-[16rem]">
+                    <Label
+                      htmlFor={`audience-${announcement._id}`}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Audience
+                    </Label>
+                    <Select
+                      value={normalizeAudience(announcement.audience)}
+                      onValueChange={(value) =>
+                        handleAudienceChange(announcement._id, normalizeAudience(value))
+                      }
+                    >
+                      <SelectTrigger id={`audience-${announcement._id}`} className="mt-1 h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ANNOUNCEMENT_AUDIENCES.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2">
                   <Button
@@ -161,7 +246,7 @@ function AnnouncementsBody() {
                   icon={Megaphone}
                   tone="brand"
                   title="Nothing published yet"
-                  description="An announcement appears as a dismissible banner on every learner dashboard. Write one above to broadcast it."
+                  description="An announcement appears as a dismissible banner on the dashboards it targets. Write one above to broadcast it."
                 />
               </li>
             )}
@@ -178,7 +263,7 @@ export default function AdminAnnouncementsPage() {
       <PageShell>
         <PageHeader
           title="Announcements"
-          description="Platform-wide notices rendered on every learner's dashboard."
+          description="Platform notices rendered as a dashboard banner, targeted at everyone, learners, or instructors."
         />
         <AnnouncementsBody />
       </PageShell>

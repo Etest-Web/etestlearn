@@ -11,6 +11,8 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
+  Input,
+  Label,
   PageHeader,
 } from "@/components/ui";
 import { CourseSchema } from "@/components/seo/course-schema";
@@ -23,6 +25,7 @@ import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useLocalization } from "@/components/localization-provider";
 import { averageRating, formatRating } from "@/lib/reviews";
+import { COUPON_CODE_MAX_LENGTH } from "@/lib/coupons";
 
 export default function CoursePage() {
   const router = useRouter();
@@ -42,6 +45,18 @@ export default function CoursePage() {
 
   const [isPaying, setIsPaying] = useState(false);
 
+  // Coupon state. The code is only sent to the server when the buyer presses
+  // Apply — a live query keyed on every keystroke would be a request per
+  // character for an answer that is almost always "no".
+  const [couponInput, setCouponInput] = useState("");
+  const [submittedCode, setSubmittedCode] = useState("");
+  const couponPreview = useQuery(
+    api.coupons.preview,
+    data?.course && submittedCode
+      ? { courseId: data.course._id, code: submittedCode }
+      : "skip",
+  );
+
   useEffect(() => {
     async function updatePrice() {
       if (data?.course) {
@@ -52,12 +67,43 @@ export default function CoursePage() {
     updatePrice();
   }, [data, formatPrice]);
 
+  // The price after an accepted coupon, formatted the same way as the list
+  // price. `null` means no accepted coupon, so the list price stands.
+  const [discountedPrice, setDiscountedPrice] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function update() {
+      if (!couponPreview?.valid || !data?.course?.price) {
+        setDiscountedPrice(null);
+        return;
+      }
+      const remaining = Math.max(0, data.course.price - couponPreview.discountKobo);
+      const formatted = await formatPrice(remaining, data.course.currency ?? "NGN");
+      if (!cancelled) setDiscountedPrice(formatted);
+    }
+    update();
+    return () => {
+      cancelled = true;
+    };
+  }, [couponPreview, data, formatPrice]);
+
+  // The code is sent whenever the buyer submitted one, not only when the
+  // preview said it was good. The preview is advisory; `createPendingPurchase`
+  // is the authority, so a code that lapsed while the page sat open is judged
+  // there rather than silently dropped because a preview had not loaded yet.
+  const appliedCouponCode = submittedCode || undefined;
+  const payablePrice = discountedPrice ?? displayPrice;
+
   async function handlePay() {
     if (!data) return;
     setIsPaying(true);
     try {
-      // Step 1: create pending purchase record
-      const { reference } = await createPendingPurchase({ courseId: data.course._id });
+      // Step 1: create pending purchase record. The coupon code is re-checked
+      // server-side; the discounted price the buyer saw is what gets charged.
+      const { reference } = await createPendingPurchase({
+        courseId: data.course._id,
+        couponCode: appliedCouponCode,
+      });
       // Step 2: get Paystack checkout URL and redirect, passing the localized currency
       const { authorizationUrl } = await initializeCheckout({ 
         reference,
@@ -113,7 +159,7 @@ export default function CoursePage() {
             </>
           ) : (
             <>
-              <Lock /> Pay {displayPrice} with Paystack
+              <Lock /> Pay {payablePrice} with Paystack
             </>
           )}
         </Button>
@@ -163,10 +209,64 @@ export default function CoursePage() {
             </span>
           )}
           <span className="tabular text-[15px] font-semibold text-foreground">
-            {displayPrice}
+            {discountedPrice && (
+              <span className="mr-2 font-normal text-muted-foreground line-through">
+                {displayPrice}
+              </span>
+            )}
+            {payablePrice}
           </span>
         </div>
       </PageHeader>
+
+      {/* Coupon entry sits with the price it changes, and only for a paid course
+          the visitor has not already bought. */}
+      {isPaidCourse && !hasAccess && (
+        <section className="rounded-sm border border-rule p-4">
+          <Label htmlFor="coupon-code-input" className="eyebrow">
+            Have a coupon?
+          </Label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Input
+              id="coupon-code-input"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+              maxLength={COUPON_CODE_MAX_LENGTH}
+              placeholder="DISCOUNT-CODE"
+              className="max-w-[16rem] font-mono"
+            />
+            <Button
+              variant="outline"
+              onClick={() => setSubmittedCode(couponInput.trim())}
+              disabled={couponInput.trim().length < 4}
+            >
+              Apply
+            </Button>
+            {submittedCode && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSubmittedCode("");
+                  setCouponInput("");
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          {submittedCode && couponPreview !== undefined && (
+            <p
+              className={
+                couponPreview.valid
+                  ? "mt-2 text-sm text-success"
+                  : "mt-2 text-sm text-destructive"
+              }
+            >
+              {couponPreview.message}
+            </p>
+          )}
+        </section>
+      )}
 
       <section>
         <Card>

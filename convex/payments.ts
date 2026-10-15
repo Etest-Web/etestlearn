@@ -12,6 +12,7 @@ import { consumeGrant } from "./referrals";
 import { settleSale } from "../lib/settlement";
 import { applyDiscount, chargedAmountFor } from "../lib/referrals";
 import { formatNaira } from "../lib/instructor-earnings";
+import { resolveCoupon, type ResolvedCoupon } from "./helpers/couponPricing";
 
 /**
  * References to `internal.referrals.*`, built by hand.
@@ -57,6 +58,13 @@ const scheduleDripRef = makeFunctionReference<"mutation">(
  * re-validated server-side here — the code in the URL is never trusted, only
  * used to look up an account (see `internal.referrals.bindReferral`).
  *
+ * `couponCode` is likewise optional and likewise re-validated here. The price a
+ * coupon produces is derived from the stored coupon, never from anything the
+ * client sends besides the code itself, and it is snapshotted onto the purchase
+ * so the amount charged cannot move after the buyer agrees to it. See
+ * `lib/coupons.ts` for why a coupon comes off the instructor's side of the
+ * split rather than the platform's.
+ *
  * ── Why a pending row is re-priced rather than reused unchanged ──────────────
  *
  * The original code returned an existing pending purchase untouched, so a
@@ -74,7 +82,11 @@ const scheduleDripRef = makeFunctionReference<"mutation">(
  * than silently.
  */
 export const createPendingPurchase = mutation({
-  args: { courseId: v.id("courses"), referralCode: v.optional(v.string()) },
+  args: {
+    courseId: v.id("courses"),
+    referralCode: v.optional(v.string()),
+    couponCode: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
@@ -106,6 +118,7 @@ export const createPendingPurchase = mutation({
     // instructor's share; `amount` is what the buyer is charged. They differ
     // only when a referral discount or grant applies.
     const listAmount = course.price;
+    const now = Date.now();
 
     // Bind first, then price: binding is the one-time identity fact (this
     // person is referred by that account), and the discount below is a
@@ -115,25 +128,49 @@ export const createPendingPurchase = mutation({
       code: args.referralCode,
     });
 
+    // ── The instructor's coupon, if the buyer typed one ──────────────────────
+    // Resolved before the referral discount, so the platform's discount applies
+    // to the price the coupon left standing and the instructor-funded coupon
+    // comes off *their* side of the split (see `lib/settlement.ts`).
+    //
+    // A code that does not resolve, or has lapsed since the page was opened, is
+    // not an error: the buyer is charged the undiscounted price, exactly as
+    // before coupons existed. Failing the whole checkout over a stale code would
+    // be worse than dropping it, and the amount is shown again on Paystack.
+    let coupon: ResolvedCoupon | null = null;
+    if (args.couponCode) {
+      const lookup = await resolveCoupon(ctx, {
+        courseId: args.courseId,
+        code: args.couponCode,
+        listAmount,
+        now,
+      });
+      if (lookup.found && lookup.coupon.state === "active") {
+        coupon = lookup.coupon;
+      }
+    }
+
+    const couponDiscountKobo = coupon?.discountKobo ?? 0;
+    const baseAfterCoupon = chargedAmountFor(listAmount, couponDiscountKobo);
+
     const inviteeDiscount = await ctx.runQuery(computeInviteeDiscountRef, {
       referredUserId: user._id,
-      listAmount,
+      listAmount: baseAfterCoupon,
     });
 
     // Oldest-first grant, so an expiring credit is spent before a fresh one.
     const grant = await ctx.runQuery(getMyAvailableGrantRef, {
       userId: user._id,
-      now: Date.now(),
+      now,
     });
 
     const applied = applyDiscount({
-      listAmount,
+      listAmount: baseAfterCoupon,
       inviteeDiscountKobo: inviteeDiscount,
       grantKobo: grant?.remainingKobo ?? 0,
     });
-    const chargedAmount = chargedAmountFor(listAmount, applied.discountAmount);
+    const chargedAmount = chargedAmountFor(baseAfterCoupon, applied.discountAmount);
 
-    const now = Date.now();
     const reference = `etest-${now}-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 
     // Reuse the pending row when there is one, so there is still exactly one
@@ -150,7 +187,8 @@ export const createPendingPurchase = mutation({
     if (existingPending) {
       const unchanged =
         existingPending.amount === chargedAmount &&
-        (existingPending.listAmount ?? existingPending.amount) === listAmount;
+        (existingPending.listAmount ?? existingPending.amount) === listAmount &&
+        (existingPending.couponId ?? undefined) === (coupon?.couponId ?? undefined);
 
       if (unchanged) {
         return { reference: existingPending.paystackReference };
@@ -160,6 +198,9 @@ export const createPendingPurchase = mutation({
         amount: chargedAmount,
         listAmount,
         discountAmount: applied.discountAmount,
+        couponId: coupon?.couponId ?? undefined,
+        couponCode: coupon?.code ?? undefined,
+        couponDiscountKobo,
         // The grant id is re-resolved here rather than trusted from a previous
         // attempt; `grantId` is cleared when no grant applied so a spent grant
         // can never be double-consumed at settlement.
@@ -179,6 +220,9 @@ export const createPendingPurchase = mutation({
       amount: chargedAmount,
       listAmount,
       discountAmount: applied.discountAmount,
+      couponId: coupon?.couponId ?? undefined,
+      couponCode: coupon?.code ?? undefined,
+      couponDiscountKobo,
       grantId: applied.fromGrant ? (grant?._id ?? undefined) : undefined,
       grantAppliedKobo: applied.fromGrant ? (grant?.remainingKobo ?? 0) : undefined,
       currency: course.currency ?? "NGN",
@@ -288,6 +332,8 @@ export const markPurchasePaid = internalMutation({
       // settings change between "add to cart" and "paid" alter what the buyer
       // agreed to, and the two would no longer reconcile.
       discountAmount: purchase.discountAmount ?? 0,
+      // The instructor-funded coupon, decided at checkout for the same reason.
+      couponDiscountKobo: purchase.couponDiscountKobo ?? 0,
     });
 
     await ctx.db.patch(purchase._id, {
@@ -296,10 +342,25 @@ export const markPurchasePaid = internalMutation({
       updatedAt: now,
       listAmount,
       discountAmount: purchase.discountAmount ?? 0,
+      couponDiscountKobo: purchase.couponDiscountKobo ?? 0,
       instructorShareKobo: settlement.instructorShareKobo,
       platformFeeKobo: settlement.platformFeeKobo,
       grantAppliedKobo: grantApplied,
     });
+
+    // Redeem the coupon. This sits below the `status === "paid"` early return, so
+    // it runs exactly once per sale however many times the webhook and the
+    // verify page fire. The coupon row can never be missing: `coupons.remove`
+    // refuses to delete a code with redemptions, and Convex serializes mutations.
+    if (purchase.couponId) {
+      const coupon = await ctx.db.get(purchase.couponId);
+      if (coupon) {
+        await ctx.db.patch(coupon._id, {
+          redemptionCount: coupon.redemptionCount + 1,
+          updatedAt: now,
+        });
+      }
+    }
 
     // Fulfilment: create the enrollment.
     const existing = await ctx.db

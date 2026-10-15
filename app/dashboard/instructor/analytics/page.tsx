@@ -15,13 +15,16 @@ import {
   StatTile,
 } from "@/components/instructor-console";
 import { formatNaira } from "@/lib/instructor-earnings";
-import { pluralize } from "@/lib/utils";
+import { formatRating } from "@/lib/reviews";
+import { formatRelativeTime, pluralize } from "@/lib/utils";
+import { StarRating } from "@/components/star-rating";
 import {
   ArrowRight,
   Award,
   BarChart3,
   CircleAlert,
   LineChart,
+  MessageSquareQuote,
   Target,
   TrendingUp,
   Users,
@@ -421,6 +424,142 @@ function QuizHealth() {
   );
 }
 
+/**
+ * What learners said, next to what the numbers say.
+ *
+ * This lives on the analytics page rather than as a tab on each course because
+ * a review is only actionable in context: a 2-star comment on the course with
+ * the worst drop-off is one diagnosis, not two unrelated readings. Reading it
+ * here also means an instructor never has to visit a public page to see
+ * criticism of their own work.
+ *
+ * The headline is weighted by review count (`reviews.listForInstructor`), so one
+ * 5-star review on a new course cannot flatter an average built on fifty
+ * reviews elsewhere.
+ */
+function LearnerFeedback() {
+  const feedback = useQuery(api.reviews.listForInstructor, {});
+
+  if (feedback === undefined) return <Skeleton className="h-64" />;
+  // `null` is the server saying "you are not staff" — it never renders.
+  if (feedback === null) return null;
+
+  const { average, ratingCount, courses, recent } = feedback;
+  const rated = courses.filter((course) => course.ratingCount > 0);
+  const comments = recent.filter((review) => review.comment);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Learner feedback</CardTitle>
+        <CardDescription>
+          Ratings and reviews left by enrolled learners, worst-rated course first.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        {ratingCount === 0 ? (
+          <EmptyState
+            icon={MessageSquareQuote}
+            title="No ratings yet"
+            description="Learners can rate a course from its page once they are enrolled. Ratings and comments will collect here."
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="tabular text-3xl font-semibold tracking-[-0.02em]">
+                {formatRating(average)}
+              </span>
+              <StarRating
+                value={average ?? 0}
+                size="md"
+                label={`Average rating ${formatRating(average)} out of 5 across ${pluralize(ratingCount, "review")}`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {pluralize(ratingCount, "review")} across{" "}
+                {pluralize(rated.length, "rated course")}
+              </span>
+            </div>
+
+            <ul className="flex flex-col border-t border-rule">
+              {rated.map((course) => (
+                <li
+                  key={course.courseId}
+                  className="flex items-center justify-between gap-4 border-b border-rule py-3"
+                >
+                  <Link
+                    href={`/dashboard/instructor/courses/${course.courseId}`}
+                    className="flex min-w-0 items-center gap-2"
+                  >
+                    <span className="truncate text-sm font-medium text-foreground link-quiet">
+                      {course.title}
+                    </span>
+                    {course.published ? null : (
+                      <Badge variant="secondary">Draft</Badge>
+                    )}
+                  </Link>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <StarRating
+                      value={course.average ?? 0}
+                      size="xs"
+                      label={`${formatRating(course.average)} out of 5`}
+                    />
+                    <span className="tabular text-sm text-foreground">
+                      {formatRating(course.average)}
+                    </span>
+                    <span className="tabular w-6 text-right text-xs text-muted-foreground">
+                      {course.ratingCount}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {comments.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                <h3 className="eyebrow">Recent comments</h3>
+                <ul className="flex flex-col gap-5">
+                  {comments.slice(0, 6).map((review) => (
+                    <li key={review._id} className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <StarRating
+                          value={review.rating}
+                          size="xs"
+                          label={`${review.rating} out of 5 stars`}
+                        />
+                        <span className="font-medium text-foreground">
+                          {review.authorName}
+                        </span>
+                        <span aria-hidden>·</span>
+                        <Link
+                          href={`/courses/${review.courseSlug}`}
+                          className="link-quiet"
+                        >
+                          {review.courseTitle}
+                        </Link>
+                        <span aria-hidden>·</span>
+                        <span>{formatRelativeTime(review.createdAt)}</span>
+                        {review.edited ? (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>edited</span>
+                          </>
+                        ) : null}
+                      </div>
+                      <p className="text-sm leading-[1.7] whitespace-pre-line">
+                        {review.comment}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function InstructorAnalyticsPage() {
   const performance = useQuery(api.instructorStats.listInstructorCoursePerformance);
 
@@ -459,6 +598,7 @@ export default function InstructorAnalyticsPage() {
             <QuizHealth />
             <CourseHealth />
           </div>
+          <LearnerFeedback />
           <PerformanceTable />
         </>
       )}

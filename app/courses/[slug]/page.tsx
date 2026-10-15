@@ -14,12 +14,15 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { CourseSchema } from "@/components/seo/course-schema";
+import { CourseReviews } from "@/components/course-reviews";
+import { StarRating } from "@/components/star-rating";
 import { notFound, useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { ArrowLeft, ListChecks, Loader2, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useLocalization } from "@/components/localization-provider";
+import { averageRating, formatRating } from "@/lib/reviews";
 
 export default function CoursePage() {
   const router = useRouter();
@@ -82,6 +85,9 @@ export default function CoursePage() {
 
   const { course, lessons } = data;
   const isPaidCourse = !!course.price && course.price > 0;
+  // The running total lives on the course document, so the header and the
+  // review block below it read the same two numbers and cannot drift apart.
+  const average = averageRating(course.ratingSum, course.ratingCount);
 
   function renderCta() {
     if (!isSignedIn) {
@@ -147,6 +153,15 @@ export default function CoursePage() {
           <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-sm object-cover" />
           {course.category && <Badge variant="secondary">{course.category}</Badge>}
           {course.level && <Badge variant="outline">{course.level}</Badge>}
+          {average !== null && (
+            <span className="flex items-center gap-1.5">
+              <StarRating value={average} size="sm" />
+              <span className="tabular text-sm text-muted-foreground">
+                {formatRating(average)}
+                {course.ratingCount ? ` · ${course.ratingCount}` : ""}
+              </span>
+            </span>
+          )}
           <span className="tabular text-[15px] font-semibold text-foreground">
             {displayPrice}
           </span>
@@ -190,6 +205,14 @@ export default function CoursePage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section>
+        <CourseReviews
+          courseId={course._id}
+          ratingSum={course.ratingSum}
+          ratingCount={course.ratingCount}
+        />
       </section>
 
       {isPaidCourse && !hasAccess && (

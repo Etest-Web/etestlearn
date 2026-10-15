@@ -64,6 +64,10 @@
   --color-rule-strong: var(--rule-strong);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-raised: var(--surface-raised);
+  /* A filled rating mark. Declared as its own token rather than borrowed as
+     `text-chart-2`, so a reshuffle of the chart palette cannot silently
+     recolour every star in the catalogue. The value is the brand gold. */
+  --color-rating: var(--rating);
 
   /* Radius collapses to a hairline. Everything at or above `--radius-lg`
      resolves to 3–6px: the scale keeps its ordering so `rounded-sm` still
@@ -172,6 +176,10 @@
   --rule-strong: oklch(74% 0.02 318.82);
   --surface-sunken: oklch(98% 0.009 318.82);
   --surface-raised: oklch(100% 0.004 318.82);
+  /* The brand gold (`#EABE5D`), which the palette comment above reserves for
+     accents. A rating mark is one: it carries no status, so it is not
+     `--warning`, and it must not move when the chart ramp is retuned. */
+  --rating: oklch(79.893% 0.102 87.38);
   --sidebar: oklch(98.5% 0.007 318.82);
   --sidebar-foreground: oklch(14.5% 0.012 318.82);
   --sidebar-primary: oklch(56.556% 0.121 318.82);
@@ -239,6 +247,10 @@
   --sidebar-accent-foreground: oklch(98.5% 0.006 318.82);
   --sidebar-border: oklch(100% 0 0 / 10%);
   --sidebar-ring: oklch(72% 0.102 318.82);
+  /* The gold steps up for dark the same way the status colours do. As the fill
+     of a small glyph on a near-black card, the light-mode value sits too close
+     to the surface and the filled marks read as smudges rather than stars. */
+  --rating: oklch(84% 0.105 87.38);
 }
 
 @layer base {

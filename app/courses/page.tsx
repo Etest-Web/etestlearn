@@ -16,6 +16,8 @@ import Image from "next/image";
 import { SearchX } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { StarRating } from "@/components/star-rating";
+import { averageRating, formatRating } from "@/lib/reviews";
 
 function CoursesWrapper() {
   const router = useRouter();
@@ -73,30 +75,42 @@ function CoursesWrapper() {
         />
       ) : (
         <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredCourses.map((course) => (
-            <Card key={course._id} variant="interactive">
-              <CardHeader>
-                <Image src={course.thumbnailUrl || "/certf.jpeg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
-                <div className="flex flex-wrap gap-2">
-                  {course.category && (
-                    <Badge variant="secondary">{course.category}</Badge>
+          {filteredCourses.map((course) => {
+            const average = averageRating(course.ratingSum, course.ratingCount);
+            return (
+              <Card key={course._id} variant="interactive">
+                <CardHeader>
+                  <Image src={course.thumbnailUrl || "/certf.jpeg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
+                  <div className="flex flex-wrap gap-2">
+                    {course.category && (
+                      <Badge variant="secondary">{course.category}</Badge>
+                    )}
+                    {course.level && (
+                      <Badge variant="outline">{course.level}</Badge>
+                    )}
+                  </div>
+                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  {average !== null && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <StarRating value={average} size="xs" />
+                      <span className="tabular text-xs text-muted-foreground">
+                        {formatRating(average)}
+                        {course.ratingCount ? ` · ${course.ratingCount}` : ""}
+                      </span>
+                    </div>
                   )}
-                  {course.level && (
-                    <Badge variant="outline">{course.level}</Badge>
-                  )}
-                </div>
-                <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <p className="text-sm leading-body text-muted-foreground line-clamp-3">
-                  {course.description}
-                </p>
-                <Button className="mt-auto w-full" variant="outline" onClick={() => router.push(`/courses/${course.slug}`)}>
-                  View course
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-4">
+                  <p className="text-sm leading-body text-muted-foreground line-clamp-3">
+                    {course.description}
+                  </p>
+                  <Button className="mt-auto w-full" variant="outline" onClick={() => router.push(`/courses/${course.slug}`)}>
+                    View course
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </section>
       )}
     </main>

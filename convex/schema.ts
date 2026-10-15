@@ -120,6 +120,19 @@ export default defineSchema({
     // Admin-curated "featured" flag; featured courses sort first on the
     // public catalog. Optional so every pre-existing course reads as false.
     featured: v.optional(v.boolean()),
+    // ── Course ratings (denormalized) ───────────────────────────────────────
+    // The running total behind the star average. `ratingSum` and `ratingCount`
+    // are kept as a *pair* rather than as a stored average: an average would be
+    // rounded on every write and slowly drift away from the reviews it claims
+    // to summarise. Both absent means "never reviewed", which is also what a
+    // course whose last review was deleted must look like — see
+    // `lib/reviews.ts#ratingPatch`.
+    //
+    // Written only by `convex/reviews.ts`, in the same mutation that writes the
+    // review, so the two can never disagree; `internal.reviews.recomputeCourseRating`
+    // exists to prove that in a test.
+    ratingSum: v.optional(v.number()),
+    ratingCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_slug", ["slug"])
@@ -261,6 +274,26 @@ export default defineSchema({
   }).index("by_user_course", ["userId", "courseId"])
     .index("by_user", ["userId"])
     .index("by_course", ["courseId"]),
+
+  // ── Course reviews ────────────────────────────────────────────────────────
+  // One row per learner per course. `by_user_course` is what makes that "one":
+  // `reviews.upsertReview` looks the pair up before deciding to insert or patch,
+  // so there is no second row to reconcile and no unique-constraint machinery.
+  //
+  // `rating` is a whole 1–5. The comment is optional because a star with no
+  // words is still feedback, and requiring prose would thin the average out.
+  // Both rules live in `lib/reviews.ts`, not here — a Convex validator can say
+  // a number is a number, only the policy can say 4.5 is not a rating.
+  courseReviews: defineTable({
+    courseId: v.id("courses"),
+    userId: v.id("users"),
+    rating: v.number(),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_course", ["courseId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_user", ["userId"]),
 
   quizzes: defineTable({
     lessonId: v.id("lessons"),

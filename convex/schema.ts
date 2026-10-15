@@ -100,7 +100,11 @@ export default defineSchema({
       showActivity: v.optional(v.boolean()),
     })),
   }).index("by_clerk_id", ["clerkId"])
-    .index("by_referral_code", ["referralCode"]),
+    .index("by_referral_code", ["referralCode"])
+    // Enumerating staff. "Notify every admin" (payout requests) and "list
+    // instructors to pay" are genuine lookup paths that were previously a full
+    // table scan; a by_role range read keeps them bounded as learners pile up.
+    .index("by_role", ["role"]),
 
   courses: defineTable({
     title: v.string(),
@@ -489,6 +493,50 @@ export default defineSchema({
     .index("by_course", ["courseId"])
     .index("by_instructor", ["instructorId"]),
 
+  // ── Payout ledger ───────────────────────────────────────────────────────────
+  //
+  // Payouts are arranged by a human (there is no transfer automation — see the
+  // note in `lib/instructor-earnings.ts`), so this table is the *record* of that
+  // human work rather than a wallet:
+  //
+  //   · an instructor's `requested` row asks to be paid their available balance;
+  //   · an admin either marks it `paid` (capturing the transfer reference) or
+  //     declines it; an admin can also write a `paid` row directly for a payout
+  //     arranged outside the queue.
+  //
+  // What is still owed is derived at read time by `lib/payouts.summarizePayouts`
+  // — lifetime earnings minus these rows — never stored, because a refund landing
+  // after a payout has no event to subtract from and a cached balance would drift.
+  payouts: defineTable({
+    instructorId: v.id("users"),
+    amountKobo: v.number(),
+    status: v.union(
+      v.literal("requested"),
+      v.literal("paid"),
+      v.literal("cancelled"),
+    ),
+    currency: v.string(),
+    // Free text for the instructor (why they want it) or the admin (how it was
+    // sent). Trimmed and length-capped at the mutation, never secrets.
+    note: v.optional(v.string()),
+    // Transfer reference for a paid row — a Paystack transfer code, a bank
+    // narration, anything that points at the actual movement of money.
+    reference: v.optional(v.string()),
+    requestedAt: v.number(),
+    // Set when the row reaches a terminal state (`paid` or `cancelled`).
+    resolvedAt: v.optional(v.number()),
+    // The admin who marked it paid or declined it. Absent while pending and for
+    // an instructor's own withdrawal.
+    recordedBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_instructor", ["instructorId", "requestedAt"])
+    // Serves the admin queue and its sidebar badge: "what is waiting on me?".
+    .index("by_status", ["status", "requestedAt"])
+    // Serves the "you already have a request pending" check in one row read.
+    .index("by_instructor_status", ["instructorId", "status"]),
+
   // ── Referrals ───────────────────────────────────────────────────────────────
   //
   // `referrals` records who invited whom, and converts when the invitee buys.
@@ -815,6 +863,13 @@ export default defineSchema({
       // Payout change request initiated by the instructor; notification to the
       // requester confirms receipt and admins/support get an email.
       v.literal("bank_change_requested"),
+      // Payout ledger. `payout_requested` goes to admins when an instructor asks
+      // to be paid (support also gets the actionable email that schedules the
+      // transfer); `payout_paid` and `payout_declined` close the loop for the
+      // instructor, in-app only.
+      v.literal("payout_requested"),
+      v.literal("payout_paid"),
+      v.literal("payout_declined"),
     ),
     title: v.string(),
     body: v.optional(v.string()),

@@ -199,6 +199,12 @@ export const NOTIFICATION_TYPES = [
   "bank_details_added",
   // Payout change request initiated by an instructor.
   "bank_change_requested",
+  // Payout ledger (see `convex/payouts.ts`). `payout_requested` nudges admins
+  // that an instructor is waiting to be paid; `payout_paid` and
+  // `payout_declined` tell the instructor how their request was resolved.
+  "payout_requested",
+  "payout_paid",
+  "payout_declined",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -223,6 +229,9 @@ export const notificationTypeValidator = v.union(
   v.literal("bank_info_required"),
   v.literal("bank_details_added"),
   v.literal("bank_change_requested"),
+  v.literal("payout_requested"),
+  v.literal("payout_paid"),
+  v.literal("payout_declined"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

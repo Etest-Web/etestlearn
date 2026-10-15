@@ -56,13 +56,26 @@ export const BPS_PER_WHOLE = 10000;
 
 /** The inputs to settling one sale. */
 export interface SettleSaleInput {
-  /** Kobo the course costs before any referral discount. */
+  /** Kobo the course costs before any discount. */
   listAmount: number;
   /**
-   * Kobo taken off by a referral discount. Clamped to `[0, listAmount]` so a
-   * misconfigured cap can never produce a negative charge.
+   * Kobo taken off by a **platform-funded** discount (a referral benefit).
+   * Clamped so a misconfigured cap can never produce a negative charge. The
+   * platform absorbs this: the instructor is still paid their share of the
+   * price before it was applied.
    */
   discountAmount: number;
+  /**
+   * Kobo taken off by an **instructor-funded** coupon code.
+   *
+   * Unlike `discountAmount` this comes off the instructor's side: it reduces
+   * the basis the share is computed from, because the instructor chose to sell
+   * their own course for less. Without that, an instructor could mint a 100%-off
+   * code, buy their own course for nothing, and still be paid 80% of the list
+   * price. Optional, defaulting to `0`, so a sale with no coupon settles exactly
+   * as it did before coupons existed.
+   */
+  couponDiscountKobo?: number;
   /** Instructor share in basis points. Defaults to {@link INSTRUCTOR_SHARE_BPS}. */
   revenueShareBps?: number;
 }
@@ -70,10 +83,15 @@ export interface SettleSaleInput {
 export interface SaleSettlement {
   /** Kobo actually charged to the buyer — what was sent to Paystack. */
   chargedAmount: number;
-  /** Kobo earned by the instructor. Derived from `listAmount`, not the charge. */
+  /**
+   * Kobo earned by the instructor, computed from `listAmount - couponDiscountKobo`.
+   * A referral discount does not reduce it; a coupon does.
+   */
   instructorShareKobo: number;
-  /** Kobo retained by the platform: its own cut plus the absorbed discount. */
+  /** Kobo retained by the platform: its own cut plus any absorbed discount. */
   platformFeeKobo: number;
+  /** Kobo the instructor's coupon took off the list price. */
+  couponDiscountKobo: number;
 }
 
 function positiveInt(value: number): number {
@@ -103,26 +121,41 @@ export function clampDiscount(listAmount: number, discountAmount: number): numbe
  * values that don't divide evenly, and "the parts do not add to the whole" is
  * precisely the class of bug a ledger exists to prevent.
  *
- * `chargedAmount` is `listAmount - discountAmount` and is derived here rather
- * than trusted from the caller, so a purchase row can never claim a charge that
- * disagrees with the prices it recorded.
+ * `chargedAmount` is `listAmount - couponDiscountKobo - discountAmount` and is
+ * derived here rather than trusted from the caller, so a purchase row can never
+ * claim a charge that disagrees with the prices it recorded.
+ *
+ * The two discounts are funded differently, which is the whole reason they are
+ * separate inputs. The coupon comes off *before* the split (the instructor pays
+ * for their own discount); the referral discount comes off *after* (the platform
+ * pays for its own). With no coupon the arithmetic is identical to what it was
+ * before coupons existed — see `lib/coupons.ts` for why the split cannot be the
+ * other way round.
  */
 export function settleSale(input: SettleSaleInput): SaleSettlement {
   const listAmount = positiveInt(input.listAmount);
-  const discountAmount = clampDiscount(listAmount, input.discountAmount);
+
+  // The instructor's own discount shrinks the pie before it is divided.
+  const couponDiscountKobo = clampDiscount(listAmount, input.couponDiscountKobo ?? 0);
+  const basisAmount = listAmount - couponDiscountKobo;
+
+  // The platform's discount then comes off what remains, so the two can never
+  // combine into a negative charge.
+  const discountAmount = clampDiscount(basisAmount, input.discountAmount);
 
   const shareBps = Math.min(
     BPS_PER_WHOLE,
     Math.max(0, Math.floor(input.revenueShareBps ?? INSTRUCTOR_SHARE_BPS)),
   );
 
-  const instructorShareKobo = Math.round((listAmount * shareBps) / BPS_PER_WHOLE);
-  const platformFeeKobo = Math.max(0, listAmount - instructorShareKobo);
+  const instructorShareKobo = Math.round((basisAmount * shareBps) / BPS_PER_WHOLE);
+  const platformFeeKobo = Math.max(0, basisAmount - instructorShareKobo);
 
   return {
-    chargedAmount: listAmount - discountAmount,
+    chargedAmount: basisAmount - discountAmount,
     instructorShareKobo,
     platformFeeKobo,
+    couponDiscountKobo,
   };
 }
 

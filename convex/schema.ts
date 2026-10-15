@@ -409,12 +409,13 @@ export default defineSchema({
     refundedAt: v.optional(v.number()),
     refundReason: v.optional(v.string()),
     // ── Settlement snapshot ───────────────────────────────────────────────────
-    // The rule these four fields exist to enforce: `amount` is ALWAYS the number
+    // The rule these fields exist to enforce: `amount` is ALWAYS the number
     // sent to Paystack and charged to the buyer. `listAmount` is what the course
-    // cost before any referral discount, and is the basis for the instructor
-    // split. Readers that must not re-derive money — `verifyAndCompletePurchase`
-    // compares `json.data.amount >= purchase.amount` — depend on that invariant
-    // holding, so nothing may repurpose `amount` as "list price".
+    // cost before any discount, and is the basis for the instructor split
+    // *after* the instructor-funded coupon below comes off it. Readers that must
+    // not re-derive money — `verifyAndCompletePurchase` compares
+    // `json.data.amount >= purchase.amount` — depend on that invariant holding,
+    // so nothing may repurpose `amount` as "list price".
     //
     // The split is written once by `internal.payments.markPurchasePaid` and read
     // thereafter. It was previously recomputed at read time from a constant,
@@ -424,8 +425,15 @@ export default defineSchema({
     // All optional because purchases settled before this change have no
     // snapshot; they fall back to `legacyShareKobo` in the query layer. New rows
     // always carry them.
-    listAmount: v.optional(v.number()), // kobo, price before referral discount
-    discountAmount: v.optional(v.number()), // kobo, referral discount applied
+    listAmount: v.optional(v.number()), // kobo, price before any discount
+    discountAmount: v.optional(v.number()), // kobo, platform-funded referral discount
+    // Kobo taken off by an instructor's coupon code, funded by the instructor
+    // (see `lib/coupons.ts`). At most one coupon applies to a sale. Snapshotted
+    // at checkout so a coupon edited or deleted afterwards cannot change what the
+    // buyer agreed to pay.
+    couponId: v.optional(v.id("coupons")),
+    couponCode: v.optional(v.string()), // normalized code as entered
+    couponDiscountKobo: v.optional(v.number()),
     instructorShareKobo: v.optional(v.number()), // snapshotted at settlement
     platformFeeKobo: v.optional(v.number()), // snapshotted at settlement
     // The referral grant consumed by this purchase, if any. Recorded so a grant
@@ -439,7 +447,44 @@ export default defineSchema({
     .index("by_course", ["courseId"])
     // Serves the unpublish gate: "does this course already have a buyer?" is a
     // single range read that stops at the first paid row.
-    .index("by_course_status", ["courseId", "status"]),
+    .index("by_course_status", ["courseId", "status"])
+    // Serves "how many times has this code been used?" and the redemption list
+    // on the instructor's coupon page. Rows without a coupon are not indexed, so
+    // the range read only ever sees real redemptions.
+    .index("by_coupon_status", ["couponId", "status"]),
+
+  // ── Coupons ─────────────────────────────────────────────────────────────────
+  //
+  // An instructor-authored discount code for one course. Deliberately *not* a
+  // wallet or a balance: a coupon is a price rule, and the only state it carries
+  // is whether it is paused, when it lapses, and how many times it has been used.
+  // The usage count is advanced once at settlement by the same idempotent
+  // mutation that writes the purchase snapshot, and the redemptions themselves
+  // remain visible as paid purchases via `purchases.by_coupon_status`.
+  //
+  // Codes are unique per course, not globally: a buyer types one on a single
+  // course page, and a global namespace would let one instructor's code block
+  // another's for no benefit. See `lib/coupons.ts` for the rules.
+  coupons: defineTable({
+    courseId: v.id("courses"),
+    // The course owner at creation time, for the author-scoped list.
+    instructorId: v.id("users"),
+    code: v.string(), // normalized uppercase
+    kind: v.union(v.literal("percent"), v.literal("amount")),
+    percentOff: v.optional(v.number()), // 1–100, when kind is "percent"
+    amountOffKobo: v.optional(v.number()), // kobo, when kind is "amount"
+    maxRedemptions: v.optional(v.number()), // absent means unlimited
+    expiresAt: v.optional(v.number()), // absent means never
+    active: v.boolean(),
+    // Written once, at settlement. A coupon with redemptions cannot be deleted,
+    // only paused, so the row a purchase points at always survives.
+    redemptionCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_course_code", ["courseId", "code"])
+    .index("by_course", ["courseId"])
+    .index("by_instructor", ["instructorId"]),
 
   // ── Referrals ───────────────────────────────────────────────────────────────
   //

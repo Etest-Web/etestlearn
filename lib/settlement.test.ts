@@ -110,6 +110,94 @@ describe("settleSale", () => {
   });
 });
 
+describe("settleSale with an instructor coupon", () => {
+  it("takes the coupon off the instructor's basis, not the platform's", () => {
+    const result = settleSale({
+      listAmount: 500000,
+      discountAmount: 0,
+      couponDiscountKobo: 100000,
+    });
+
+    // 80% of the 400,000 the coupon left standing, not 80% of the list price.
+    expect(result.chargedAmount).toBe(400000);
+    expect(result.instructorShareKobo).toBe(320000);
+    expect(result.platformFeeKobo).toBe(80000);
+    expect(result.couponDiscountKobo).toBe(100000);
+  });
+
+  it("pays nothing for a self-purchase with a 100%-off code", () => {
+    // The money pump this models: an instructor mints a 100%-off code, "buys"
+    // their own course, and would otherwise be paid 80% of the list price for a
+    // sale that charged nothing. Nothing is charged, so nothing is owed.
+    const result = settleSale({
+      listAmount: 500000,
+      discountAmount: 0,
+      couponDiscountKobo: 500000,
+    });
+
+    expect(result.chargedAmount).toBe(0);
+    expect(result.instructorShareKobo).toBe(0);
+    expect(result.platformFeeKobo).toBe(0);
+  });
+
+  it("keeps the halves summing to the coupon-adjusted price", () => {
+    for (const listAmount of [1, 3, 999, 1001, 33333, 500000, 123457]) {
+      const couponDiscountKobo = Math.min(listAmount, Math.floor(listAmount / 3));
+      const { instructorShareKobo, platformFeeKobo } = settleSale({
+        listAmount,
+        discountAmount: 0,
+        couponDiscountKobo,
+      });
+      expect(instructorShareKobo + platformFeeKobo).toBe(listAmount - couponDiscountKobo);
+    }
+  });
+
+  it("applies a platform discount to what the coupon left standing", () => {
+    const result = settleSale({
+      listAmount: 500000,
+      discountAmount: 100000,
+      couponDiscountKobo: 100000,
+    });
+
+    // 500,000 − 100,000 coupon = 400,000 basis; − 100,000 referral = 300,000.
+    expect(result.chargedAmount).toBe(300000);
+    expect(result.instructorShareKobo).toBe(320000);
+    expect(result.platformFeeKobo).toBe(80000);
+  });
+
+  it("clamps a coupon larger than the price", () => {
+    const result = settleSale({
+      listAmount: 500000,
+      discountAmount: 0,
+      couponDiscountKobo: 900000,
+    });
+
+    expect(result.chargedAmount).toBe(0);
+    expect(result.instructorShareKobo).toBe(0);
+    expect(result.couponDiscountKobo).toBe(500000);
+  });
+
+  it("treats a negative or non-finite coupon as no coupon", () => {
+    expect(
+      settleSale({ listAmount: 1000, discountAmount: 0, couponDiscountKobo: -50 }).chargedAmount,
+    ).toBe(1000);
+    expect(
+      settleSale({ listAmount: 1000, discountAmount: 0, couponDiscountKobo: NaN }).chargedAmount,
+    ).toBe(1000);
+  });
+
+  it("is identical to the pre-coupon result when no coupon applies", () => {
+    const withoutCoupon = settleSale({ listAmount: 500000, discountAmount: 100000 });
+    const withZero = settleSale({
+      listAmount: 500000,
+      discountAmount: 100000,
+      couponDiscountKobo: 0,
+    });
+
+    expect(withZero).toEqual({ ...withoutCoupon, couponDiscountKobo: 0 });
+  });
+});
+
 describe("clampDiscount", () => {
   it("allows a discount that exactly zeroes the sale", () => {
     expect(clampDiscount(1000, 1000)).toBe(1000);

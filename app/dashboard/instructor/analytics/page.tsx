@@ -18,6 +18,7 @@ import { formatNaira } from "@/lib/instructor-earnings";
 import { formatRating } from "@/lib/reviews";
 import { formatRelativeTime, pluralize } from "@/lib/utils";
 import { StarRating } from "@/components/star-rating";
+import { AnalyticsExportButton } from "@/components/analytics-export-button";
 import {
   ArrowRight,
   Award,
@@ -569,10 +570,13 @@ export default function InstructorAnalyticsPage() {
         title="Analytics"
         description="Enrollment, completion and quiz performance for every course you own, side by side."
         actions={
-          <Button variant="outline" render={<Link href="/dashboard/instructor/earnings" />}>
-            Earnings breakdown
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+          <>
+            <AnalyticsExportButton />
+            <Button variant="outline" render={<Link href="/dashboard/instructor/earnings" />}>
+              Earnings breakdown
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </>
         }
       />
 

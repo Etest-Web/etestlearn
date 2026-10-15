@@ -225,3 +225,83 @@ export const sendBankChangeRequestEmail = internalAction({
     }
   },
 });
+
+/**
+ * Human-readable naira for an email body.
+ *
+ * Deliberately not `lib/instructor-earnings.formatNaira`: this runs in a Node
+ * action where ICU data is not guaranteed, and the money figure in a "please
+ * send this" email must be exactly the number the admin saw in the queue. The
+ * grouping regex is deterministic on every runtime.
+ */
+function formatKoboAsNaira(kobo: number): string {
+  const whole = Math.round(kobo / 100);
+  const grouped = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `₦${grouped}`;
+}
+
+/**
+ * Internal action to email support about a payout request.
+ *
+ * The requester gets an in-app confirmation (see `convex/payouts.ts`); this is
+ * the *actionable* copy — the one that means a person opens a transfer form —
+ * so it goes to the support inbox with the figures already resolved, exactly as
+ * the bank-change email does. Nightly payouts still depend on a human, and this
+ * email is how that human finds out.
+ */
+export const sendPayoutRequestEmail = internalAction({
+  args: {
+    payoutId: v.string(),
+    amountKobo: v.number(),
+    userName: v.optional(v.string()),
+    userEmail: v.optional(v.string()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (!isMailConfigured()) {
+      console.warn("No mail provider configured — skipping payout request email");
+      return;
+    }
+
+    const amount = formatKoboAsNaira(args.amountKobo);
+    const fields: Array<[string, string]> = [
+      ["Payout request", args.payoutId],
+      ["Instructor", args.userName ?? "(not set)"],
+      ["Email", args.userEmail ?? "(not available from identity)"],
+      ["Amount requested", amount],
+    ];
+    if (args.note) fields.push(["Note", args.note]);
+
+    const bodyHtml =
+      emailParagraph(
+        "An instructor has asked to be paid their available balance. " +
+          "Payouts are arranged by hand, so someone has to send this.",
+      ) +
+      emailKeyValueRows(fields);
+
+    try {
+      await sendMail({
+        group: "instructors",
+        to: supportEmail(),
+        // Replies reach the instructor directly.
+        ...(args.userEmail ? { replyTo: args.userEmail } : {}),
+        subject: `Payout request: ${args.userName ?? args.payoutId} — ${amount}`,
+        text: [
+          "An instructor has asked to be paid their available balance.",
+          "",
+          ...fields.map(([label, value]) => `${label}: ${value}`),
+        ].join("\n"),
+        html: emailLayout({
+          preheader: `${args.userName ?? args.payoutId} requested a payout of ${amount}`,
+          eyebrow: "Payout request",
+          heading: "Payout requested",
+          body: bodyHtml,
+          footnote:
+            "Mark the request paid on /dashboard/admin/payouts once the transfer is sent.",
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to send payout request email:", error);
+    }
+  },
+});

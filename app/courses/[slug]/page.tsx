@@ -18,9 +18,10 @@ import {
 import { CourseSchema } from "@/components/seo/course-schema";
 import { CourseReviews } from "@/components/course-reviews";
 import { StarRating } from "@/components/star-rating";
+import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, ListChecks, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ListChecks, Loader2, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useLocalization } from "@/components/localization-provider";
@@ -39,6 +40,13 @@ export default function CoursePage() {
   const hasAccess = useQuery(
     api.payments.hasAccessToCourse,
     data?.course ? { courseId: data.course._id } : "skip",
+  );
+  // The "taught by" card. Deliberately the light `getInstructorCard` rather than
+  // the full profile: a course page needs a name and a face, not a read of every
+  // other course the instructor has listed.
+  const instructor = useQuery(
+    api.instructors.getInstructorCard,
+    data?.course ? { instructorId: data.course.instructorId } : "skip",
   );
   const createPendingPurchase = useMutation(api.payments.createPendingPurchase);
   const initializeCheckout = useAction(api.paystack.initializeCheckout);
@@ -265,6 +273,49 @@ export default function CoursePage() {
               {couponPreview.message}
             </p>
           )}
+        </section>
+      )}
+
+      {instructor && (
+        <section>
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-4">
+              <Image
+                src={instructor.imageUrl || "/certf.jpeg"}
+                alt={instructor.name}
+                width={112}
+                height={112}
+                className="h-14 w-14 shrink-0 rounded-full object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Taught by
+                </p>
+                <p className="font-medium">
+                  {instructor.name}
+                  {instructor.pronouns && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({instructor.pronouns})
+                    </span>
+                  )}
+                </p>
+                {instructor.bio && (
+                  <p className="line-clamp-2 text-sm text-muted-foreground">{instructor.bio}</p>
+                )}
+              </div>
+              {/* A real link, not a router.push: this is the one crawlable path
+                  into the public profile, which is what makes listing profiles
+                  in the sitemap worth anything. */}
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href={`/instructors/${instructor._id}`} />}
+              >
+                View profile
+                <ArrowUpRight className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
         </section>
       )}
 

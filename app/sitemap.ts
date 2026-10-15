@@ -15,12 +15,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
     const courses = await client.query(api.courses.listPublishedCourses, {});
+
+    // Instructor profiles come from the courses already in hand rather than a
+    // second query: a profile exists to be found through a course, and any
+    // instructor with nothing published has nothing to crawl yet. `Set` because
+    // one instructor teaching five courses is one profile.
+    const instructorIds = [...new Set(courses.map((course) => course.instructorId))];
+
     return [
       ...staticRoutes,
       ...courses.map((course) => ({
         url: `${siteConfig.url}/courses/${course.slug}`,
         changeFrequency: "weekly" as const,
         priority: 0.8,
+      })),
+      ...instructorIds.map((instructorId) => ({
+        url: `${siteConfig.url}/instructors/${instructorId}`,
+        changeFrequency: "weekly" as const,
+        priority: 0.6,
       })),
     ];
   } catch {

@@ -25,6 +25,7 @@ import {
   Banknote,
   BookOpen,
   CircleAlert,
+  ExternalLink,
   GraduationCap,
   LifeBuoy,
   PlusCircle,
@@ -459,6 +460,9 @@ function CourseListPreview() {
 
 export default function InstructorOverviewPage() {
   const earnings = useQuery(api.instructorStats.getEarningsSummary, { months: 6 });
+  // Only for the public-profile link below. The id has to come from the session,
+  // not from anything on the page, or the button would link to the wrong person.
+  const me = useQuery(api.users.getCurrentUser);
 
   const chartData =
     earnings?.series.map((point) => ({
@@ -493,6 +497,14 @@ export default function InstructorOverviewPage() {
               <Banknote className="h-4 w-4" />
               Earnings
             </Button>
+            {/* The profile is public and shareable, but nothing else links to
+                it, so without this the only way to find your own is to guess. */}
+            {me && (
+              <Button variant="outline" render={<Link href={`/instructors/${me._id}`} />}>
+                <ExternalLink className="h-4 w-4" />
+                Public profile
+              </Button>
+            )}
             <Button render={<Link href="/dashboard/instructor/courses/new" data-tour="create-course" />}>
               <PlusCircle className="h-4 w-4" />
               New course

@@ -78,6 +78,12 @@ function withContentSecurityPolicy(
  *   /                    landing page
  *   /sign-in, /sign-up   auth entry points — must load signed out
  *   /courses(.*)         catalog is browsable without an account
+ *   /instructors(.*)     a public instructor profile is a shareable page, and
+ *                        the point of sharing it is that the recipient does not
+ *                        need an account to read it. The data behind it is
+ *                        already public: `instructors.getPublicProfile` returns
+ *                        only instructors/admins and only their published
+ *                        courses.
  *   /verify(.*)          certificate verification is meant for outsiders
  *   /become-instructor   an applicant with no account can still apply
  *   /maintenance         the outage notice, which is aimed at signed-out people
@@ -106,6 +112,9 @@ const isPublicRoute = createRouteMatcher([
   '/sso-callback(.*)',
   '/',
   '/courses(.*)',
+  // See the route-map above: a shared profile page has to open for the person
+  // it was shared with, who by definition may have no account.
+  '/instructors(.*)',
   '/verify(.*)',
   '/become-instructor',
   // The maintenance page must load signed out, for the same reason the gate has

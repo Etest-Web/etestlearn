@@ -15,6 +15,7 @@
  */
 import {
     Award,
+    Banknote,
     BarChart3,
     BookOpen,
     ClipboardList,
@@ -68,6 +69,7 @@ export type NavBadge =
     | "friendRequests"
     | "pendingApplications"
     | "pendingUnpublish"
+    | "pendingPayouts"
     | "maintenanceOn";
 
 export type NavItem = {
@@ -125,6 +127,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/instructor", label: "Overview", icon: LayoutDashboard },
             { href: "/dashboard/instructor/courses", label: "Courses", icon: LayoutList },
             { href: "/dashboard/instructor/earnings", label: "Earnings", icon: Wallet },
+            // The payout ledger. Sits right after Earnings because it is the
+            // "did the money actually reach me?" half of that page.
+            { href: "/dashboard/instructor/payouts", label: "Payouts", icon: Banknote },
             { href: "/dashboard/instructor/analytics", label: "Analytics", icon: BarChart3 },
         ],
     },
@@ -142,6 +147,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/admin/applications", label: "Applications", icon: FileCheck2, badge: "pendingApplications" },
             { href: "/dashboard/admin/courses", label: "Courses", icon: BookOpen },
             { href: "/dashboard/admin/payments", label: "Payments", icon: Receipt },
+            // The payout queue: the place a requested payout actually gets sent,
+            // and the record of what was sent before.
+            { href: "/dashboard/admin/payouts", label: "Payouts", icon: Banknote, badge: "pendingPayouts" },
             { href: "/dashboard/admin/certificates", label: "Certificates", icon: Award },
             { href: "/dashboard/admin/discussions", label: "Moderation", icon: MessagesSquare },
             { href: "/dashboard/admin/categories", label: "Categories", icon: Tags },

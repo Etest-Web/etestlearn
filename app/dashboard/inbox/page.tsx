@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Award,
   BadgeCheck,
+  Banknote,
   Bell,
   BookOpen,
   Check,
@@ -30,6 +31,7 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -204,6 +206,23 @@ const NOTIFICATION_ICONS: Record<
     // "details needed" nudge rather than the success plate.
     tint: "text-info bg-info/10",
     verb: "Payout change requested",
+  },
+  payout_requested: {
+    icon: Banknote,
+    // Pending a human on both sides: an admin has to send it, the instructor is
+    // waiting. Info, not success — nothing has moved yet.
+    tint: "text-info bg-info/10",
+    verb: "Payout requested",
+  },
+  payout_paid: {
+    icon: BadgeCheck,
+    tint: "text-success bg-success/10",
+    verb: "Payout sent",
+  },
+  payout_declined: {
+    icon: XCircle,
+    tint: "text-destructive bg-destructive/10",
+    verb: "Payout declined",
   },
 };
 

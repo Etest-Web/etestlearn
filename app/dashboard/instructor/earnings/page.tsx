@@ -21,7 +21,7 @@ import { formatNaira } from "@/lib/instructor-earnings";
 import { formatAbsoluteDate, formatRelativeTime, pluralize } from "@/lib/utils";
 import { supportEmail, supportMailto } from "@/lib/support";
 import { useBankSetup } from "@/components/bank-setup-modal";
-import { ArrowRight, Banknote, BadgeCheck, Download, Lock, Percent, Receipt, Wallet } from "lucide-react";
+import { ArrowRight, Banknote, BadgeCheck, Download, Lock, Percent, Receipt, Send, Wallet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -269,6 +269,51 @@ function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/**
+ * The Earnings page's doorway to the payout ledger.
+ *
+ * Earnings answers "what have I earned?"; the ledger answers "what can I ask
+ * for, and what has already been sent?". Linking them here means an instructor
+ * who has just looked at their total has an obvious next step, and the two
+ * figures come from the same source, so they never contradict each other.
+ */
+function PayoutLedgerSection() {
+  const overview = useQuery(api.payouts.getPayoutOverview, {});
+
+  if (overview === undefined) {
+    return <Skeleton className="h-32 w-full" />;
+  }
+
+  const { balance, bankVerified } = overview;
+  const description = !bankVerified
+    ? "Add a verified payout account to request the money your courses have earned."
+    : balance.availableKobo > 0
+      ? `${formatNaira(balance.availableKobo)} is available to request.`
+      : balance.pendingKobo > 0
+        ? `${formatNaira(balance.pendingKobo)} is already requested and awaiting payment.`
+        : "Nothing is available to request yet — it appears as your courses sell.";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="size-5 text-muted-foreground" aria-hidden />
+              Request a payout
+            </CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+          <Button render={<Link href="/dashboard/instructor/payouts" />}>
+            <Wallet className="h-4 w-4" />
+            View payouts
+          </Button>
+        </div>
+      </CardHeader>
+    </Card>
+  );
 }
 
 export default function InstructorEarningsPage() {
@@ -622,6 +667,8 @@ export default function InstructorEarningsPage() {
       </Card>
 
       <PayoutAccountSection />
+
+      <PayoutLedgerSection />
 
       <Card variant="sunken">
         <CardContent className="flex flex-col gap-3 p-5">

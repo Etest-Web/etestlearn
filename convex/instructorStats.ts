@@ -127,6 +127,28 @@ function clampMonths(months: number | undefined): number {
   return Math.max(1, Math.min(24, Math.floor(months ?? DEFAULT_MONTHS)));
 }
 
+/**
+ * Lifetime net earnings for one staff member.
+ *
+ * Exported so the payout ledger and the Earnings page share one number rather
+ * than two implementations of the platform split: `summarizePayouts` subtracts
+ * the ledger from exactly this figure, so "available to request" and "All time"
+ * cannot disagree. Reads the same two indexes `getEarningsSummary` does
+ * (`by_instructor`, then `by_course_status` per owned course).
+ */
+export async function lifetimeEarnedKobo(
+  ctx: ReadCtx,
+  user: UserDoc,
+): Promise<number> {
+  const courses = await loadOwnedCourses(ctx, user);
+  const sales: EarningsSale[] = [];
+  for (const course of courses) {
+    const purchases = await loadPaidSales(ctx, course._id);
+    for (const purchase of purchases) sales.push(toSale(purchase));
+  }
+  return summarizeEarnings(sales).netEarningsKobo;
+}
+
 // ─── Money ──────────────────────────────────────────────────────────────────
 
 /**

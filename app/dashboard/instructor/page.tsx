@@ -482,11 +482,14 @@ export default function InstructorOverviewPage() {
         description="What you have earned, how your learners are doing, and what needs fixing today."
         actions={
           <>
-            <Button variant="outline" render={<Link href="/dashboard/instructor/earnings" />}>
+            <Button
+              variant="outline"
+              render={<Link href="/dashboard/instructor/earnings" data-tour="earnings" />}
+            >
               <Banknote className="h-4 w-4" />
               Earnings
             </Button>
-            <Button render={<Link href="/dashboard/instructor/courses/new" />}>
+            <Button render={<Link href="/dashboard/instructor/courses/new" data-tour="create-course" />}>
               <PlusCircle className="h-4 w-4" />
               New course
             </Button>

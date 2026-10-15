@@ -121,6 +121,8 @@ export function buildContentSecurityPolicy(nonce: string): string {
       "https://clerk.glypha.com.ng",
       "https://*.clerk.accounts.dev",
       "https://api.paystack.co",
+      // Localization provider (ipapi.co geo-IP lookup for currency detection).
+      "https://ipapi.co",
       "https://*.uploadthing.com",
       "https://uploadthing.com",
       "https://unpkg.com",

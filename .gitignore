@@ -56,3 +56,8 @@ implementation_plan.md
 # build logs
 build_out.txt
 build.log
+.vercel
+.env*
+
+# allow env.example if added later
+!.env.example

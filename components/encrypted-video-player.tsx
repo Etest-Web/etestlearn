@@ -5,6 +5,7 @@ import Hls from "hls.js";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { getErrorMessage } from "@/lib/errors";
 
 export type WatchProgress = {
   positionSeconds: number;
@@ -61,7 +62,7 @@ export function EncryptedVideoPlayer({
         const { token } = await issueToken({ assetId });
         if (!cancelled) setMasterUrl(`${site}/video/${assetId}/master.m3u8?t=${token}`);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not start playback");
+        if (!cancelled) setError(getErrorMessage(e, "Could not start playback"));
       }
     })();
     return () => { cancelled = true; };

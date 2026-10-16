@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -40,7 +42,7 @@ function DiscussionsBody() {
       await setLocked({ threadId: threadId as never, locked });
       toast.success(locked ? "Thread locked" : "Thread unlocked");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Action failed");
+      toast.error(getErrorMessage(err, "Action failed"));
     }
   }
 
@@ -50,7 +52,7 @@ function DiscussionsBody() {
       toast.success("Thread and its messages deleted");
       if (openThreadId === threadId) setOpenThreadId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed");
+      toast.error(getErrorMessage(err, "Delete failed"));
     }
   }
 
@@ -59,7 +61,7 @@ function DiscussionsBody() {
       await deleteMessage({ messageId: messageId as never });
       toast.success("Message deleted");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed");
+      toast.error(getErrorMessage(err, "Delete failed"));
     }
   }
 

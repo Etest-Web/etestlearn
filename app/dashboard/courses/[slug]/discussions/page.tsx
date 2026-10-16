@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {
   Card,
   CardHeader,
@@ -14,13 +15,18 @@ import {
   Button,
 } from "@/components/ui";
 import { MessagesSquare } from "lucide-react";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function CourseDiscussionsPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug as string;
 
   const courseData = useQuery(api.courses.getCourseBySlug, { slug });
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  // Held as the branded `Id`, not a bare string: it is what both the thread
+  // query and the `postMessage` mutation take, so keeping it typed here is what
+  // removes the casts at the two call sites below.
+  const [selectedThreadId, setSelectedThreadId] = useState<Id<"discussionThreads"> | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newMessage, setNewMessage] = useState("");
 
@@ -30,7 +36,7 @@ export default function CourseDiscussionsPage() {
   );
   const messages = useQuery(
     api.discussions.listMessagesForThread,
-    selectedThreadId ? { threadId: selectedThreadId as any } : "skip",
+    selectedThreadId ? { threadId: selectedThreadId } : "skip",
   );
 
   const createThread = useMutation(api.discussions.createThread);
@@ -54,24 +60,34 @@ export default function CourseDiscussionsPage() {
     );
   }
 
+  // Both composers are fire-and-forget, so without these the rejection escapes
+  // the click handler and the post looks like it simply never happened.
   async function handleCreateThread() {
     if (!newTitle.trim()) return;
     if (!courseData) return;
-    const id = await createThread({
-      courseId: courseData.course._id,
-      title: newTitle.trim(),
-    });
-    setNewTitle("");
-    setSelectedThreadId(id as any);
+    try {
+      const id = await createThread({
+        courseId: courseData.course._id,
+        title: newTitle.trim(),
+      });
+      setNewTitle("");
+      setSelectedThreadId(id);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "That thread could not be created"));
+    }
   }
 
   async function handlePostMessage() {
     if (!newMessage.trim() || !selectedThreadId) return;
-    await postMessage({
-      threadId: selectedThreadId as any,
-      body: newMessage.trim(),
-    });
-    setNewMessage("");
+    try {
+      await postMessage({
+        threadId: selectedThreadId,
+        body: newMessage.trim(),
+      });
+      setNewMessage("");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Your reply was not posted"));
+    }
   }
 
   const threadList = threads ?? [];
@@ -96,7 +112,7 @@ export default function CourseDiscussionsPage() {
               />
             ) : (
               <ul className="space-y-1">
-                {threadList.map((t: any) => (
+                {threadList.map((t) => (
                   <li key={t._id}>
                     <button
                       type="button"
@@ -154,7 +170,7 @@ export default function CourseDiscussionsPage() {
                       className="border-y-0 px-0 py-8"
                     />
                   ) : (
-                    messageList.map((m: any) => (
+                    messageList.map((m) => (
                       <div
                         key={m._id}
                         className="rounded-sm bg-surface-sunken px-2 py-1.5 text-xs space-y-0.5"

@@ -35,6 +35,7 @@ import {
   normalizeAudience,
   type AnnouncementAudience,
 } from "@/lib/announcements";
+import { getErrorMessage } from "@/lib/errors";
 
 function AnnouncementsBody() {
   const announcements = useQuery(api.announcements.listAll);
@@ -64,7 +65,7 @@ function AnnouncementsBody() {
       setBody("");
       setAudienceChoice("everyone");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create announcement");
+      toast.error(getErrorMessage(err, "Could not create announcement"));
     }
   }
 
@@ -216,7 +217,7 @@ function AnnouncementsBody() {
                         });
                         toast.success(announcement.active ? "Deactivated" : "Activated");
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Action failed");
+                        toast.error(getErrorMessage(err, "Action failed"));
                       }
                     }}
                   >
@@ -231,7 +232,7 @@ function AnnouncementsBody() {
                         await remove({ announcementId: announcement._id });
                         toast.success("Deleted");
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Delete failed");
+                        toast.error(getErrorMessage(err, "Delete failed"));
                       }
                     }}
                   >

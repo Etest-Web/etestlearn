@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import {
     Card,
     CardContent,
@@ -90,9 +92,9 @@ export default function BecomeInstructorPage() {
             }).catch(notifyError => {
                 console.warn("Failed to send instructor application notification:", notifyError);
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            toast.error(error.message || "Failed to submit application.");
+            toast.error(getErrorMessage(error, "Failed to submit application."));
         } finally {
             setIsSubmitting(false);
         }

@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -102,7 +104,7 @@ function MaintenanceBody() {
             toast.success(success);
             return true;
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "That did not go through");
+            toast.error(getErrorMessage(error, "That did not go through"));
             return false;
         } finally {
             setPending(false);

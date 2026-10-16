@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Award, Ban, RotateCcw, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui";
 import {
   Card,
@@ -51,7 +52,7 @@ export function CertificatesPanel({
       await fn();
       toast.success(ok);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(getErrorMessage(err, "Something went wrong"));
     } finally {
       setBusy(null);
     }

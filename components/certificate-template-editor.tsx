@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { FileUp, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -57,7 +58,7 @@ export function CertificateTemplateEditor() {
       await fn();
       toast.success(ok);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(getErrorMessage(err, "Something went wrong"));
     }
   }
 
@@ -97,7 +98,7 @@ export function CertificateTemplateEditor() {
           : "Design uploaded",
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      toast.error(getErrorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
     }
@@ -120,7 +121,7 @@ export function CertificateTemplateEditor() {
       const result = await preview({ layout: parseDrafts() });
       setPreviewUrl(result.url);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Preview failed");
+      toast.error(getErrorMessage(err, "Preview failed"));
     }
   }
 
@@ -132,7 +133,7 @@ export function CertificateTemplateEditor() {
       setDrafts({});
       toast.success("Field positions saved");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save positions");
+      toast.error(getErrorMessage(err, "Could not save positions"));
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -103,7 +105,7 @@ function UsersBody() {
       setSelected(new Set());
       setBulkRole("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bulk update failed");
+      toast.error(getErrorMessage(err, "Bulk update failed"));
     }
   }
 
@@ -117,7 +119,7 @@ function UsersBody() {
         toast.success("User suspended — they now read as signed out platform-wide");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Action failed");
+      toast.error(getErrorMessage(err, "Action failed"));
     }
   }
 
@@ -231,7 +233,7 @@ function UsersBody() {
                             });
                             toast.success(`Role updated to ${role}`);
                           } catch (err) {
-                            toast.error(err instanceof Error ? err.message : "Failed to update role");
+                            toast.error(getErrorMessage(err, "Failed to update role"));
                           }
                         }}
                       >

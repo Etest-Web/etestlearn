@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -42,7 +44,7 @@ function CertificatesBody() {
       await fn();
       toast.success(ok);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(getErrorMessage(err, "Something went wrong"));
     } finally {
       setBusy(null);
     }

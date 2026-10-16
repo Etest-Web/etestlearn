@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -133,7 +134,7 @@ export function MyTasksTab() {
         delete next_[task.id];
         return next_;
       });
-      toast.error(error instanceof Error ? error.message : "Could not update that task");
+      toast.error(getErrorMessage(error, "Could not update that task"));
     } finally {
       setPendingIds((prev) => prev.filter((id) => id !== task.id));
     }
@@ -312,7 +313,7 @@ function TaskRow({
       toast.success("Task deleted");
       setDeleteOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete that task");
+      toast.error(getErrorMessage(error, "Could not delete that task"));
     } finally {
       setDeletePending(false);
     }
@@ -458,7 +459,7 @@ function TaskComposer() {
       setDueDate("");
       setPriority("medium");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not add that task");
+      toast.error(getErrorMessage(error, "Could not add that task"));
     } finally {
       setPending(false);
     }
@@ -616,7 +617,7 @@ function TaskEditDialog({
       toast.success("Task updated");
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update that task");
+      toast.error(getErrorMessage(error, "Could not update that task"));
     } finally {
       setPending(false);
     }

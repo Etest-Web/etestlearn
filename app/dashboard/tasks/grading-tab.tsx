@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -283,7 +284,7 @@ function AssignmentRow({
             : "Moved back to draft",
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not change the status");
+      toast.error(getErrorMessage(error, "Could not change the status"));
     } finally {
       setStatusPending(false);
     }
@@ -300,7 +301,7 @@ function AssignmentRow({
       );
       setDeleteOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete the assignment");
+      toast.error(getErrorMessage(error, "Could not delete the assignment"));
     } finally {
       setDeletePending(false);
     }
@@ -554,7 +555,7 @@ function SubmissionRow({
       });
       toast.success(`${submission.studentName} marked`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the grade");
+      toast.error(getErrorMessage(error, "Could not save the grade"));
     } finally {
       setPending(false);
     }
@@ -763,7 +764,7 @@ function AssignmentComposer({
       toast.success(publishNow ? "Assignment published" : "Draft assignment created");
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the assignment");
+      toast.error(getErrorMessage(error, "Could not save the assignment"));
     } finally {
       setPending(false);
     }

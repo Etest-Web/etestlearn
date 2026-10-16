@@ -9,6 +9,7 @@ import { useRouter, useParams } from "next/navigation";
 import { FileText } from "lucide-react";
 import { toast } from "sonner";
 import { CourseAnnouncementsList } from "@/components/course-announcements-list";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function DashboardCoursePage() {
   const router = useRouter();
@@ -90,9 +91,7 @@ export default function DashboardCoursePage() {
       await issueCertificate({ courseId: course._id });
       toast.success("Your certificate is ready");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Could not issue certificate",
-      );
+      toast.error(getErrorMessage(err, "Could not issue certificate"));
     } finally {
       setIsIssuing(false);
     }

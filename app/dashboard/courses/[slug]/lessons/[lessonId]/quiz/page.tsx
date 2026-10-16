@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {
   Card,
   CardHeader,
@@ -14,14 +15,17 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { HelpCircle } from "lucide-react";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function LessonQuizPage() {
   const params = useParams<{ slug: string; lessonId: string }>();
-  const lessonId = params.lessonId as string;
+  // A URL segment is a plain string; Convex `Id`s are branded strings, so this
+  // is the one cast that genuinely has to happen. The validator on the query
+  // rejects a bad id server-side, which is where it is caught.
+  const lessonId = params.lessonId as Id<"lessons">;
 
-  const quizData = useQuery(api.quizzes.getQuizForLesson, {
-    lessonId: lessonId as any,
-  });
+  const quizData = useQuery(api.quizzes.getQuizForLesson, { lessonId });
   const [selected, setSelected] = useState<Record<string, string>>({});
   const submitAttempt = useMutation(api.quizzes.submitQuizAttempt);
   const [result, setResult] = useState<{
@@ -59,14 +63,18 @@ export default function LessonQuizPage() {
     setSubmitting(true);
     try {
       const answers = Object.entries(selected).map(([questionId, optionId]) => ({
-        questionId: questionId as any,
-        optionId: optionId as any,
+        questionId: questionId as Id<"quizQuestions">,
+        optionId: optionId as Id<"quizOptions">,
       }));
       const res = await submitAttempt({
         lessonId: quiz.lessonId,
         answers,
       });
       setResult(res);
+    } catch (err) {
+      // Without this the promise rejection escapes the click handler: the button
+      // re-enables and the attempt looks like it simply did nothing.
+      toast.error(getErrorMessage(err, "Your answers could not be submitted"));
     } finally {
       setSubmitting(false);
     }
@@ -87,14 +95,14 @@ export default function LessonQuizPage() {
           <CardTitle>Questions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {questions.map(({ question, options }: any, index: number) => (
+          {questions.map(({ question, options }, index) => (
             <div key={question._id} className="space-y-2">
               <p className="text-sm font-medium">
                 <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
                 {question.prompt}
               </p>
               <div className="space-y-1" role="radiogroup">
-                {options.map((opt: any) => {
+                {options.map((opt) => {
                   const questionKey = String(question._id);
                   const optionKey = String(opt._id);
                   const checked = selected[questionKey] === optionKey;

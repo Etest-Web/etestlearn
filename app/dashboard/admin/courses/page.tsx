@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -87,7 +89,7 @@ function CoursesBody() {
       );
       setSelected(new Set());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bulk action failed");
+      toast.error(getErrorMessage(err, "Bulk action failed"));
     }
   }
 
@@ -96,7 +98,7 @@ function CoursesBody() {
       await setFeatured({ courseId: courseId as never, featured });
       toast.success(featured ? "Course featured" : "Course removed from featured");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Action failed");
+      toast.error(getErrorMessage(err, "Action failed"));
     }
   }
 
@@ -110,7 +112,7 @@ function CoursesBody() {
       toast.success(decision === "approved" ? "Course approved and published" : "Review rejected");
       setReviewNote("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Review failed");
+      toast.error(getErrorMessage(err, "Review failed"));
     }
   }
 

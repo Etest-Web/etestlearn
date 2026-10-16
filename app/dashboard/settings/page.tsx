@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -125,7 +127,7 @@ export default function SettingsPage() {
       });
       toast.success("Profile updated");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(getErrorMessage(err, "Something went wrong"));
     } finally {
       setIsSaving(false);
     }
@@ -154,9 +156,7 @@ export default function SettingsPage() {
       }
       toast.success("Profile photo updated");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? `Upload failed: ${err.message}` : "Upload failed. Please try again.",
-      );
+      toast.error(getErrorMessage(err, "Upload failed. Please try again."));
     } finally {
       setIsUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";

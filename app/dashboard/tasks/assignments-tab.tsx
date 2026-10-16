@@ -14,6 +14,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import {
   Button,
   Dialog,
@@ -273,7 +274,7 @@ function SubmissionDialog({
       }
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Something went wrong");
+      toast.error(getErrorMessage(error, "Something went wrong"));
     } finally {
       setPending(null);
     }

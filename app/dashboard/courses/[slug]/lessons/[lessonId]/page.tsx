@@ -18,6 +18,7 @@ import {
 import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import {
   ArrowLeft,
   ArrowRight,
@@ -193,7 +194,7 @@ export default function LessonPage() {
         router.push(`/dashboard/courses/${course.slug}`);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update progress");
+      toast.error(getErrorMessage(err, "Failed to update progress"));
     } finally {
       setIsMarking(false);
     }
@@ -271,7 +272,7 @@ export default function LessonPage() {
                 // 90% watched counts as done — no navigation, just the toast + progress.
                 completeLesson({ courseId: course._id, lessonId: lesson._id }).then(
                   () => toast.success("Lesson completed"),
-                  (err) => toast.error(err instanceof Error ? err.message : "Failed to update progress"),
+                  (err) => toast.error(getErrorMessage(err, "Failed to update progress")),
                 );
               }}
             />

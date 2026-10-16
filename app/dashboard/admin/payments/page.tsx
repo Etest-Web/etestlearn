@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -52,7 +54,7 @@ function PaymentsBody() {
       toast.success(clear ? "Refund annotation cleared" : "Purchase marked refunded");
       setReason("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Action failed");
+      toast.error(getErrorMessage(err, "Action failed"));
     }
   }
 

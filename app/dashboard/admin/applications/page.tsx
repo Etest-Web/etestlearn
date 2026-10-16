@@ -1,5 +1,7 @@
 "use client";
 
+import { getErrorMessage } from "@/lib/errors";
+
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -73,9 +75,9 @@ function ApplicationsBody() {
       );
       setReviewingId(null);
       setReviewNote("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.message || "Failed to process application.");
+      toast.error(getErrorMessage(error, "Failed to process application."));
     } finally {
       setIsProcessing(false);
     }

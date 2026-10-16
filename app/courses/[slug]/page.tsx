@@ -24,6 +24,7 @@ import Image from "next/image";
 import { ArrowLeft, ArrowUpRight, ListChecks, Loader2, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import { useLocalization } from "@/components/localization-provider";
 import { averageRating, formatRating } from "@/lib/reviews";
 import { COUPON_CODE_MAX_LENGTH } from "@/lib/coupons";
@@ -119,7 +120,7 @@ export default function CoursePage() {
       });
       window.location.href = authorizationUrl;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Payment failed to start");
+      toast.error(getErrorMessage(err, "Payment failed to start"));
     } finally {
       setIsPaying(false);
     }

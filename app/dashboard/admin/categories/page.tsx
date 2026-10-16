@@ -10,6 +10,7 @@ import { Button, Card, EmptyState, Input, Label } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 function CategoriesBody() {
   const categories = useQuery(api.categories.list);
@@ -31,7 +32,7 @@ function CategoriesBody() {
       toast.success("Category added");
       setName("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add category");
+      toast.error(getErrorMessage(err, "Could not add category"));
     }
   }
 
@@ -42,7 +43,7 @@ function CategoriesBody() {
       toast.success("Category renamed");
       setEditingId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not rename category");
+      toast.error(getErrorMessage(err, "Could not rename category"));
     }
   }
 
@@ -51,7 +52,7 @@ function CategoriesBody() {
       await remove({ categoryId: categoryId as never });
       toast.success("Category deleted");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not delete category");
+      toast.error(getErrorMessage(err, "Could not delete category"));
     }
   }
 

@@ -83,38 +83,29 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "clean-bullfrog-580.eu-west-1.convex.cloud",
-      },
-      {
-        protocol: "https",
-        hostname: "clean-bullfrog-580.eu-west-1.convex.site",
-      },
-      {
-        protocol: "https",
-        hostname: "*.eu-west-1.convex.cloud",
-      },
-      {
-        protocol: "https",
-        hostname: "*.eu-west-1.convex.site",
-      },
-      {
-        protocol: "https",
-        hostname: "**.convex.cloud",
-      },
-      {
-        protocol: "https",
-        hostname: "**.convex.site",
-      },
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "img.clerk.com",
-      },
+      // Convex file storage. Wildcards, not the deployment name: a
+      // deployment name is a per-environment string (`<name>-<region>.convex.cloud`)
+      // that changes the moment you cut over to prod or open a preview
+      // deployment, and a hardcoded one silently turns every `next/image` URL
+      // into a 400 at the worst possible time. Covering `**.convex.{cloud,site}`
+      // is the same trade the CSP already makes in `lib/csp.ts`.
+      { protocol: "https", hostname: "**.convex.cloud" },
+      { protocol: "https", hostname: "**.convex.site" },
+
+      // Clerk avatars arrive from TWO different hosts and both are still in
+      // production use: `img.clerk.com` for newer OAuth/profile photos, and
+      // `images.clerk.dev` for older uploads that were already in the user's
+      // Clerk record. Clerk does not migrate those, so allowing only one of
+      // them breaks exactly the accounts that predate the change — which is
+      // how this class of 400 hides until an admin looks at a page. Both
+      // wildcards cover either host without having to track Clerk's split.
+      { protocol: "https", hostname: "**.clerk.com" },
+      { protocol: "https", hostname: "**.clerk.dev" },
+
+      // Clerk-hosted user avatars served from the frontend API host.
+      { protocol: "https", hostname: "clerk.glypha.com.ng" },
+
+      { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
 };

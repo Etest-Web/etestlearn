@@ -6,6 +6,7 @@ import { Gift, Users, UserPlus, BarChart3, Clock, Award } from "lucide-react";
 import { Card, CardContent } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageShell } from "@/components/dashboard-shell";
+import { ReferralSettingsSection } from "./settings";
 
 // No role guard here: `app/dashboard/admin/layout.tsx` gates the whole console,
 // so a per-page guard would be a second client-side role check for the same
@@ -113,6 +114,11 @@ function ReferralStatsPageContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* The editor lives here rather than at `/dashboard/admin/referrals/settings`:
+          the admin console is flat, and this is the same shape as the "Certificate
+          design" card on `/dashboard/admin/certificates`. */}
+      <ReferralSettingsSection />
     </PageShell>
   );
 }

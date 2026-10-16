@@ -6,8 +6,6 @@ import { api } from "@/convex/_generated/api";
 import { Gift, Percent, Wallet, Clock, Save, RotateCcw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label } from "@/components/ui";
-import { PageHeader } from "@/components/ui/page-header";
-import { AdminGuard } from "@/components/role-guard";
 
 /**
  * Referral settings editor.
@@ -17,16 +15,21 @@ import { AdminGuard } from "@/components/role-guard";
  * - Invitee discount: percentage and absolute caps
  * - Referrer grant: percentage and absolute caps
  * - Grant expiration window
+ *
+ * This is a section of `/dashboard/admin/referrals`, not a route of its own.
+ * The admin console is flat (no page nests under another), and the editor
+ * belongs next to the stats it changes — the same shape as the "Certificate
+ * design" card on `/dashboard/admin/certificates`. Shipping it as
+ * `referrals/settings.tsx` made it dead code: Next only routes `page.tsx`, so
+ * the file was never mounted and `updateSettings` was unreachable.
+ *
+ * No role guard here: `app/dashboard/admin/layout.tsx` gates the segment.
  */
-export default function ReferralSettingsPage() {
-  return (
-    <AdminGuard>
-      <ReferralSettingsPageContent />
-    </AdminGuard>
-  );
+export function ReferralSettingsSection() {
+  return <ReferralSettingsForm />;
 }
 
-function ReferralSettingsPageContent() {
+function ReferralSettingsForm() {
   const settings = useQuery(api.referrals.getSettings);
   const updateSettings = useMutation(api.referrals.updateSettings);
 

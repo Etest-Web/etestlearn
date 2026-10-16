@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Copy, Gift, Users, UserPlus, UserCheck, Clock, Calendar, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -42,9 +43,13 @@ export default function ReferrerPage() {
 
 function ReferrerPageContent() {
   const summary = useQuery(api.referrals.getMyReferralSummary, {});
-  const settings = useQuery(api.referrals.getSettings, {});
-
-  if (summary === undefined || settings === undefined) {
+  const ensureMyCode = useMutation(api.referrals.ensureMyCode);
+  const [generating, setGenerating] = useState(false);
+  // No `getSettings` here. It is an `requireAdmin` query, and this page is the
+  // learner surface — subscribing to it threw for every student and instructor
+  // and took the page straight to the error boundary. Nothing read the value
+  // anyway; it only fed the skeleton gate below.
+  if (summary === undefined) {
     return <ReferrerSkeleton />;
   }
 
@@ -107,12 +112,24 @@ function ReferrerPageContent() {
                   </p>
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      // Navigate to settings to generate referral code
-                      window.location.href = "/dashboard/settings?tab=referral";
+                    disabled={generating}
+                    onClick={async () => {
+                      // Allocates and stores the code, then `getMyReferralSummary`
+                      // picks it up reactively. This used to navigate to
+                      // `/dashboard/settings?tab=referral`, a tab that does not
+                      // exist — so a user without a code had no way to get one.
+                      setGenerating(true);
+                      try {
+                        await ensureMyCode({});
+                        toast.success("Referral code generated");
+                      } catch {
+                        toast.error("Could not generate a code. Try again.");
+                      } finally {
+                        setGenerating(false);
+                      }
                     }}
                   >
-                    Generate Code
+                    {generating ? "Generating…" : "Generate Code"}
                   </Button>
                 </div>
               )}

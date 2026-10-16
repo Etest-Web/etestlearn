@@ -85,7 +85,7 @@ export default function InstructorProfilePage() {
         />
         <div className="min-w-0 space-y-3">
           <div className="space-y-1">
-            <h1 className="font-display text-3xl leading-tight">
+            <h1 className="font-outfit text-3xl leading-tight">
               {instructor.name}
               {instructor.pronouns && (
                 <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">
@@ -131,7 +131,7 @@ export default function InstructorProfilePage() {
       </header>
 
       <section className="space-y-6">
-        <h2 className="font-display text-2xl">Courses</h2>
+        <h2 className="font-outfit text-2xl">Courses</h2>
 
         {courses.length === 0 ? (
           <EmptyState

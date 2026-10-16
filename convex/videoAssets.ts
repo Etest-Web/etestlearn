@@ -107,18 +107,31 @@ export const getAssetStatus = query({
   args: { lessonId: v.id("lessons") },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    if (!user) return null;
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson?.videoAssetId) return null;
     const asset = await ctx.db.get(lesson.videoAssetId);
     if (!asset) return null;
     const course = await ctx.db.get(lesson.courseId);
 
-    if (isStaff(user) && (await canManageCourse(ctx, user, course))) {
+    if (user && isStaff(user) && (await canManageCourse(ctx, user, course))) {
       return { role: "manager" as const, asset };
     }
     if (asset.status !== "ready") return null;
-    if (!(await hasEnrollment(ctx, user._id, lesson.courseId))) return null;
+
+    // ponytail: lesson 1 defaults to public preview; upgrade to per-lesson isPreview flag when authored
+    if (lesson.order === 1) {
+      return {
+        role: "preview" as const,
+        asset: {
+          _id: asset._id,
+          status: asset.status,
+          variants: asset.variants ?? [],
+          durationSeconds: asset.durationSeconds ?? 0,
+        },
+      };
+    }
+
+    if (!user || !(await hasEnrollment(ctx, user._id, lesson.courseId))) return null;
     return {
       role: "student" as const,
       asset: {
@@ -131,22 +144,26 @@ export const getAssetStatus = query({
   },
 });
 
-/** Step 3: mint a short-lived playback token for an enrolled student (or manager preview). */
+/** Step 3: mint a short-lived playback token for an enrolled student (or manager/free preview). */
 export const issuePlaybackToken = mutation({
   args: { assetId: v.id("videoAssets") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
+    const user = await getCurrentUser(ctx);
     const asset = await ctx.db.get(args.assetId);
     if (!asset || asset.status !== "ready") throw new Error("Video is not ready");
     const lesson = await ctx.db.get(asset.lessonId);
     if (!lesson) throw new Error("Lesson not found");
     const course = await ctx.db.get(lesson.courseId);
-    const manager = isStaff(user) && (await canManageCourse(ctx, user, course));
-    if (!manager && !(await hasEnrollment(ctx, user._id, lesson.courseId))) {
+    const manager = user && isStaff(user) && (await canManageCourse(ctx, user, course));
+    const isEnrolled = user ? await hasEnrollment(ctx, user._id, lesson.courseId) : false;
+    const isPreview = lesson.order === 1;
+
+    if (!manager && !isEnrolled && !isPreview) {
       throw new Error("Not enrolled in this course");
     }
     const exp = Date.now() + TOKEN_TTL_MS;
-    const token = await signPlaybackToken({ a: asset._id, u: user._id, exp });
+    const userId = user ? user._id : "anonymous";
+    const token = await signPlaybackToken({ a: asset._id, u: userId, exp });
     return { token, exp };
   },
 });
@@ -313,14 +330,21 @@ export const failAsset = internalMutation({
  * enrolled student. The route verifies the token signature itself first.
  */
 export const checkPlaybackAccess = internalQuery({
-  args: { assetId: v.id("videoAssets"), userId: v.id("users") },
+  args: {
+    assetId: v.id("videoAssets"),
+    userId: v.union(v.id("users"), v.literal("anonymous")),
+  },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    if (!user || user.suspendedAt !== undefined) return false;
     const asset = await ctx.db.get(args.assetId);
     if (!asset || asset.status !== "ready") return false;
     const lesson = await ctx.db.get(asset.lessonId);
     if (!lesson) return false;
+    // ponytail: lesson 1 defaults to public preview; upgrade to per-lesson isPreview flag when authored
+    if (lesson.order === 1) return true;
+    if (args.userId === "anonymous") return false;
+
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.suspendedAt !== undefined) return false;
     const course = await ctx.db.get(lesson.courseId);
     if (isStaff(user) && (await canManageCourse(ctx, user, course))) return true;
     return hasEnrollment(ctx, user._id, lesson.courseId);

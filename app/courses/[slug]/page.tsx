@@ -1,33 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
   Badge,
   Button,
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   EmptyState,
   Input,
   Label,
-  PageHeader,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui";
 import { CourseSchema } from "@/components/seo/course-schema";
 import { CourseReviews } from "@/components/course-reviews";
 import { StarRating } from "@/components/star-rating";
+import { VideoPlayer } from "@/components/video-player";
+import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import Link from "next/link";
 import { notFound, useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, ArrowUpRight, ListChecks, Loader2, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Award,
+  CheckCircle2,
+  Clock,
+  FileText,
+  GraduationCap,
+  HelpCircle,
+  ListChecks,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Play,
+  PlayCircle,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  Video as VideoIcon,
+} from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 import { useLocalization } from "@/components/localization-provider";
 import { averageRating, formatRating } from "@/lib/reviews";
 import { COUPON_CODE_MAX_LENGTH } from "@/lib/coupons";
+import { cn } from "@/lib/utils";
 
 export default function CoursePage() {
   const router = useRouter();
@@ -42,9 +69,6 @@ export default function CoursePage() {
     api.payments.hasAccessToCourse,
     data?.course ? { courseId: data.course._id } : "skip",
   );
-  // The "taught by" card. Deliberately the light `getInstructorCard` rather than
-  // the full profile: a course page needs a name and a face, not a read of every
-  // other course the instructor has listed.
   const instructor = useQuery(
     api.instructors.getInstructorCard,
     data?.course ? { instructorId: data.course.instructorId } : "skip",
@@ -53,10 +77,9 @@ export default function CoursePage() {
   const initializeCheckout = useAction(api.paystack.initializeCheckout);
 
   const [isPaying, setIsPaying] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
-  // Coupon state. The code is only sent to the server when the buyer presses
-  // Apply — a live query keyed on every keystroke would be a request per
-  // character for an answer that is almost always "no".
+  // Coupon state
   const [couponInput, setCouponInput] = useState("");
   const [submittedCode, setSubmittedCode] = useState("");
   const couponPreview = useQuery(
@@ -76,8 +99,6 @@ export default function CoursePage() {
     updatePrice();
   }, [data, formatPrice]);
 
-  // The price after an accepted coupon, formatted the same way as the list
-  // price. `null` means no accepted coupon, so the list price stands.
   const [discountedPrice, setDiscountedPrice] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -96,10 +117,6 @@ export default function CoursePage() {
     };
   }, [couponPreview, data, formatPrice]);
 
-  // The code is sent whenever the buyer submitted one, not only when the
-  // preview said it was good. The preview is advisory; `createPendingPurchase`
-  // is the authority, so a code that lapsed while the page sat open is judged
-  // there rather than silently dropped because a preview had not loaded yet.
   const appliedCouponCode = submittedCode || undefined;
   const payablePrice = discountedPrice ?? displayPrice;
 
@@ -107,16 +124,13 @@ export default function CoursePage() {
     if (!data) return;
     setIsPaying(true);
     try {
-      // Step 1: create pending purchase record. The coupon code is re-checked
-      // server-side; the discounted price the buyer saw is what gets charged.
       const { reference } = await createPendingPurchase({
         courseId: data.course._id,
         couponCode: appliedCouponCode,
       });
-      // Step 2: get Paystack checkout URL and redirect, passing the localized currency
-      const { authorizationUrl } = await initializeCheckout({ 
+      const { authorizationUrl } = await initializeCheckout({
         reference,
-        currency: currency 
+        currency: currency,
       });
       window.location.href = authorizationUrl;
     } catch (err) {
@@ -126,57 +140,109 @@ export default function CoursePage() {
     }
   }
 
+  const course = data?.course;
+  const rawLessons = data?.lessons;
+  const lessons = useMemo(() => rawLessons ?? [], [rawLessons]);
+  const skills = useMemo(() => {
+    if (data && "skills" in data && Array.isArray((data as { skills?: unknown }).skills)) {
+      return (data as { skills: { _id: string; name: string }[] }).skills;
+    }
+    return [];
+  }, [data]);
+
+  // Active lesson in theater preview player
+  const activeLesson = useMemo(() => {
+    if (!lessons.length) return null;
+    if (selectedLessonId) {
+      return lessons.find((l) => l._id === selectedLessonId) ?? lessons[0];
+    }
+    return lessons[0];
+  }, [lessons, selectedLessonId]);
+
+  const totalDurationMinutes = useMemo(() => {
+    return lessons.reduce((acc, l) => acc + (l.durationMinutes ?? 0), 0);
+  }, [lessons]);
+
+  const formattedTotalDuration = useMemo(() => {
+    if (totalDurationMinutes === 0) return null;
+    const hours = Math.floor(totalDurationMinutes / 60);
+    const mins = totalDurationMinutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins > 0 ? `${mins}m` : ""}`;
+    }
+    return `${mins}m`;
+  }, [totalDurationMinutes]);
+
   if (data === undefined) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-12">
-        <p className="text-muted-foreground">Loading course...</p>
+      <main className="mx-auto max-w-6xl px-4 py-16">
+        <div className="flex items-center justify-center gap-3 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <p>Loading course preview...</p>
+        </div>
       </main>
     );
   }
 
-  if (data === null) {
+  if (data === null || !course) {
     notFound();
   }
 
-  const { course, lessons } = data;
   const isPaidCourse = !!course.price && course.price > 0;
-  // The running total lives on the course document, so the header and the
-  // review block below it read the same two numbers and cannot drift apart.
   const average = averageRating(course.ratingSum, course.ratingCount);
 
-  function renderCta() {
+  // Lesson preview permission: lesson 1 is free preview; all lessons unlocked once enrolled
+  // ponytail: lesson.order === 1 is default preview; upgrade to explicit lesson.isPreview when added to schema
+  const isLessonUnlocked = (lessonOrder: number) => {
+    return Boolean(hasAccess || lessonOrder === 1);
+  };
+
+  const isActiveLessonUnlocked = activeLesson ? isLessonUnlocked(activeLesson.order) : false;
+
+  function renderCta(options?: { className?: string; size?: "default" | "sm" | "lg" }) {
+    const size = options?.size ?? "lg";
+    const className = cn("w-full font-medium shadow-sm", options?.className);
+
     if (!isSignedIn) {
       return (
-        <Button size="lg" onClick={() => router.push("/sign-in")}>
+        <Button size={size} className={className} onClick={() => router.push("/sign-in")}>
           Sign in to enroll
         </Button>
       );
     }
     if (hasAccess) {
       return (
-        <Button size="lg" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
+        <Button
+          size={size}
+          className={className}
+          onClick={() => router.push(`/dashboard/courses/${course!.slug}`)}
+        >
           Continue learning
         </Button>
       );
     }
     if (isPaidCourse) {
       return (
-        <Button size="lg" disabled={isPaying} onClick={handlePay}>
+        <Button size={size} className={className} disabled={isPaying} onClick={handlePay}>
           {isPaying ? (
             <>
-              <Loader2 className="animate-spin" /> Redirecting to Paystack...
+              <Loader2 className="h-4 w-4 animate-spin" /> Redirecting to Paystack...
             </>
           ) : (
             <>
-              <Lock /> Pay {payablePrice} with Paystack
+              <Lock className="h-4 w-4" /> Enroll for {payablePrice}
             </>
           )}
         </Button>
       );
     }
     return (
-      <Button size="lg" onClick={() => router.push(`/dashboard/courses/${course.slug}`)}>
-        Enroll &amp; start learning
+      <Button
+        size={size}
+        className={className}
+        onClick={() => router.push(`/dashboard/courses/${course!.slug}`)}
+      >
+        Enroll for free
       </Button>
     );
   }
@@ -194,185 +260,617 @@ export default function CoursePage() {
           priceKobo: course.price,
         }}
       />
-      <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:py-12">
-      <Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => router.back()}>
-        <ArrowLeft /> Back
-      </Button>
 
-      <PageHeader
-        title={course.title}
-        description={course.description}
-        actions={renderCta()}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Image src={course.thumbnailUrl || "/hero-backdrop.jpg"} alt={course.title} width={500} height={500} className="h-12 w-12 shrink-0 rounded-sm object-cover" />
-          {course.category && <Badge variant="secondary">{course.category}</Badge>}
-          {course.level && <Badge variant="outline">{course.level}</Badge>}
-          {average !== null && (
-            <span className="flex items-center gap-1.5">
-              <StarRating value={average} size="sm" />
-              <span className="tabular text-sm text-muted-foreground">
-                {formatRating(average)}
-                {course.ratingCount ? ` · ${course.ratingCount}` : ""}
-              </span>
-            </span>
-          )}
-          <span className="tabular text-[15px] font-semibold text-foreground">
-            {discountedPrice && (
-              <span className="mr-2 font-normal text-muted-foreground line-through">
-                {displayPrice}
-              </span>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:py-10 space-y-8 pb-24 lg:pb-16">
+        {/* Breadcrumb & Back */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2.5 text-muted-foreground hover:text-foreground"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to courses
+          </Button>
+          <div className="flex items-center gap-2">
+            {course.category && (
+              <Badge variant="secondary" className="font-normal text-xs">
+                {course.category}
+              </Badge>
             )}
-            {payablePrice}
-          </span>
-        </div>
-      </PageHeader>
-
-      {/* Coupon entry sits with the price it changes, and only for a paid course
-          the visitor has not already bought. */}
-      {isPaidCourse && !hasAccess && (
-        <section className="rounded-sm border border-rule p-4">
-          <Label htmlFor="coupon-code-input" className="eyebrow">
-            Have a coupon?
-          </Label>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Input
-              id="coupon-code-input"
-              value={couponInput}
-              onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-              maxLength={COUPON_CODE_MAX_LENGTH}
-              placeholder="DISCOUNT-CODE"
-              className="max-w-[16rem] font-mono"
-            />
-            <Button
-              variant="outline"
-              onClick={() => setSubmittedCode(couponInput.trim())}
-              disabled={couponInput.trim().length < 4}
-            >
-              Apply
-            </Button>
-            {submittedCode && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setSubmittedCode("");
-                  setCouponInput("");
-                }}
-              >
-                Clear
-              </Button>
+            {course.level && (
+              <Badge variant="outline" className="font-normal text-xs">
+                {course.level}
+              </Badge>
             )}
           </div>
-          {submittedCode && couponPreview !== undefined && (
-            <p
-              className={
-                couponPreview.valid
-                  ? "mt-2 text-sm text-success"
-                  : "mt-2 text-sm text-destructive"
-              }
-            >
-              {couponPreview.message}
-            </p>
-          )}
-        </section>
-      )}
+        </div>
 
-      {instructor && (
-        <section>
-          <Card>
-            <CardContent className="flex flex-wrap items-center gap-4">
-              <Image
-                src={instructor.imageUrl || "/certf.jpeg"}
-                alt={instructor.name}
-                width={112}
-                height={112}
-                className="h-14 w-14 shrink-0 rounded-full object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Taught by
-                </p>
-                <p className="font-medium">
-                  {instructor.name}
-                  {instructor.pronouns && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({instructor.pronouns})
-                    </span>
-                  )}
-                </p>
-                {instructor.bio && (
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{instructor.bio}</p>
+        {/* ============================================================== */}
+        {/* SKILLSHARE-STYLE THEATER: PREVIEW PLAYER & PLAYLIST */}
+        {/* ============================================================== */}
+        <section aria-label="Course Preview Theater" className="rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-12">
+            {/* Left: 16:9 Cinema Preview Player */}
+            <div className="lg:col-span-8 p-3 sm:p-5 flex flex-col justify-between">
+              <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-black flex items-center justify-center border border-zinc-900 shadow-inner">
+                {activeLesson ? (
+                  isActiveLessonUnlocked ? (
+                    activeLesson.contentType === "video" ? (
+                      activeLesson.videoAssetId ? (
+                        <EncryptedVideoPlayer
+                          assetId={activeLesson.videoAssetId}
+                          title={activeLesson.title}
+                        />
+                      ) : activeLesson.content ? (
+                        <VideoPlayer src={activeLesson.content} title={activeLesson.title} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-6 text-center text-zinc-400">
+                          <VideoIcon className="h-10 w-10 text-zinc-600 mb-2" />
+                          <p className="text-sm font-medium">Video preview being prepared</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            The instructor is finalizing the media for this lesson.
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      /* Article or Quiz preview */
+                      <div className="flex flex-col items-center justify-center p-8 text-center max-w-md">
+                        {activeLesson.contentType === "quiz" ? (
+                          <HelpCircle className="h-12 w-12 text-primary mb-3" />
+                        ) : (
+                          <FileText className="h-12 w-12 text-primary mb-3" />
+                        )}
+                        <span className="text-xs uppercase tracking-wider text-zinc-400 mb-1">
+                          {activeLesson.contentType} Lesson
+                        </span>
+                        <h3 className="text-lg font-semibold text-zinc-100">{activeLesson.title}</h3>
+                        <p className="text-xs text-zinc-400 mt-2">
+                          {hasAccess
+                            ? "You are enrolled in this course. Launch the dashboard to complete this lesson."
+                            : "This lesson is included with this course. Enroll to take quizzes and read full notes."}
+                        </p>
+                        {hasAccess ? (
+                          <Button
+                            size="sm"
+                            className="mt-4"
+                            onClick={() =>
+                              router.push(
+                                activeLesson.contentType === "quiz"
+                                  ? `/dashboard/courses/${course.slug}/lessons/${activeLesson._id}/quiz`
+                                  : `/dashboard/courses/${course.slug}/lessons/${activeLesson._id}`,
+                              )
+                            }
+                          >
+                            Open lesson in dashboard
+                          </Button>
+                        ) : (
+                          <div className="mt-4 max-w-xs">{renderCta({ size: "sm" })}</div>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    /* Locked Lesson Overlay */
+                    <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center">
+                      <Image
+                        src={course.thumbnailUrl || "/hero-backdrop.jpg"}
+                        alt={course.title}
+                        fill
+                        className="object-cover opacity-20 filter blur-xs"
+                      />
+                      <div className="relative z-10 flex flex-col items-center max-w-md">
+                        <div className="h-12 w-12 rounded-full bg-zinc-900/90 border border-zinc-700 flex items-center justify-center text-amber-400 mb-3 shadow-lg">
+                          <Lock className="h-5 w-5" />
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1">
+                          Lesson {activeLesson.order} is Locked
+                        </span>
+                        <h3 className="text-lg font-semibold text-white">{activeLesson.title}</h3>
+                        <p className="text-xs text-zinc-300 mt-2 mb-4 leading-relaxed">
+                          Enroll in <span className="text-white font-medium">{course.title}</span> to
+                          unlock all {lessons.length} lessons, hands-on tasks, and your completion
+                          certificate.
+                        </p>
+                        <div className="w-full max-w-xs">{renderCta({ size: "default" })}</div>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center p-6 text-zinc-500">
+                    <p className="text-sm">No lessons available yet.</p>
+                  </div>
                 )}
               </div>
-              {/* A real link, not a router.push: this is the one crawlable path
-                  into the public profile, which is what makes listing profiles
-                  in the sitemap worth anything. */}
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href={`/instructors/${instructor._id}`} />}
-              >
-                View profile
-                <ArrowUpRight className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-      )}
 
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className="rule-heading">Course outline</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {lessons.length === 0 ? (
-              <EmptyState
-                icon={ListChecks}
-                tone="neutral"
-                title="No lessons published yet"
-                description="Lessons will appear here once the instructor has added them in Convex."
-              />
-            ) : (
-              <ol className="space-y-3">
-                {lessons.map((lesson) => (
-                  <li
-                    key={lesson._id}
-                    className="flex items-center justify-between border border-rule px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{lesson.title}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {lesson.contentType}
-                      </p>
-                    </div>
-                    {lesson.durationMinutes && (
-                      <span className="tabular text-xs text-muted-foreground">
-                        {lesson.durationMinutes} min
+              {/* Theater Bottom Bar */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-900 text-xs text-zinc-400">
+                <div className="flex items-center gap-2 min-w-0">
+                  {activeLesson && (
+                    <>
+                      <span className="font-medium text-zinc-200 truncate">
+                        Lesson {activeLesson.order}: {activeLesson.title}
                       </span>
+                      {activeLesson.order === 1 && (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 font-normal shrink-0"
+                        >
+                          Free Preview
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                </div>
+                {activeLesson?.durationMinutes && (
+                  <span className="flex items-center gap-1 tabular text-zinc-400 shrink-0">
+                    <Clock className="h-3 w-3" /> {activeLesson.durationMinutes} min
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Playlist Queue */}
+            <div className="lg:col-span-4 p-3 sm:p-5 border-t lg:border-t-0 lg:border-l border-zinc-800 flex flex-col justify-between bg-zinc-950/80">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                  <div>
+                    <h2 className="text-sm font-semibold text-zinc-100">Course Lessons</h2>
+                    <p className="text-[11px] text-zinc-400">
+                      {lessons.length} lessons {formattedTotalDuration ? `· ${formattedTotalDuration}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-[11px] uppercase tracking-wider text-emerald-400 font-medium">
+                    1 Preview Free
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-1.5 max-h-[360px] lg:max-h-[420px] overflow-y-auto pr-1">
+                  {lessons.length === 0 ? (
+                    <p className="text-xs text-zinc-500 py-6 text-center">No lessons uploaded yet.</p>
+                  ) : (
+                    lessons.map((lesson) => {
+                      const isSelected = activeLesson?._id === lesson._id;
+                      const isUnlocked = isLessonUnlocked(lesson.order);
+                      const isFreePreview = lesson.order === 1;
+
+                      return (
+                        <button
+                          key={lesson._id}
+                          type="button"
+                          onClick={() => setSelectedLessonId(lesson._id)}
+                          className={cn(
+                            "w-full text-left p-2.5 rounded-lg text-xs transition-all flex items-start gap-3 group border",
+                            isSelected
+                              ? "bg-zinc-900 border-zinc-700 text-white shadow-sm"
+                              : "bg-zinc-950/40 hover:bg-zinc-900/50 text-zinc-300 border-transparent",
+                          )}
+                        >
+                          <div className="mt-0.5 shrink-0">
+                            {isSelected ? (
+                              <div className="h-5 w-5 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+                                <Play className="h-2.5 w-2.5 fill-current" />
+                              </div>
+                            ) : isUnlocked ? (
+                              <PlayCircle className="h-5 w-5 text-zinc-400 group-hover:text-zinc-200" />
+                            ) : (
+                              <Lock className="h-4 w-4 text-zinc-500 mt-0.5" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="tabular text-[10px] text-zinc-400 font-mono">
+                                {String(lesson.order).padStart(2, "0")}
+                              </span>
+                              <p className={cn("truncate font-medium", isSelected ? "text-white" : "text-zinc-300")}>
+                                {lesson.title}
+                              </p>
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-400">
+                              <span className="capitalize">{lesson.contentType}</span>
+                              {lesson.durationMinutes && <span>· {lesson.durationMinutes} min</span>}
+                              {isFreePreview && (
+                                <span className="text-emerald-400 font-medium">· Free Preview</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Playlist footer note */}
+              <div className="pt-3 border-t border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between">
+                <span>{hasAccess ? "Full Access Unlocked" : "Preview mode active"}</span>
+                {!hasAccess && isPaidCourse && (
+                  <span className="text-zinc-200 font-semibold">{payablePrice}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================== */}
+        {/* COURSE OVERVIEW & TEACHER ROW */}
+        {/* ============================================================== */}
+        <section className="space-y-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
+              {course.title}
+            </h1>
+            <p className="text-base text-muted-foreground max-w-3xl leading-relaxed">
+              {course.description}
+            </p>
+          </div>
+
+          {/* Instructor & Meta Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 py-3 border-y border-border">
+            {instructor && (
+              <div className="flex items-center gap-3">
+                <Avatar className="h-11 w-11 border border-border">
+                  <AvatarImage src={instructor.imageUrl || "/certf.jpeg"} alt={instructor.name} />
+                  <AvatarFallback>{instructor.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{instructor.name}</p>
+                    {instructor.pronouns && (
+                      <span className="text-xs text-muted-foreground">({instructor.pronouns})</span>
                     )}
-                  </li>
-                ))}
-              </ol>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Course Instructor</p>
+                </div>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </section>
 
-      <section>
-        <CourseReviews
-          courseId={course._id}
-          ratingSum={course.ratingSum}
-          ratingCount={course.ratingCount}
-        />
-      </section>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+              {average !== null && (
+                <div className="flex items-center gap-1.5">
+                  <StarRating value={average} size="sm" />
+                  <span className="tabular font-medium text-foreground">
+                    {formatRating(average)}
+                  </span>
+                  <span>({course.ratingCount ?? 0} reviews)</span>
+                </div>
+              )}
+              {lessons.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <ListChecks className="h-3.5 w-3.5" />
+                  {lessons.length} lessons
+                </span>
+              )}
+              {formattedTotalDuration && (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formattedTotalDuration} total
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
 
-      {isPaidCourse && !hasAccess && (
-        <p className="text-xs text-center text-muted-foreground">
-          Payments are processed securely by Paystack — cards, bank transfer &amp; USSD accepted.
-        </p>
-      )}
+        {/* ============================================================== */}
+        {/* TWO-COLUMN DETAILS & CHECKOUT SIDEBAR */}
+        {/* ============================================================== */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Main Left: Tabs Content */}
+          <div className="lg:col-span-8 space-y-6">
+            <Tabs defaultValue="about" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="about">About Class</TabsTrigger>
+                <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
+                <TabsTrigger value="instructor">Teacher</TabsTrigger>
+                <TabsTrigger value="reviews">
+                  Reviews {course.ratingCount ? `(${course.ratingCount})` : ""}
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ABOUT TAB */}
+              <TabsContent value="about" className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">About This Class</h3>
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed whitespace-pre-line">
+                    {course.description}
+                  </div>
+                </div>
+
+                {/* Skills tags */}
+                {skills && skills.length > 0 && (
+                  <div className="space-y-2 pt-4 border-t border-border">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Skills You Will Learn
+                    </h4>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {skills.map((skill: { _id: string; name: string }) => (
+                        <Badge key={skill._id} variant="secondary" className="px-2.5 py-1 text-xs">
+                          <Tag className="h-3 w-3 mr-1 opacity-70" /> {skill.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* What's included value props */}
+                <div className="rounded-xl border border-border p-5 bg-card space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" /> Key Class Highlights
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-muted-foreground pt-1">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span>{lessons.length} on-demand video &amp; interactive lessons</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Award className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span>Official Certificate of Completion awarded</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span>Direct class discussion community and instructor Q&amp;A</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <GraduationCap className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span>Lifetime access on mobile and desktop</span>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* SYLLABUS TAB */}
+              <TabsContent value="syllabus" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">Course Syllabus</h3>
+                  <span className="text-xs text-muted-foreground tabular">
+                    {lessons.length} lessons {formattedTotalDuration ? `(${formattedTotalDuration})` : ""}
+                  </span>
+                </div>
+
+                {lessons.length === 0 ? (
+                  <EmptyState
+                    icon={ListChecks}
+                    tone="neutral"
+                    title="No lessons published yet"
+                    description="The instructor has not added any lessons to this course yet."
+                  />
+                ) : (
+                  <div className="rounded-xl border border-border divide-y divide-border overflow-hidden bg-card">
+                    {lessons.map((lesson) => {
+                      const isFree = lesson.order === 1;
+                      const unlocked = isLessonUnlocked(lesson.order);
+
+                      return (
+                        <div
+                          key={lesson._id}
+                          className="flex items-center justify-between p-3.5 sm:p-4 text-sm hover:bg-muted/40 transition-colors"
+                        >
+                          <div className="flex items-start gap-3 min-w-0 pr-4">
+                            <div className="mt-0.5 shrink-0 text-muted-foreground">
+                              {unlocked ? (
+                                <PlayCircle className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Lock className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{lesson.title}</p>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                <span className="capitalize">{lesson.contentType}</span>
+                                {lesson.durationMinutes && (
+                                  <span>· {lesson.durationMinutes} min</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isFree ? (
+                              <Badge
+                                variant="outline"
+                                className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px]"
+                              >
+                                Free Preview
+                              </Badge>
+                            ) : !hasAccess ? (
+                              <span className="text-xs text-muted-foreground">Locked</span>
+                            ) : null}
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => {
+                                setSelectedLessonId(lesson._id);
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
+                            >
+                              {unlocked ? "Watch" : "Preview"}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* INSTRUCTOR TAB */}
+              <TabsContent value="instructor" className="space-y-4">
+                {instructor ? (
+                  <Card>
+                    <CardContent className="pt-6 flex flex-col sm:flex-row gap-5 items-start">
+                      <Avatar className="h-16 w-16 border border-border shrink-0">
+                        <AvatarImage
+                          src={instructor.imageUrl || "/certf.jpeg"}
+                          alt={instructor.name}
+                        />
+                        <AvatarFallback>
+                          {instructor.name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h3 className="text-base font-semibold text-foreground">
+                              {instructor.name}
+                            </h3>
+                            {instructor.pronouns && (
+                              <p className="text-xs text-muted-foreground">{instructor.pronouns}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            render={<Link href={`/instructors/${instructor._id}`} />}
+                          >
+                            View instructor profile
+                            <ArrowUpRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {instructor.bio ? (
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {instructor.bio}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            No bio provided by instructor.
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Instructor profile unavailable.</p>
+                )}
+              </TabsContent>
+
+              {/* REVIEWS TAB */}
+              <TabsContent value="reviews">
+                <CourseReviews
+                  courseId={course._id}
+                  ratingSum={course.ratingSum}
+                  ratingCount={course.ratingCount}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Right: Sticky Checkout Card */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-20 space-y-4">
+              <Card className="border-border shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Enrollment &amp; Pricing
+                    </span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold tracking-tight text-foreground tabular">
+                        {payablePrice}
+                      </span>
+                      {discountedPrice && (
+                        <span className="text-sm text-muted-foreground line-through tabular">
+                          {displayPrice}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {/* Primary Action Button */}
+                  {renderCta()}
+
+                  {/* Coupon section for unpurchased paid courses */}
+                  {isPaidCourse && !hasAccess && (
+                    <div className="pt-2 border-t border-border space-y-2">
+                      <Label htmlFor="coupon-code-input" className="text-xs font-medium text-foreground">
+                        Have a discount coupon?
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="coupon-code-input"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          maxLength={COUPON_CODE_MAX_LENGTH}
+                          placeholder="DISCOUNT-CODE"
+                          className="font-mono text-xs uppercase"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSubmittedCode(couponInput.trim())}
+                          disabled={couponInput.trim().length < 4}
+                        >
+                          Apply
+                        </Button>
+                        {submittedCode && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSubmittedCode("");
+                              setCouponInput("");
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      {submittedCode && couponPreview !== undefined && (
+                        <p
+                          className={cn(
+                            "text-xs font-medium",
+                            couponPreview.valid ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+                          )}
+                        >
+                          {couponPreview.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Trust & Guarantee points */}
+                  <div className="pt-3 border-t border-border space-y-2.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>Instant access to all lessons &amp; preview videos</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>Official certificate upon completion</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>Secure payment handled by Paystack</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {isPaidCourse && !hasAccess && (
+                <p className="text-[11px] text-center text-muted-foreground px-2">
+                  Payments are processed securely via Paystack. Cards, Bank Transfer &amp; USSD accepted.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
+
+      {/* ============================================================== */}
+      {/* MOBILE STICKY BOTTOM CHECKOUT BAR */}
+      {/* ============================================================== */}
+      {!hasAccess && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border p-3 px-4 lg:hidden flex items-center justify-between gap-4 shadow-lg">
+          <div>
+            <span className="text-[11px] text-muted-foreground block">Total price</span>
+            <span className="text-lg font-bold text-foreground tabular">{payablePrice}</span>
+          </div>
+          <div className="w-1/2">{renderCta({ size: "default" })}</div>
+        </div>
+      )}
     </>
   );
 }

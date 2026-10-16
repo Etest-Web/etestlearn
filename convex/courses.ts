@@ -169,7 +169,18 @@ export const getCourseBySlug = query({
       .withIndex("by_course_order", (q) => q.eq("courseId", course._id))
       .collect();
 
-    return { course, lessons };
+    // ponytail: inline skill resolution; upgrade to batch join helper if course has >20 skills
+    const skills = course.skillIds?.length
+      ? (
+          await Promise.all(
+            course.skillIds.map((id) => ctx.db.get(id))
+          )
+        )
+          .filter((s): s is NonNullable<typeof s> => s !== null)
+          .map((s) => ({ _id: s._id, name: s.name, slug: s.slug }))
+      : [];
+
+    return { course, lessons, skills };
   },
 });
 

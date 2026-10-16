@@ -85,11 +85,27 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "laudable-cuttlefish-591.eu-west-1.convex.cloud",
+        hostname: "clean-bullfrog-580.eu-west-1.convex.cloud",
       },
       {
         protocol: "https",
-        hostname: "laudable-cuttlefish-591.eu-west-1.convex.site",
+        hostname: "clean-bullfrog-580.eu-west-1.convex.site",
+      },
+      {
+        protocol: "https",
+        hostname: "*.eu-west-1.convex.cloud",
+      },
+      {
+        protocol: "https",
+        hostname: "*.eu-west-1.convex.site",
+      },
+      {
+        protocol: "https",
+        hostname: "**.convex.cloud",
+      },
+      {
+        protocol: "https",
+        hostname: "**.convex.site",
       },
       {
         protocol: "https",

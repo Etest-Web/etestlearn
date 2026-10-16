@@ -190,6 +190,14 @@ describe("enrollment gating", () => {
       asStudent.mutation(api.enrollments.enrollInCourse, { courseId: freeCourseId }),
     ).resolves.toBeTruthy();
   });
+
+  test("getUserEnrollments returns empty array when unauthenticated", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+
+    const enrollments = await t.query(api.enrollments.getUserEnrollments, {});
+    expect(enrollments).toEqual([]);
+  });
 });
 
 describe("lesson progress", () => {

@@ -127,7 +127,8 @@ export const enrollInCourse = mutation({
 export const getUserEnrollments = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireUser(ctx);
+    const user = await getCurrentUser(ctx);
+    if (!user) return [];
 
     return await ctx.db
       .query("enrollments")

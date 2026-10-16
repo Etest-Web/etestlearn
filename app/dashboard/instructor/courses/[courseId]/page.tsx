@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock, SearchX } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
 import { CertificatesPanel } from "@/components/course-certificates-panel";
@@ -165,7 +166,7 @@ export default function CourseEditPage() {
       toast.success(successMessage);
     } catch (error: unknown) {
       toast.error(
-        error instanceof Error ? error.message : errorMessage,
+        getErrorMessage(error, errorMessage),
       );
     } finally {
       setIsPublishingActionPending(false);
@@ -199,7 +200,7 @@ export default function CourseEditPage() {
       toast.success("Request submitted. An admin will review it shortly.");
     } catch (error: unknown) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to submit the request.",
+        getErrorMessage(error, "Failed to submit the request."),
       );
     } finally {
       setIsPublishingActionPending(false);

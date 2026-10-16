@@ -41,6 +41,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 /**
  * The payout queue.
@@ -130,7 +131,7 @@ function ResolvePanel({
       }
       onDone?.();
     } catch (error) {
-      toast.error((error as Error)?.message ?? "Failed to update the request");
+      toast.error(getErrorMessage(error, "Failed to update the request"));
     } finally {
       setBusy(false);
     }
@@ -266,7 +267,7 @@ function RecordPayoutCard() {
       setReference("");
       setNote("");
     } catch (error) {
-      toast.error((error as Error)?.message ?? "Failed to record the payout");
+      toast.error(getErrorMessage(error, "Failed to record the payout"));
     } finally {
       setBusy(false);
     }

@@ -34,6 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 
 /**
  * Earnings — the money page.
@@ -209,7 +210,7 @@ function BankChangeRequestButton() {
       setOpen(false);
       setReason("");
     } catch (error) {
-      toast.error((error as Error)?.message ?? "Failed to submit request");
+      toast.error(getErrorMessage(error, "Failed to submit request"));
     } finally {
       setSubmitting(false);
     }

@@ -20,6 +20,7 @@ import { PageShell } from "@/components/dashboard-shell";
 import { Textarea } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import {
   CheckCircle2,
   XCircle,
@@ -69,7 +70,7 @@ function UnpublishRequestsBody() {
     } catch (error: unknown) {
       console.error(error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to process the request.",
+        getErrorMessage(error, "Failed to process the request."),
       );
     } finally {
       setIsProcessing(false);

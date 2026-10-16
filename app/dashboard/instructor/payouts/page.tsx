@@ -47,6 +47,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors";
 import type { PayoutStatus } from "@/lib/payouts";
 
 /**
@@ -124,7 +125,7 @@ function RequestPayoutButton({
       setOpen(false);
       setNote("");
     } catch (error) {
-      toast.error((error as Error)?.message ?? "Failed to request a payout");
+      toast.error(getErrorMessage(error, "Failed to request a payout"));
     } finally {
       setSubmitting(false);
     }
@@ -259,7 +260,7 @@ export default function InstructorPayoutsPage() {
       await cancelRequest({ payoutId });
       toast.success("Request withdrawn — the balance is available again.");
     } catch (error) {
-      toast.error((error as Error)?.message ?? "Failed to withdraw the request");
+      toast.error(getErrorMessage(error, "Failed to withdraw the request"));
     } finally {
       setCancellingId(null);
     }

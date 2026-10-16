@@ -74,7 +74,7 @@ function AnnouncementsBody() {
       await setAudience({ announcementId: id, audience: next });
       toast.success(`Now shown to ${audienceLabel(next).toLowerCase()}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not change the audience");
+      toast.error(getErrorMessage(err, "Could not change the audience"));
     }
   }
 

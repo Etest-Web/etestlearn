@@ -22,6 +22,7 @@ import {
     EyeOff,
     FileCheck2,
     Gauge,
+    Gift,
     Inbox,
     LayoutDashboard,
     LayoutList,
@@ -116,6 +117,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             // lit up nothing in the sidebar and had no input of its own below
             // `md`. It belongs with the rest of the learner surface.
             { href: "/dashboard/search", label: "Search", icon: Search },
+            // The referral backend (`convex/referrals.ts`) shipped without its
+            // pages, so this entry was the only thing missing to make the
+            // earn-a-credit surface reachable.
+            { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
         ],
     },
     {
@@ -162,6 +167,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/admin/maintenance", label: "Maintenance", icon: Wrench, badge: "maintenanceOn" },
             { href: "/dashboard/admin/unpublish-requests", label: "Unpublish requests", icon: EyeOff, badge: "pendingUnpublish" },
             { href: "/dashboard/admin/audit", label: "Audit log", icon: ScrollText },
+            { href: "/dashboard/admin/referrals", label: "Referrals", icon: Gift },
         ],
     },
 ];

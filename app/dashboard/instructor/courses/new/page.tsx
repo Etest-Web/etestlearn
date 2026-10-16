@@ -24,6 +24,7 @@ export default function CreateCoursePage() {
     title: "",
     slug: "",
     description: "",
+    previewVideoUrl: "",
     priceNaira: "",
   });
 
@@ -54,6 +55,9 @@ export default function CreateCoursePage() {
         title: formData.title,
         slug: formData.slug,
         description: formData.description,
+        ...(formData.previewVideoUrl.trim()
+          ? { previewVideoUrl: formData.previewVideoUrl.trim() }
+          : {}),
         ...(price !== undefined ? { price, currency: "NGN" } : {}),
       });
       toast.success("Course created successfully!");
@@ -136,6 +140,19 @@ export default function CreateCoursePage() {
                 rows={4}
                 required
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="previewVideoUrl">Course Preview Video URL (Optional)</Label>
+              <Input
+                id="previewVideoUrl"
+                name="previewVideoUrl"
+                placeholder="e.g. https://www.youtube.com/watch?v=... or Vimeo / MP4"
+                value={formData.previewVideoUrl}
+                onChange={handleChange}
+              />
+              <p className="text-xs leading-[1.5] text-muted-foreground">
+                Trailer or preview video shown to prospective learners in the course theater.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>

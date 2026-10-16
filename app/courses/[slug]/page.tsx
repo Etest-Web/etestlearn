@@ -191,6 +191,11 @@ export default function CoursePage() {
   const isPaidCourse = !!course.price && course.price > 0;
   const average = averageRating(course.ratingSum, course.ratingCount);
 
+  const isTrailerActive = Boolean(
+    course?.previewVideoUrl &&
+      (selectedLessonId === "preview" || (selectedLessonId === null && !hasAccess)),
+  );
+
   // Lesson preview permission: lesson 1 is free preview; all lessons unlocked once enrolled
   // ponytail: lesson.order === 1 is default preview; upgrade to explicit lesson.isPreview when added to schema
   const isLessonUnlocked = (lessonOrder: number) => {
@@ -294,7 +299,12 @@ export default function CoursePage() {
             {/* Left: 16:9 Cinema Preview Player */}
             <div className="lg:col-span-8 p-3 sm:p-5 flex flex-col justify-between">
               <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-black flex items-center justify-center border border-zinc-900 shadow-inner">
-                {activeLesson ? (
+                {isTrailerActive && course.previewVideoUrl ? (
+                  <VideoPlayer
+                    src={course.previewVideoUrl}
+                    title={`${course.title} - Preview Trailer`}
+                  />
+                ) : activeLesson ? (
                   isActiveLessonUnlocked ? (
                     activeLesson.contentType === "video" ? (
                       activeLesson.videoAssetId ? (
@@ -384,24 +394,38 @@ export default function CoursePage() {
 
               {/* Theater Bottom Bar */}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-900 text-xs text-zinc-400">
-                <div className="flex items-center gap-2 min-w-0">
-                  {activeLesson && (
-                    <>
-                      <span className="font-medium text-zinc-200 truncate">
-                        Lesson {activeLesson.order}: {activeLesson.title}
-                      </span>
-                      {activeLesson.order === 1 && (
-                        <Badge
-                          variant="outline"
-                          className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 font-normal shrink-0"
-                        >
-                          Free Preview
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </div>
-                {activeLesson?.durationMinutes && (
+                {isTrailerActive ? (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-zinc-200 truncate">
+                      Course Trailer &amp; Overview
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 font-normal shrink-0"
+                    >
+                      Free Preview
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 min-w-0">
+                    {activeLesson && (
+                      <>
+                        <span className="font-medium text-zinc-200 truncate">
+                          Lesson {activeLesson.order}: {activeLesson.title}
+                        </span>
+                        {activeLesson.order === 1 && (
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0 font-normal shrink-0"
+                          >
+                            Free Preview
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+                {!isTrailerActive && activeLesson?.durationMinutes && (
                   <span className="flex items-center gap-1 tabular text-zinc-400 shrink-0">
                     <Clock className="h-3 w-3" /> {activeLesson.durationMinutes} min
                   </span>
@@ -416,20 +440,64 @@ export default function CoursePage() {
                   <div>
                     <h2 className="text-sm font-semibold text-zinc-100">Course Lessons</h2>
                     <p className="text-[11px] text-zinc-400">
-                      {lessons.length} lessons {formattedTotalDuration ? `· ${formattedTotalDuration}` : ""}
+                      {lessons.length} lessons {course.previewVideoUrl ? "+ Trailer" : ""}{" "}
+                      {formattedTotalDuration ? `· ${formattedTotalDuration}` : ""}
                     </p>
                   </div>
                   <span className="text-[11px] uppercase tracking-wider text-emerald-400 font-medium">
-                    1 Preview Free
+                    {course.previewVideoUrl ? "Trailer Free" : "1 Preview Free"}
                   </span>
                 </div>
 
                 <div className="mt-3 space-y-1.5 max-h-[360px] lg:max-h-[420px] overflow-y-auto pr-1">
+                  {course.previewVideoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLessonId("preview")}
+                      className={cn(
+                        "w-full text-left p-2.5 rounded-lg text-xs transition-all flex items-start gap-3 group border mb-1",
+                        isTrailerActive
+                          ? "bg-zinc-900 border-zinc-700 text-white shadow-sm"
+                          : "bg-zinc-950/40 hover:bg-zinc-900/50 text-zinc-300 border-transparent",
+                      )}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {isTrailerActive ? (
+                          <div className="h-5 w-5 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+                            <Play className="h-2.5 w-2.5 fill-current" />
+                          </div>
+                        ) : (
+                          <PlayCircle className="h-5 w-5 text-emerald-400 group-hover:text-emerald-300" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="tabular text-[10px] text-emerald-400 font-mono font-medium">
+                            PREVIEW
+                          </span>
+                          <p
+                            className={cn(
+                              "truncate font-medium",
+                              isTrailerActive ? "text-white" : "text-zinc-200",
+                            )}
+                          >
+                            Course Trailer &amp; Overview
+                          </p>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-400">
+                          <span>Video Preview</span>
+                          <span className="text-emerald-400 font-medium">· Free Preview</span>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
                   {lessons.length === 0 ? (
                     <p className="text-xs text-zinc-500 py-6 text-center">No lessons uploaded yet.</p>
                   ) : (
                     lessons.map((lesson) => {
-                      const isSelected = activeLesson?._id === lesson._id;
+                      const isSelected = !isTrailerActive && activeLesson?._id === lesson._id;
                       const isUnlocked = isLessonUnlocked(lesson.order);
                       const isFreePreview = lesson.order === 1;
 
@@ -627,7 +695,7 @@ export default function CoursePage() {
                   </span>
                 </div>
 
-                {lessons.length === 0 ? (
+                {lessons.length === 0 && !course.previewVideoUrl ? (
                   <EmptyState
                     icon={ListChecks}
                     tone="neutral"
@@ -636,6 +704,43 @@ export default function CoursePage() {
                   />
                 ) : (
                   <div className="rounded-xl border border-border divide-y divide-border overflow-hidden bg-card">
+                    {course.previewVideoUrl && (
+                      <div className="flex items-center justify-between p-3.5 sm:p-4 text-sm hover:bg-muted/40 transition-colors bg-muted/10">
+                        <div className="flex items-start gap-3 min-w-0 pr-4">
+                          <div className="mt-0.5 shrink-0 text-emerald-500">
+                            <PlayCircle className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground truncate">
+                              Course Trailer &amp; Overview
+                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              Introductory video preview
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px]"
+                          >
+                            Free Preview
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => {
+                              setSelectedLessonId("preview");
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                          >
+                            Watch
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {lessons.map((lesson) => {
                       const isFree = lesson.order === 1;
                       const unlocked = isLessonUnlocked(lesson.order);

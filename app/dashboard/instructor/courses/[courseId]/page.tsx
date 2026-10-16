@@ -95,6 +95,7 @@ export default function CourseEditPage() {
     category: "",
     level: "",
     thumbnailUrl: "",
+    previewVideoUrl: "",
     priceNaira: "",
   });
 
@@ -107,6 +108,7 @@ export default function CourseEditPage() {
         category: courseData.course.category || "",
         level: courseData.course.level || "",
         thumbnailUrl: courseData.course.thumbnailUrl || "",
+        previewVideoUrl: courseData.course.previewVideoUrl || "",
         priceNaira: courseData.course.price ? String(courseData.course.price / 100) : "",
       });
     }
@@ -139,6 +141,7 @@ export default function CourseEditPage() {
         category: formData.category || undefined,
         level: formData.level || undefined,
         thumbnailUrl: formData.thumbnailUrl || undefined,
+        previewVideoUrl: formData.previewVideoUrl.trim() || undefined,
         price,
         ...(price > 0 ? { currency: "NGN" } : {}),
       });
@@ -522,6 +525,19 @@ export default function CourseEditPage() {
                       placeholder="e.g. Beginner"
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="previewVideoUrl">Course Preview / Trailer Video URL</Label>
+                  <Input
+                    id="previewVideoUrl"
+                    name="previewVideoUrl"
+                    value={formData.previewVideoUrl}
+                    onChange={handleChange}
+                    placeholder="e.g. https://www.youtube.com/watch?v=... or Vimeo / MP4"
+                  />
+                  <p className="text-xs leading-[1.5] text-muted-foreground">
+                    Trailer or preview video shown to prospective learners in the course theater.
+                  </p>
                 </div>
                 <div className="max-w-xs space-y-1.5">
                   <Label htmlFor="priceNaira">Price (₦, in Naira)</Label>

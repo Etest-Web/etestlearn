@@ -211,6 +211,7 @@ export const createCourse = mutation({
     skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+    previewVideoUrl: v.optional(v.string()),
     // Kobo; omit or 0 for free courses.
     price: v.optional(v.number()),
     currency: v.optional(v.string()),
@@ -244,6 +245,7 @@ export const createCourse = mutation({
       level: args.level,
       published: false,
       thumbnailUrl: args.thumbnailUrl,
+      previewVideoUrl: args.previewVideoUrl,
       price: args.price,
       currency: args.currency,
       searchText: buildSearchText(args.title, args.description, args.category),
@@ -271,6 +273,7 @@ export const updateCourse = mutation({
     skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+    previewVideoUrl: v.optional(v.string()),
     price: v.optional(v.number()),
     currency: v.optional(v.string()),
   },
@@ -312,6 +315,7 @@ export const updateCourse = mutation({
     if (args.skillIds !== undefined) updates.skillIds = args.skillIds;
     if (args.level !== undefined) updates.level = args.level;
     if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
+    if (args.previewVideoUrl !== undefined) updates.previewVideoUrl = args.previewVideoUrl;
     if (args.price !== undefined) updates.price = args.price;
     if (args.currency !== undefined) updates.currency = args.currency;
 

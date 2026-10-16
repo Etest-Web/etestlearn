@@ -116,6 +116,7 @@ export default defineSchema({
     level: v.optional(v.string()),
     published: v.boolean(),
     thumbnailUrl: v.optional(v.string()),
+    previewVideoUrl: v.optional(v.string()),
     // Pricing in kobo (1 Naira = 100 kobo). Absent or 0 = free course.
     price: v.optional(v.number()),
     currency: v.optional(v.string()), // e.g. "NGN"

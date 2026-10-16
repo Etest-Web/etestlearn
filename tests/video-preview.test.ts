@@ -168,4 +168,42 @@ describe("course preview & video assets", () => {
     expect(result?.skills).toHaveLength(1);
     expect(result?.skills[0].name).toBe("Video Editing");
   });
+
+  test("instructor can set and update custom previewVideoUrl", async () => {
+    const t = convexTest(testSchema, modules);
+    const now = Date.now();
+
+    await t.run((ctx: TestCtx) =>
+      ctx.db.insert("users", {
+        clerkId: "clerk_instructor_3",
+        email: "instructor3@test.com",
+        name: "Instructor 3",
+        role: "instructor",
+        createdAt: now,
+      }),
+    );
+
+    const asInstructor = t.withIdentity({
+      subject: "clerk_instructor_3",
+      tokenIdentifier: "clerk_instructor_3",
+    });
+
+    const courseId = await asInstructor.mutation(api.courses.createCourse, {
+      title: "Filmmaking 101",
+      slug: "filmmaking-101",
+      description: "Direct your first short film",
+      previewVideoUrl: "https://www.youtube.com/watch?v=sample-trailer",
+    });
+
+    let courseData = await t.query(api.courses.getCourseBySlug, { slug: "filmmaking-101" });
+    expect(courseData?.course.previewVideoUrl).toBe("https://www.youtube.com/watch?v=sample-trailer");
+
+    await asInstructor.mutation(api.courses.updateCourse, {
+      courseId,
+      previewVideoUrl: "https://vimeo.com/123456789",
+    });
+
+    courseData = await t.query(api.courses.getCourseBySlug, { slug: "filmmaking-101" });
+    expect(courseData?.course.previewVideoUrl).toBe("https://vimeo.com/123456789");
+  });
 });

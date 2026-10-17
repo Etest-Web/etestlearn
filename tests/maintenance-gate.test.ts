@@ -64,7 +64,27 @@ describe("the maintenance gate is wired into proxy.ts", () => {
       proxy.indexOf("function maintenanceResponse"),
     );
     expect(staffBody).toContain("catch");
-    expect(staffBody).toMatch(/catch\s*\{\s*return false/);
+    // Still fails closed. The assertion is looser than a bare `catch { return
+    // false` because the catch now binds the error and records it before it
+    // gives up — see the test below — and the property being guarded is the
+    // *return*, not the absence of a log line. The binding is optional in the
+    // pattern for the same reason.
+    expect(staffBody).toMatch(/catch\s*(?:\([^)]*\)\s*)?\{[\s\S]*?return false/);
+  });
+
+  test("records why the staff check failed, so a lockout is diagnosable afterwards", () => {
+    // The gap this closes: every failure collapsed into a bare `return false`,
+    // so an admin who could not get back in had nothing to read. The two
+    // branches are different fixes — no token means the session or the issuer
+    // is wrong; a throwing query means the `users` lookup or the deployment is
+    // wrong — and they are indistinguishable from the outside.
+    const staffBody = proxy.slice(
+      proxy.indexOf("async function isStaffRequest"),
+      proxy.indexOf("function maintenanceResponse"),
+    );
+    expect(staffBody).toContain("console.error");
+    expect(staffBody).toMatch(/no session token/i);
+    expect(staffBody).toMatch(/staff check threw/i);
   });
 
   test("proves staff identity through a session token, not a client-supplied argument", () => {
@@ -184,5 +204,19 @@ describe("the admin console can always get back in", () => {
   test("the toggle mutation is admin-gated server-side", () => {
     const mod = readFileSync(join(REPO_ROOT, "convex/maintenance.ts"), "utf8");
     expect(mod).toMatch(/setMode[\s\S]*?requireAdmin\(ctx\)/);
+  });
+
+  test("the console preflights the bypass before the switch will arm", () => {
+    // The lockout this guards against: the switch turns on, and the only
+    // account that can turn it off can no longer reach the page that does. The
+    // console must ask the deployment whether *this* caller would get back in,
+    // and refuse to arm while the answer is no — before, not after, the site is
+    // down.
+    const page = readFileSync(
+      join(REPO_ROOT, "app/dashboard/admin/maintenance/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("api.maintenance.preflight");
+    expect(page).toContain("bypassWorks");
   });
 });

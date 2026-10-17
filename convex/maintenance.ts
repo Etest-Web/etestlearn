@@ -20,7 +20,7 @@ import {
  * `lib/maintenance.ts` and is imported, not restated. This module is the stored
  * state plus the authorization around it.
  *
- * Two very different callers, and that split drives the shape of the file:
+ * Three callers, and that split drives the shape of the file:
  *
  *   · `proxy.ts` runs on the Edge runtime in front of every request and often
  *     with **no Clerk session at all**, so `getStatus` is deliberately public.
@@ -28,6 +28,13 @@ import {
  *     to render in the visitor's browser anyway. It exposes no user data, no
  *     ids and no capability — only "is the site down", the note, and the
  *     applications setting.
+ *   · `isStaffCaller` is the middleware's escape hatch, read only while the
+ *     gate is actually blocking. Same reasoning for being public: the caller
+ *     has to present a session token, and the answer is a boolean about the
+ *     caller alone.
+ *   · `preflight` is the operator's diagnosis, and it is the one reader that
+ *     must NOT be admin-gated — an admin-gated query throws exactly when the
+ *     identity is broken, which is the only case it exists for.
  *   · `setMode` is the admin-only write, and it is audited like every other
  *     privileged mutation because it takes the entire public site away.
  */
@@ -116,6 +123,79 @@ export const isStaffCaller = query({
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
     return user ? isStaff(user) : false;
+  },
+});
+
+/** The caller's own route back in — what {@link preflight} reports. */
+export type MaintenancePreflight = {
+  identity: "resolved" | "none";
+  user: "not_checked" | "found" | "missing" | "duplicate" | "suspended";
+  role: "student" | "instructor" | "admin" | null;
+  bypassWorks: boolean;
+};
+
+/**
+ * Why this caller would — or would not — get back past the gate.
+ *
+ * `isStaffCaller` answers a boolean and the middleware flattens every failure
+ * into `false`, so an operator who has locked themselves out has no way to tell
+ * *which* of the four very different problems they are looking at:
+ *
+ *   · `identity: "none"`       the session never resolved. Issuer mismatch, an
+ *                              expired token, or a browser with no session at
+ *                              all — fixed in Clerk or in `auth.config.ts`.
+ *   · `user: "missing"`        the session is fine and no `users` row matches
+ *                              it. The Clerk webhook has not run for this
+ *                              account — fixed in the webhook, not in Convex.
+ *   · `user: "duplicate"`      two rows share the clerkId. `getCurrentUser`
+ *                              reads with `.unique()`, so *every* identity call
+ *                              throws and the gate silently refuses everyone.
+ *   · `user: "suspended"`      the row exists and the account is suspended.
+ *
+ * Each has a different fix, and each is invisible through `isStaffCaller`.
+ *
+ * **Deliberately not behind `requireAdmin`.** If the identity or the row is
+ * broken, an admin-gated query throws the very diagnosis that was requested —
+ * it would work only in the case where nothing is wrong. The cost is that an
+ * anonymous caller can invoke it, which is why it returns only the caller's
+ * own state: no id, no email, no cross-user read, nothing that turns it into a
+ * probe for other accounts. See `lib/maintenance.ts` for the policy it feeds.
+ */
+export const preflight = query({
+  args: {},
+  handler: async (ctx): Promise<MaintenancePreflight> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return { identity: "none", user: "not_checked", role: null, bypassWorks: false };
+    }
+
+    // Read with `collect()` rather than `getCurrentUser`'s `.unique()`: a
+    // duplicate is one of the states this exists to name, and `.unique()` would
+    // throw it away as an error.
+    const rows = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .collect();
+
+    if (rows.length === 0) {
+      return { identity: "resolved", user: "missing", role: null, bypassWorks: false };
+    }
+    if (rows.length > 1) {
+      // Role is null rather than the duplicated value: with two rows the lookup
+      // cannot say which one the caller is, and guessing would send whoever
+      // reads this chasing the wrong account.
+      return { identity: "resolved", user: "duplicate", role: null, bypassWorks: false };
+    }
+
+    const user = rows[0];
+    if (user.suspendedAt !== undefined) {
+      return { identity: "resolved", user: "suspended", role: user.role, bypassWorks: false };
+    }
+
+    // `isStaff` is the same predicate `isStaffCaller` consults, so the two
+    // cannot drift — the preflight is a reading of the bypass, not a second
+    // opinion about who counts as staff.
+    return { identity: "resolved", user: "found", role: user.role, bypassWorks: isStaff(user) };
   },
 });
 

@@ -10,6 +10,7 @@ import {
     Loader2,
     Megaphone,
     RotateCcw,
+    ShieldAlert,
     ShieldCheck,
     Wrench,
 } from "lucide-react";
@@ -49,10 +50,49 @@ import {
 } from "@/lib/maintenance";
 
 /**
+ * Mirrors `convex/maintenance.MaintenancePreflight`.
+ *
+ * Redeclared rather than imported for the same reason `proxy.ts` and
+ * `app/maintenance/page.tsx` redeclare `MaintenanceStatus`: a client component
+ * importing a type out of a Convex module pulls that module's graph into the
+ * bundle unless the import is perfectly elided, and the shape is four fields.
+ */
+type Preflight = {
+    identity: "resolved" | "none";
+    user: "not_checked" | "found" | "missing" | "duplicate" | "suspended";
+    role: "student" | "instructor" | "admin" | null;
+    bypassWorks: boolean;
+};
+
+/**
+ * Turns the preflight's enum into the fix, not just the symptom.
+ *
+ * These four sentences are the whole reason the panel exists. Every one of them
+ * is a different repair — Clerk, the webhook, the database, the account itself —
+ * and before this read existed they were all indistinguishable from outside,
+ * because the gate reduces all of them to a 503.
+ */
+function explainBypass(preflight: Preflight): string {
+    if (preflight.identity === "none") {
+        return "No Clerk session resolved on this request. Either this browser is signed out, or the deployment is rejecting the session token — in which case check that CLERK_JWT_ISSUER_DOMAIN set on this Convex deployment matches the Clerk instance the site signs in against.";
+    }
+    if (preflight.user === "missing") {
+        return "Your session resolved, but no user record matches it. The Clerk webhook that creates user records has not run for this account on this deployment — the usual cause after pushing code to a new Convex deployment, since env vars and data do not travel with the code.";
+    }
+    if (preflight.user === "duplicate") {
+        return "More than one user record matches your session. Identity lookups read with .unique(), so every authenticated call throws and the gate refuses everyone — the duplicate row has to go first.";
+    }
+    if (preflight.user === "suspended") {
+        return "This account is suspended. Suspension reads as signed out platform-wide, and the gate's exemption is no exception.";
+    }
+    return `This account resolves as a ${preflight.role}, and students are not exempt from the gate — only instructors and admins are.`;
+}
+
+/**
  * The maintenance switch.
  *
- * Two decisions worth naming, because both are about the failure mode of getting
- * this wrong:
+ * Three decisions worth naming, because all three are about the failure mode of
+ * getting this wrong:
  *
  * **Turning it ON asks first.** This one control takes the storefront, the
  * catalogue and every learner's dashboard off the internet in a single write,
@@ -63,6 +103,13 @@ import {
  * click is that the site comes back up early, which is the outcome everybody
  * wants anyway.
  *
+ * **The switch refuses to arm while you would not get back in.** Being able to
+ * turn it on and being able to turn it off are the same account, so arming it
+ * while the exemption would not resolve for you is building a one-way door on
+ * purpose. The preflight answers that before the site goes down, rather than
+ * after. It cannot be the only protection — `setMode` still refuses server-side
+ * — but it is the one that tells you in advance.
+ *
  * **The message saves separately from the switch.** The message is inert until
  * the switch is on, so editing it must not require taking the site down to
  * store the text. An admin can compose the notice in advance and save it while
@@ -70,6 +117,7 @@ import {
  */
 function MaintenanceBody() {
     const status = useQuery(api.maintenance.getStatus);
+    const preflight = useQuery(api.maintenance.preflight);
     const setMode = useMutation(api.maintenance.setMode);
 
     const [message, setMessage] = useState<string | null>(null);
@@ -87,10 +135,19 @@ function MaintenanceBody() {
         setAllowApplications((current) => current ?? status.allowInstructorApplications);
     }, [status]);
 
-    if (status === undefined || message === null || allowApplications === null) {
+    if (
+        status === undefined ||
+        preflight === undefined ||
+        message === null ||
+        allowApplications === null
+    ) {
         return <Skeleton className="h-96 w-full rounded-2xl" />;
     }
 
+    // Fail-safe rather than fail-open: until the deployment has answered, the
+    // switch stays armed off. A skeleton that resolves into a disabled switch is
+    // a far cheaper surprise than one that resolves into a one-way door.
+    const bypassOk = preflight.bypassWorks;
     const enabled = status.enabled;
     const normalized = normalizeMaintenanceMessage(message);
     const messageDirty = normalized !== status.message;
@@ -138,6 +195,45 @@ function MaintenanceBody() {
 
     return (
         <div className="space-y-6">
+            {/* ── can this operator still get back in? ─────────────────────── */}
+            {/* First on the page on purpose: the question it answers is the one
+                that has to be settled before the switch below means anything. */}
+            {!bypassOk ? (
+                <Card className="border-destructive/40 bg-destructive/5 rounded-2xl p-5">
+                    <div className="flex items-start gap-3">
+                        <ShieldAlert
+                            className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
+                            aria-hidden
+                        />
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">
+                                You would not get back in
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {explainBypass(preflight)}
+                            </p>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                The switch is held off until this account resolves as exempt.
+                                Turning it on right now would 503 you along with everyone else,
+                                and this console is the only place to undo it.
+                                {enabled &&
+                                    " That appears to have happened already — fix the cause above, then reload and this panel clears."}
+                            </p>
+                        </div>
+                    </div>
+                </Card>
+            ) : (
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden />
+                    <p>
+                        You can get back in. This session resolves to an{" "}
+                        <span className="font-medium text-foreground">{preflight.role}</span>{" "}
+                        account, which the gate exempts &mdash; so switching maintenance on stays
+                        reversible from this console.
+                    </p>
+                </div>
+            )}
+
             {enabled && (
                 // The editorial system separates with rules and tints, never a
                 // dashed outline — so this is a bordered card, not an alert box.
@@ -183,7 +279,9 @@ function MaintenanceBody() {
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     {enabled
                                         ? "Live since this switch was last turned on."
-                                        : "The site is serving normally."}
+                                        : bypassOk
+                                          ? "The site is serving normally."
+                                          : "Held off — see the note above."}
                                 </p>
                             </div>
                             {enabled ? (
@@ -207,6 +305,11 @@ function MaintenanceBody() {
                                             <Switch
                                                 id="maintenance-switch"
                                                 size="sm"
+                                                // Refuses to arm while the exemption would not
+                                                // resolve for this account. The confirm dialog
+                                                // is unreachable when this is off, which is the
+                                                // point — see `explainBypass` above.
+                                                disabled={pending || !bypassOk}
                                                 aria-label="Maintenance mode"
                                             />
                                         }

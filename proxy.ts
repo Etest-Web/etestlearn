@@ -234,9 +234,18 @@ async function readMaintenanceStatus(): Promise<MaintenanceStatus> {
  * for the opposite reason: here, failing open would give every anonymous
  * visitor the full site.
  *
+ * Every exit records why. It used to be a single `catch { return false }`,
+ * which meant an operator who had just taken the site down and could not get
+ * back in had nothing to read — the two realistic causes (no session token,
+ * versus a Convex query that threw) looked identical from the outside and had
+ * entirely different fixes. `maintenance.preflight` is the other half of that
+ * diagnosis: this function says *that* the bypass failed, the query says why.
+ *
  * Only consulted while maintenance is actually on and the path is actually
  * blocked, so its cost — a token mint plus an authenticated query — is paid
- * only during an outage.
+ * only during an outage. Note that the no-token line is the high-volume one:
+ * every signed-out visitor blocked during an outage writes one, which is
+ * acceptable precisely because that path does no network work.
  */
 /**
  * The one capability this needs. Narrowed structurally rather than to Clerk's
@@ -251,16 +260,41 @@ type TokenBearer = {
 
 async function isStaffRequest(auth: TokenBearer): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!url) return false;
+  if (!url) {
+    console.error('[maintenance] staff check could not run: NEXT_PUBLIC_CONVEX_URL is not set');
+    return false;
+  }
+
+  let token: string | null = null;
+  try {
+    token = await auth.getToken();
+  } catch (error) {
+    console.error(
+      '[maintenance] staff check could not read a session token — the session or its issuer is wrong',
+      error,
+    );
+    return false;
+  }
+
+  if (!token) {
+    // The common case during an outage is a signed-out visitor, so this is not
+    // an error — but for an operator who believed they were signed in it is the
+    // entire answer, and it costs no network round-trip to record.
+    console.error('[maintenance] staff check found no session token for this request');
+    return false;
+  }
 
   try {
-    const token = await auth.getToken();
-    if (!token) return false;
-
     const client = new ConvexHttpClient(url);
     client.setAuth(token);
     return await client.query(isMaintenanceStaff, {});
-  } catch {
+  } catch (error) {
+    // Fails closed, and now visibly: a throwing query means the `users` lookup
+    // or the deployment itself is the problem, not the visitor's session.
+    console.error(
+      '[maintenance] staff check threw while resolving the caller against Convex',
+      error,
+    );
     return false;
   }
 }

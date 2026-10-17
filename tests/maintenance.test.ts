@@ -39,6 +39,22 @@ const getStatus = makeFunctionReference<"query", Record<string, never>, Maintena
 const isStaffCaller = makeFunctionReference<"query", Record<string, never>, boolean>(
     "maintenance:isStaffCaller",
 );
+
+/**
+ * The operator-facing diagnosis. `role` mirrors `users.role` exactly so it
+ * cannot drift from the platform's own vocabulary; `null` means "no row was
+ * reached", never "unknown role".
+ */
+type MaintenancePreflight = {
+    identity: "resolved" | "none";
+    user: "not_checked" | "found" | "missing" | "duplicate" | "suspended";
+    role: "student" | "instructor" | "admin" | null;
+    bypassWorks: boolean;
+};
+
+const preflight = makeFunctionReference<"query", Record<string, never>, MaintenancePreflight>(
+    "maintenance:preflight",
+);
 const setMode = makeFunctionReference<
     "mutation",
     {
@@ -378,5 +394,133 @@ describe("maintenance.setMode", () => {
         const rows = await t.run((ctx: TestCtx) => ctx.db.query("auditLogs").collect());
         expect(rows[0].details).toContain('"messageChanged":true');
         expect(rows[0].details).not.toContain("specific note");
+    });
+});
+
+describe("maintenance.preflight", () => {
+    // This query exists because of a specific failure: an admin turned the
+    // switch on, then could not get back in, and nothing recorded why. The gate
+    // reduces every reason to `false`, so the operator needs a read that
+    // separates the causes — token not resolved, users row missing, row
+    // suspended, duplicate rows — before they take the site down again.
+    //
+    // Deliberately NOT behind `requireAdmin`. If the identity or the row is
+    // broken, an admin-gated query would throw the very diagnosis the operator
+    // came for. It therefore reports only the caller's own state: no ids, no
+    // email, no cross-user reads.
+
+    test("answers an anonymous caller with the reason they cannot get back in", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await t.query(preflight, {});
+        expect(result.identity).toBe("none");
+        expect(result.user).toBe("not_checked");
+        expect(result.role).toBeNull();
+        expect(result.bypassWorks).toBe(false);
+    });
+
+    test("confirms the bypass works for an admin", async () => {
+        // The state to reach *before* flipping the switch. If this is not true
+        // while the site is still up, enabling maintenance is a one-way door.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await as(t, "clerk_admin").query(preflight, {});
+        expect(result.identity).toBe("resolved");
+        expect(result.user).toBe("found");
+        expect(result.role).toBe("admin");
+        expect(result.bypassWorks).toBe(true);
+    });
+
+    test("confirms the bypass works for an instructor too", async () => {
+        // `isStaff` is the single definition, so the two must agree rather than
+        // the preflight growing its own idea of who counts as staff.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await as(t, "clerk_instructor").query(preflight, {});
+        expect(result.role).toBe("instructor");
+        expect(result.bypassWorks).toBe(true);
+    });
+
+    test("reports a student without pretending the bypass will work", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await as(t, "clerk_student").query(preflight, {});
+        expect(result.identity).toBe("resolved");
+        expect(result.user).toBe("found");
+        expect(result.role).toBe("student");
+        expect(result.bypassWorks).toBe(false);
+    });
+
+    test("separates 'the row does not exist' from 'the identity did not resolve'", async () => {
+        // The webhook diagnosis. A valid session that finds no `users` row means
+        // `users.upsertFromClerk` never ran for this account — an entirely
+        // different fix from a token the deployment rejects, and the two are
+        // indistinguishable through `isStaffCaller`, which returns false for both.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await as(t, "clerk_nobody").query(preflight, {});
+        expect(result.identity).toBe("resolved");
+        expect(result.user).toBe("missing");
+        expect(result.role).toBeNull();
+        expect(result.bypassWorks).toBe(false);
+    });
+
+    test("reports a suspended account as suspended, not as missing", async () => {
+        // Otherwise an operator would chase the webhook for a row that is
+        // sitting there perfectly well.
+        const t = convexTest(testSchema, modules);
+        const { adminId } = await seedWorld(t);
+        await t.run(async (ctx: TestCtx) => {
+            await ctx.db.patch(adminId, { suspendedAt: Date.now() });
+        });
+
+        const result = await as(t, "clerk_admin").query(preflight, {});
+        expect(result.identity).toBe("resolved");
+        expect(result.user).toBe("suspended");
+        expect(result.role).toBe("admin");
+        expect(result.bypassWorks).toBe(false);
+    });
+
+    test("reports duplicate rows rather than throwing the diagnosis away", async () => {
+        // `getCurrentUser` reads with `.unique()`, so a duplicate makes every
+        // identity-resolving call throw — which the gate catches and flattens to
+        // `false`. Silently un-bypassable, and invisible without this.
+        const t = convexTest(testSchema, modules);
+        const now = Date.now();
+        await t.run(async (ctx: TestCtx) => {
+            const insert = () =>
+                ctx.db.insert("users", {
+                    clerkId: "clerk_admin",
+                    email: "admin@test.com",
+                    name: "Admin",
+                    role: "admin",
+                    createdAt: now,
+                });
+            await insert();
+            await insert();
+        });
+
+        const result = await as(t, "clerk_admin").query(preflight, {});
+        expect(result.user).toBe("duplicate");
+        expect(result.bypassWorks).toBe(false);
+    });
+
+    test("returns nothing about the caller beyond their own role", async () => {
+        // The query is reachable by anyone, including signed-out visitors, so it
+        // must carry no identifier, no email and no user id — nothing that turns
+        // it into a way to probe for other accounts.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const result = await as(t, "clerk_admin").query(preflight, {});
+        expect(Object.keys(result).sort()).toEqual(["bypassWorks", "identity", "role", "user"]);
+        expect(result).not.toHaveProperty("clerkId");
+        expect(result).not.toHaveProperty("email");
+        expect(result).not.toHaveProperty("_id");
     });
 });

@@ -73,6 +73,19 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  /**
+   * Fonts for the generated OpenGraph cards.
+   *
+   * They are read off disk by `loadOgFonts` (see `lib/og-brand.ts`) via
+   * `new URL(..., import.meta.url)`, which output-file tracing follows on its
+   * own — this is the explicit backstop. Without the TTFs in the function
+   * bundle, `readFile` throws on Vercel and *every* share card 500s, which is
+   * the kind of failure that looks like "OpenGraph is broken" from the outside
+   * and is not diagnosable from the app's own logs.
+   */
+  outputFileTracingIncludes: {
+    "/**": ["./assets/fonts/*.ttf"],
+  },
   async headers() {
     return [
       {

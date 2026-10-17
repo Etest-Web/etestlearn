@@ -87,6 +87,14 @@ function withContentSecurityPolicy(
  *   /verify(.*)          certificate verification is meant for outsiders
  *   /become-instructor   an applicant with no account can still apply
  *   /maintenance         the outage notice, which is aimed at signed-out people
+ *   /opengraph-image,    the file-based metadata image routes. These have NO
+ *   /twitter-image       file extension, so the matcher below does not skip
+ *                        them, and they are what a crawler fetches when a link
+ *                        is shared. They must load signed out: an anonymous
+ *                        `auth.protect()` here is a 307 to Clerk, and the
+ *                        link preview renders as a login page. The nested ones
+ *                        (`/courses/<slug>/opengraph-image`) are already covered
+ *                        by the `/courses(.*)` and `/instructors(.*)` entries.
  *
  * API routes (public):
  *   /api/instructor-applications/notify
@@ -123,6 +131,11 @@ const isPublicRoute = createRouteMatcher([
   // outage page to sign-in, so a visitor who bookmarks it gets a login form
   // during the outage — the one moment the notice matters most.
   '/maintenance',
+  // File-based metadata images — see the route-map above. Extensionless, so
+  // the matcher does not skip them, and anonymous by definition: the crawler
+  // fetching a share card has no session.
+  '/opengraph-image',
+  '/twitter-image',
   '/robots.txt',
   '/sitemap.xml',
   '/manifest.json',

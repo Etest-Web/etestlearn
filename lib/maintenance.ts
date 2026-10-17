@@ -68,6 +68,13 @@ export function normalizeMaintenanceMessage(raw: string): string {
  *     surfaces. A 503 on robots.txt is read as "disallow everything"; serving
  *     the sitemap while the pages themselves answer 503 is the correct signal
  *     for a temporary outage (revisit later, do not deindex).
+ *   · `/opengraph-image`, `/twitter-image` — the generated share cards. Same
+ *     family as the crawler surfaces above: they expose nothing but the
+ *     platform's own branding and a course title, they are what a crawler
+ *     fetches when a link has already been shared, and answering a 503 here
+ *     takes every existing shared link's preview down for the length of the
+ *     outage. The nested ones (`/courses/<slug>/opengraph-image`) are not in
+ *     this list — they read the catalogue, and the catalogue is down.
  *
  * A `(.*)` suffix means "this path and everything under it".
  */
@@ -93,6 +100,10 @@ export const MAINTENANCE_ALLOWED_ROUTES: readonly string[] = [
   "/sitemap.xml",
   "/manifest.json",
   "/llms.txt",
+  // Generated share cards. See the note above: they are crawler surfaces, and
+  // a 500/503 on an og:image is a blank preview on every link already shared.
+  "/opengraph-image",
+  "/twitter-image",
 ];
 
 /**

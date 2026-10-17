@@ -52,11 +52,24 @@ export async function generateMetadata({
     description,
     alternates: { canonical: `/instructors/${instructorId}` },
     openGraph: {
+      // No `images` — `./opengraph-image.tsx` generates the card, and Next
+      // skips a file-based image when this key exists at all, even undefined.
+      // See the note in `app/layout.tsx`.
       title: `${instructor.name} — Instructor on Glypha Learn`,
       description,
       url: `${siteConfig.url}/instructors/${instructorId}`,
-      images: instructor.imageUrl ? [{ url: instructor.imageUrl }] : undefined,
       type: "profile",
+      siteName: siteConfig.name,
+      locale: "en_US",
+    },
+    twitter: {
+      // Mirrored rather than inherited — a child's openGraph/twitter replaces
+      // the root's wholesale, so X would otherwise show the site-wide copy on a
+      // shared profile link.
+      card: "summary_large_image",
+      title: `${instructor.name} — Instructor on Glypha Learn`,
+      description,
+      site: "@glypha_learn",
     },
   };
 }

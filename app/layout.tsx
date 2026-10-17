@@ -54,16 +54,27 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: siteConfig.name,
+    locale: "en_US",
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
     url: siteConfig.url,
-    images: [{ url: siteConfig.ogImage, width: 1600, height: 1140, alt: siteConfig.name }],
+    // Deliberately no `images` here (and none in `twitter` below).
+    //
+    // `app/opengraph-image.tsx` generates the real card, and Next only applies
+    // a file-based image when the segment's own metadata does not carry the
+    // key at all — see `mergeStaticMetadata` in Next's
+    // `lib/metadata/resolve-metadata.js`, which gates on
+    // `openGraph.hasOwnProperty("images")`. Writing `images: undefined` still
+    // satisfies hasOwnProperty and would silently suppress the generated card,
+    // so the key has to be absent rather than empty.
   },
   twitter: {
     card: "summary_large_image",
     title: `${siteConfig.name} — ${siteConfig.tagline}`,
     description: siteConfig.description,
-    images: [siteConfig.ogImage],
+    // Same reason as the openGraph comment above: no `images`, so the
+    // file-based route fills it. There is no `twitter-image.tsx` — Next falls
+    // back to `opengraph-image.tsx` for the twitter card when none exists.
     // Site handle — lets Twitter/X know who owns the account.
     site: "@glypha_learn",
   },

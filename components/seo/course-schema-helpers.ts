@@ -27,7 +27,7 @@ export function buildCourseSchema(course: CourseMeta): SchemaOrg {
     name: course.title,
     description: course.description.slice(0, 1000),
     url: `${siteUrl}/courses/${course.slug}`,
-    image: course.thumbnailUrl ? new URL(course.thumbnailUrl, siteUrl).href : `${siteUrl}/certf.jpeg`,
+    image: course.thumbnailUrl ? new URL(course.thumbnailUrl, siteUrl).href : `${siteUrl}${siteConfig.ogImage}`,
     inLanguage: "en",
     category: course.category,
     courseMode: "recorded",

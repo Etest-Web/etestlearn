@@ -258,4 +258,15 @@ describe("the admin console can always get back in", () => {
     expect(page).toContain("enabledAt");
     expect(page).not.toContain("Live since this switch was last turned on.");
   });
+
+  test("the console says when the site releases itself", () => {
+    // A deadline the operator cannot see is a deadline they will assume is not
+    // there, and the whole point of auto-off is that the site comes back while
+    // nobody is watching. The console has to state the time and let it be moved.
+    const page = readFileSync(
+      join(REPO_ROOT, "app/dashboard/admin/maintenance/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("disableAt");
+  });
 });

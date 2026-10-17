@@ -191,6 +191,15 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       `isPublicRoute` (else `auth.protect()` sends the outage page to sign-in). The toggle is at
       `/dashboard/admin/maintenance`; `proxy.ts` caches the flag for 5s per isolate, so flipping it
       is not instant.
+    - **Maintenance lapses on its own.** `setMode` stamps `disableAt` on the rising edge
+      (default 2h, clamped to 5min–24h by `resolveMaintenanceDeadline` in `lib/maintenance.ts`)
+      and arms `internal.maintenance.releaseIfDue`, which flips the site back up and re-arms
+      itself if the deadline has been extended. The deadline survives edits to the note and is
+      cleared on the way back up. `releaseIfDue` is deliberately **not** audited — `auditLogs.actorId`
+      is required and a scheduler is not a person; the window is reconstructable from `enabledAt`.
+      It self-schedules via `makeFunctionReference("maintenance:releaseIfDue")` rather than
+      `internal.maintenance.*`, because a self-reference to a newly added function resolves to
+      `undefined` until codegen runs (same workaround as `lib/durable-rate-limit.ts`).
     - **Two backstops exist because the gate cannot heal itself from a lockout.** It fails open on
       a Convex blip, but a readable flag plus a broken staff exemption is the case it cannot
       recover from — the console that turns it off resolves its own permission through the same

@@ -1154,6 +1154,11 @@ export default defineSchema({
     // console can show the duration of the current outage without replaying
     // every toggle. Undefined while maintenance has never been switched on.
     enabledAt: v.optional(v.number()),
+    // When the site releases itself if nobody stops it. Stamped on the rising
+    // edge, kept across edits to the note, cleared on the way back up. Written
+    // through `resolveMaintenanceDeadline`, so it is always inside the min/max
+    // bounds rather than whatever a form happened to send.
+    disableAt: v.optional(v.number()),
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("users")),
   }).index("by_updatedAt", ["updatedAt"]),

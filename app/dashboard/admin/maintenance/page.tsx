@@ -26,6 +26,7 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
+    Input,
     Label,
     PageHeader,
     Switch,
@@ -122,6 +123,28 @@ function describeDuration(elapsedMs: number): string {
     return `${days} day${days === 1 ? "" : "s"}${restHours ? ` ${restHours}h` : ""}`;
 }
 
+/** "in 1h 42m" — the deadline expressed from wherever the reader is standing. */
+function describeReleaseIn(startedAt: number | null): string {
+    if (startedAt === null) return "";
+    const remaining = startedAt - Date.now();
+    if (remaining <= 0) return "any moment now";
+    return `in ${describeDuration(remaining)}`;
+}
+
+/**
+ * A timestamp as a `datetime-local` value, in the reader's own zone.
+ *
+ * `toISOString` would be UTC, and a picker that shows 14:00 while meaning 15:00
+ * is worse than no picker at all — the operator would set a deadline an hour
+ * out from the one they meant.
+ */
+function toLocalInputValue(ms: number | null): string {
+    if (ms === null) return "";
+    const at = new Date(ms);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
 /**
  * The maintenance switch.
  *
@@ -156,6 +179,7 @@ function MaintenanceBody() {
 
     const [message, setMessage] = useState<string | null>(null);
     const [allowApplications, setAllowApplications] = useState<boolean | null>(null);
+    const [releaseAt, setReleaseAt] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -167,6 +191,9 @@ function MaintenanceBody() {
         if (status === undefined) return;
         setMessage((current) => current ?? status.message);
         setAllowApplications((current) => current ?? status.allowInstructorApplications);
+        // Empty while the site is up: the deadline belongs to a window that is
+        // open, and there is nothing to move yet.
+        setReleaseAt((current) => current ?? toLocalInputValue(status.disableAt));
     }, [status]);
 
     if (
@@ -225,6 +252,26 @@ function MaintenanceBody() {
             setMessage(normalized);
             setAllowApplications(allowApplications);
         }
+    };
+
+    // Moving the deadline of a window that is already open. `enabled` is sent
+    // as it currently stands so the write cannot accidentally close the site,
+    // and the server clamps whatever comes in — a mistyped year is not a
+    // deadline, it is an outage nobody notices for months.
+    const releaseAtMs = releaseAt ? new Date(releaseAt).getTime() : null;
+    const releaseDirty =
+        enabled &&
+        releaseAtMs !== null &&
+        Number.isFinite(releaseAtMs) &&
+        releaseAtMs !== status.disableAt;
+
+    const saveRelease = async () => {
+        if (releaseAtMs === null || !Number.isFinite(releaseAtMs)) return;
+        const ok = await run(
+            () => setMode({ enabled: status.enabled, disableAt: releaseAtMs }),
+            "Release time updated",
+        );
+        if (ok) setReleaseAt(toLocalInputValue(releaseAtMs));
     };
 
     return (
@@ -355,7 +402,10 @@ function MaintenanceBody() {
                                     }
                                 >
                                     {enabled
-                                        ? describeDownSince(status.enabledAt)
+                                        ? describeDownSince(status.enabledAt) +
+                                          (status.disableAt !== null
+                                              ? ` · releases ${describeReleaseIn(status.disableAt)}`
+                                              : "")
                                         : bypassOk
                                           ? "The site is serving normally."
                                           : "Held off — see the note above."}
@@ -400,7 +450,9 @@ function MaintenanceBody() {
                                                 <code className="text-xs">Retry-After</code>.{" "}
                                                 {allowApplications
                                                     ? "Instructor applications stay open."
-                                                    : "Instructor applications are currently closed too, so nothing at all will be reachable."}
+                                                    : "Instructor applications are currently closed too, so nothing at all will be reachable."}{" "}
+                                                The site also releases itself two hours from now unless
+                                                you move the deadline.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
@@ -454,6 +506,57 @@ function MaintenanceBody() {
                                 onCheckedChange={(next) => setAllowApplications(next)}
                                 aria-label="Keep instructor applications open"
                             />
+                        </div>
+
+                        <div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-rule p-4">
+                            <div className="min-w-0">
+                                <Label
+                                    htmlFor="release-at"
+                                    className="flex items-center gap-2 text-sm font-semibold"
+                                >
+                                    Release the site automatically
+                                </Label>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Defaults to two hours once the switch goes on, so a window
+                                    nobody is watching cannot become an outage nobody notices.
+                                    Move it while the site is down.
+                                </p>
+                                {enabled && status.disableAt !== null && (
+                                    <p className="mt-1.5 text-xs font-medium text-foreground tabular">
+                                        Releases at{" "}
+                                        {new Date(status.disableAt).toLocaleString(undefined, {
+                                            dateStyle: "medium",
+                                            timeStyle: "short",
+                                        })}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Input
+                                    id="release-at"
+                                    type="datetime-local"
+                                    value={releaseAt ?? ""}
+                                    disabled={pending || !enabled}
+                                    onChange={(event) => setReleaseAt(event.target.value)}
+                                    className="w-[13.5rem] tabular"
+                                />
+                                {releaseDirty && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={() => void saveRelease()}
+                                    >
+                                        {pending ? (
+                                            <Loader2
+                                                className="mr-2 h-4 w-4 animate-spin"
+                                                aria-hidden
+                                            />
+                                        ) : null}
+                                        Move
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

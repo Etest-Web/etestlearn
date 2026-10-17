@@ -7,10 +7,14 @@ import {
     isPathAllowedDuringMaintenance,
     MAINTENANCE_ALLOWED_ROUTES,
     MAINTENANCE_APPLICATION_ROUTES,
+    MAINTENANCE_AUTO_OFF_DEFAULT_MS,
+    MAINTENANCE_AUTO_OFF_MAX_MS,
+    MAINTENANCE_AUTO_OFF_MIN_MS,
     MAINTENANCE_OVERRIDE_ENV,
     MAINTENANCE_RETRY_AFTER_SECONDS,
     MAX_MAINTENANCE_MESSAGE_LENGTH,
     normalizeMaintenanceMessage,
+    resolveMaintenanceDeadline,
 } from "@/lib/maintenance";
 
 /**
@@ -196,6 +200,56 @@ describe("Retry-After", () => {
         // value and a date-string would be silently wrong.
         expect(Number.isInteger(MAINTENANCE_RETRY_AFTER_SECONDS)).toBe(true);
         expect(MAINTENANCE_RETRY_AFTER_SECONDS).toBeGreaterThan(0);
+    });
+});
+
+describe("the auto-off deadline", () => {
+    // The failure this exists for: the switch goes on at 2am, the operator gets
+    // locked out or simply goes home, and the site stays down for three days.
+    // The gate is not a safety interlock — it already fails open on a Convex
+    // blip — so letting it lapse early costs nothing, while never latching it
+    // back up costs a whole night of downtime.
+
+    test("defaults to two hours", () => {
+        const now = 1_000_000;
+        expect(resolveMaintenanceDeadline(undefined, now) - now).toBe(
+            MAINTENANCE_AUTO_OFF_DEFAULT_MS,
+        );
+        expect(MAINTENANCE_AUTO_OFF_DEFAULT_MS).toBe(2 * 60 * 60 * 1000);
+    });
+
+    test("honours an explicit deadline", () => {
+        const now = 1_000_000;
+        const asked = now + 30 * 60 * 1000;
+        expect(resolveMaintenanceDeadline(asked, now)).toBe(asked);
+    });
+
+    test("clamps a deadline that is too soon to be useful", () => {
+        // Five minutes is the shortest window in which anybody could notice an
+        // outage, read the console and act on it. Anything shorter is a switch
+        // that appears to work and then releases underneath the operator.
+        const now = 1_000_000;
+        expect(resolveMaintenanceDeadline(now, now)).toBe(now + MAINTENANCE_AUTO_OFF_MIN_MS);
+        expect(resolveMaintenanceDeadline(now - 999_999, now)).toBe(
+            now + MAINTENANCE_AUTO_OFF_MIN_MS,
+        );
+    });
+
+    test("clamps a deadline so far out that it stops being a deadline", () => {
+        // A typo pointing at next year is not an auto-off, and nobody would
+        // notice until the site had been down for a very long time.
+        const now = 1_000_000;
+        expect(resolveMaintenanceDeadline(now + 999 * 24 * 60 * 60 * 1000, now)).toBe(
+            now + MAINTENANCE_AUTO_OFF_MAX_MS,
+        );
+        expect(MAINTENANCE_AUTO_OFF_MAX_MS).toBe(24 * 60 * 60 * 1000);
+    });
+
+    test("keeps the bounds in a sane order", () => {
+        // If these ever invert, every deadline clamps to the minimum and the
+        // feature silently becomes "always five minutes".
+        expect(MAINTENANCE_AUTO_OFF_MIN_MS).toBeLessThan(MAINTENANCE_AUTO_OFF_DEFAULT_MS);
+        expect(MAINTENANCE_AUTO_OFF_DEFAULT_MS).toBeLessThan(MAINTENANCE_AUTO_OFF_MAX_MS);
     });
 });
 

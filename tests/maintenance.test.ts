@@ -6,6 +6,7 @@ import schema from "../convex/schema";
 import type { Id } from "../convex/_generated/dataModel";
 import {
     DEFAULT_MAINTENANCE_MESSAGE,
+    MAINTENANCE_AUTO_OFF_DEFAULT_MS,
     MAX_MAINTENANCE_MESSAGE_LENGTH,
 } from "@/lib/maintenance";
 import type {
@@ -27,6 +28,7 @@ type MaintenanceStatus = {
     updatedAt: number | null;
     overrideActive: boolean;
     enabledAt: number | null;
+    disableAt: number | null;
 };
 
 /**
@@ -63,8 +65,14 @@ const setMode = makeFunctionReference<
         enabled: boolean;
         message?: string;
         allowInstructorApplications?: boolean;
+        disableAt?: number;
     },
-    { enabled: boolean; message: string; allowInstructorApplications: boolean }
+    {
+        enabled: boolean;
+        message: string;
+        allowInstructorApplications: boolean;
+        disableAt?: number;
+    }
 >("maintenance:setMode");
 
 const as = (t: TestWorld, subject: string) =>
@@ -667,5 +675,168 @@ describe("the env kill-switch", () => {
         const status = await t.query(getStatus, {});
         expect(status.enabled).toBe(false);
         expect(status.overrideActive).toBe(true);
+    });
+});
+
+describe("maintenance auto-off", () => {
+    // The site must be able to come back without anybody still being awake.
+    // `setMode` stamps a deadline on the way up, and `releaseIfDue` is what
+    // latches it back open — so a lockout heals itself instead of lasting
+    // until somebody notices.
+
+    const releaseIfDue = makeFunctionReference<
+        "mutation",
+        Record<string, never>,
+        { released: boolean }
+    >("maintenance:releaseIfDue");
+
+    async function setRowDeadline(t: TestWorld, at: number) {
+        await t.run(async (ctx: TestCtx) => {
+            const rows = await ctx.db.query("maintenanceMode").collect();
+            await ctx.db.patch(rows[0]._id, { disableAt: at });
+        });
+    }
+
+    test("defaults to two hours when the switch goes up", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const before = Date.now();
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        const after = Date.now();
+
+        const rows = await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect());
+        const deadline = rows[0].disableAt;
+        expect(deadline).toBeGreaterThanOrEqual(before + MAINTENANCE_AUTO_OFF_DEFAULT_MS);
+        expect(deadline).toBeLessThanOrEqual(after + MAINTENANCE_AUTO_OFF_DEFAULT_MS);
+    });
+
+    test("honours an explicit deadline", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const asked = Date.now() + 30 * 60 * 1000;
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true, disableAt: asked });
+
+        const rows = await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect());
+        expect(rows[0].disableAt).toBe(asked);
+    });
+
+    test("an edit to the note does not restart the window", async () => {
+        // Otherwise every rewording quietly extends the outage, and the
+        // operator who set a two-hour window gets a four-hour one because
+        // somebody clarified the copy.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        const first = (await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect()))[0]
+            .disableAt;
+
+        await as(t, "clerk_admin").mutation(setMode, {
+            enabled: true,
+            message: "Still down, sorry.",
+        });
+
+        const after = (await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect()))[0]
+            .disableAt;
+        expect(after).toBe(first);
+    });
+
+    test("clears the deadline when the site comes back up", async () => {
+        // Left set, the next switch-on would inherit a deadline from a window
+        // that is already over and release the site almost immediately.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await as(t, "clerk_admin").mutation(setMode, { enabled: false });
+
+        const rows = await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect());
+        expect(rows[0].disableAt).toBeUndefined();
+    });
+
+    test("reports the deadline, so the console can say when it releases", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        expect((await t.query(getStatus, {})).disableAt).toBeGreaterThan(0);
+    });
+
+    test("reads null once the site is up", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await as(t, "clerk_admin").mutation(setMode, { enabled: false });
+
+        expect((await t.query(getStatus, {})).disableAt).toBeNull();
+    });
+
+    test("releases the site once the deadline has passed", async () => {
+        // The whole point: nobody has to be awake for this.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await setRowDeadline(t, Date.now() - 1);
+
+        const result = await t.mutation(releaseIfDue, {});
+        expect(result.released).toBe(true);
+
+        const status = await t.query(getStatus, {});
+        expect(status.enabled).toBe(false);
+        expect(status.enabledAt).toBeNull();
+        expect(status.disableAt).toBeNull();
+    });
+
+    test("leaves the site down while the deadline is still ahead", async () => {
+        // A job armed against an old deadline must not fire early.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await setRowDeadline(t, Date.now() + 60 * 60 * 1000);
+
+        expect((await t.mutation(releaseIfDue, {})).released).toBe(false);
+        expect((await t.query(getStatus, {})).enabled).toBe(true);
+    });
+
+    test("does nothing when the site is already up", async () => {
+        // The job stays armed after a manual switch-off, so it has to be able
+        // to land on an already-up site without writing anything.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await as(t, "clerk_admin").mutation(setMode, { enabled: false });
+
+        expect((await t.mutation(releaseIfDue, {})).released).toBe(false);
+        expect((await t.query(getStatus, {})).enabled).toBe(false);
+    });
+
+    test("does nothing when the row has no deadline", async () => {
+        // A row written before this feature, or by hand, must not be released
+        // on sight — the deadline is what says the window is over.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await t.run(async (ctx: TestCtx) => {
+            const rows = await ctx.db.query("maintenanceMode").collect();
+            await ctx.db.patch(rows[0]._id, { disableAt: undefined });
+        });
+
+        expect((await t.mutation(releaseIfDue, {})).released).toBe(false);
+        expect((await t.query(getStatus, {})).enabled).toBe(true);
+    });
+
+    test("clears the deadline it acted on, so the job cannot fire twice", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await setRowDeadline(t, Date.now() - 1);
+
+        await t.mutation(releaseIfDue, {});
+        const second = await t.mutation(releaseIfDue, {});
+
+        expect(second.released).toBe(false);
     });
 });

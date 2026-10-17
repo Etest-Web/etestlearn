@@ -1,4 +1,5 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 import {
   getCurrentUser,
@@ -13,6 +14,7 @@ import {
   isMaintenanceOverridden,
   MAINTENANCE_OVERRIDE_ENV,
   normalizeMaintenanceMessage,
+  resolveMaintenanceDeadline,
 } from "../lib/maintenance";
 
 /**
@@ -41,6 +43,23 @@ import {
  *     privileged mutation because it takes the entire public site away.
  */
 
+/**
+ * The auto-off job, referenced by wire name rather than
+ * `internal.maintenance.releaseIfDue`.
+ *
+ * The same reason `proxy.ts` and `lib/durable-rate-limit.ts` do it: `internal`
+ * is generated, so a self-reference to a function added in this very commit
+ * resolves to `undefined` until `npx convex dev` has run — and that fails at
+ * runtime rather than at compile time, in the scheduler path only, which is
+ * precisely the path nobody exercises until an outage. The string is what
+ * codegen emits for the `internalMutation` below.
+ */
+const releaseIfDueJob = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  { released: boolean }
+>("maintenance:releaseIfDue");
+
 /** The subset of the row that is safe to serve anonymously. */
 export type MaintenanceStatus = {
   enabled: boolean;
@@ -53,6 +72,12 @@ export type MaintenanceStatus = {
    * `null` whenever the site is up.
    */
   enabledAt: number | null;
+  /**
+   * When the site releases itself if nobody stops it. Stamped on the rising
+   * edge, kept across edits to the note, cleared on the way back up. `null`
+   * whenever the site is up or no deadline was ever set.
+   */
+  disableAt: number | null;
   /**
    * True while `MAINTENANCE_OVERRIDE` is forcing the site up. Reported separately
    * from `enabled` so the admin console can say "the stored switch is on, but the
@@ -78,6 +103,7 @@ const OFF: MaintenanceStatus = {
   updatedAt: null,
   overrideActive: false,
   enabledAt: null,
+  disableAt: null,
 };
 
 /**
@@ -118,11 +144,12 @@ async function loadStatus(ctx: ReadCtx): Promise<MaintenanceStatus> {
     allowInstructorApplications: newest.allowInstructorApplications,
     updatedAt: newest.updatedAt,
     overrideActive,
-    // Null while overridden: `enabledAt` exists to answer "how long has this
-    // been down?", and reporting a start time next to `enabled: false` would
-    // contradict the flag beside it. The console's override banner is where
-    // that state gets explained.
+    // Null while overridden, for the same reason as `enabledAt`: both answer
+    // "is the site down, and since when?", and reporting a start or a release
+    // time next to `enabled: false` would contradict the flag beside it. The
+    // console's override banner is where that state gets explained.
     enabledAt: newest.enabled && !overrideActive ? newest.enabledAt ?? null : null,
+    disableAt: newest.enabled && !overrideActive ? newest.disableAt ?? null : null,
   };
 }
 
@@ -232,18 +259,26 @@ export const preflight = query({
 });
 
 /**
- * Turns maintenance on or off, and edits the note shown while it is on.
+ * Turns maintenance on or off, edits the note shown while it is on, and sets
+ * when the site should release itself.
  *
  * `message` and `allowInstructorApplications` are optional so the console's
  * primary switch can send `{ enabled }` alone and cannot accidentally overwrite
  * the note with a stale copy from a form that was rendered before somebody else
  * edited it. Omitted means "leave as it is".
+ *
+ * `disableAt` follows the same rule. Omitted while the site is already down
+ * keeps the existing deadline, so saving the note mid-outage does not quietly
+ * extend the window; omitted on the way up falls back to the two-hour default.
+ * Either way the value is clamped through `resolveMaintenanceDeadline` rather
+ * than stored as sent.
  */
 export const setMode = mutation({
   args: {
     enabled: v.boolean(),
     message: v.optional(v.string()),
     allowInstructorApplications: v.optional(v.boolean()),
+    disableAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
@@ -259,10 +294,22 @@ export const setMode = mutation({
       previous.allowInstructorApplications;
 
     const now = Date.now();
-    // Stamped only on the rising edge, so "how long has this been down?" stays
-    // answerable after two edits to the note — and cleared on the way back up,
-    // rather than left pointing at a window that is already over.
+    // Both stamps are rising-edge only, so "how long has this been down?" and
+    // "when does it come back?" stay answerable after two edits to the note —
+    // and both are cleared on the way back up rather than left pointing at a
+    // window that is already over.
+    const siteIsUp = row === null || !row.enabled;
     const enabledAt = args.enabled ? (previous.enabled ? row?.enabledAt : now) : undefined;
+
+    let disableAt: number | undefined;
+    if (!args.enabled) {
+      disableAt = undefined;
+    } else if (previous.enabled && args.disableAt === undefined) {
+      // Already down and no new deadline asked for: keep the one in force.
+      disableAt = row?.disableAt;
+    } else {
+      disableAt = resolveMaintenanceDeadline(args.disableAt, now);
+    }
 
     if (row) {
       await ctx.db.patch(row._id, {
@@ -270,6 +317,7 @@ export const setMode = mutation({
         message,
         allowInstructorApplications,
         enabledAt,
+        disableAt,
         updatedAt: now,
         updatedBy: admin._id,
       });
@@ -279,9 +327,22 @@ export const setMode = mutation({
         message,
         allowInstructorApplications,
         enabledAt,
+        disableAt,
         updatedAt: now,
         updatedBy: admin._id,
       });
+    }
+
+    // Armed on the rising edge, and again whenever the deadline moves while the
+    // site is already down. The second case matters: pulling the window
+    // *forward* would otherwise never take effect, because the job armed at the
+    // original time is the only one scheduled. A later move needs no re-arm —
+    // that job re-arms itself for the remainder. Saving the note without
+    // touching the deadline arms nothing: `releaseIfDue` is idempotent, but a
+    // job per save would still be pointless work at 3am.
+    const deadlineMoved = disableAt !== (row?.disableAt ?? undefined);
+    if (args.enabled && disableAt !== undefined && (siteIsUp || deadlineMoved)) {
+      await ctx.scheduler.runAfter(Math.max(0, disableAt - now), releaseIfDueJob, {});
     }
 
     // Audited because this is the most consequential switch on the platform:
@@ -297,9 +358,57 @@ export const setMode = mutation({
         allowInstructorApplications,
         wasEnabled: previous.enabled,
         messageChanged: args.message !== undefined,
+        autoReleaseAt: disableAt ?? null,
       },
     });
 
-    return { enabled: args.enabled, message, allowInstructorApplications };
+    return { enabled: args.enabled, message, allowInstructorApplications, disableAt };
+  },
+});
+
+/**
+ * Releases the site when its window is up.
+ *
+ * The half that makes auto-off real: `setMode` can only *arm* a deadline, and
+ * something has to act on it when the operator has gone home or been locked
+ * out — which is the whole reason this feature exists.
+ *
+ * Written to be safe against every arrival order:
+ *   · the site is already up (the operator turned it off by hand, and the armed
+ *     job lands later anyway) — a no-op;
+ *   · the row has no deadline (a row written before this feature) — a no-op,
+ *     because only a deadline can say the window is over;
+ *   · the deadline has been *extended* since this job was armed — re-arm for
+ *     the remainder rather than firing early, which is the difference between a
+ *     deadline an operator can move and one they cannot.
+ *
+ * **Not audited, deliberately.** `auditLogs.actorId` is required, and the actor
+ * here is a scheduler. Attaching the last admin would make the log claim a
+ * human turned the site off when nobody did — which is exactly the kind of
+ * record an incident review would later lean on. The window stays
+ * reconstructable from `enabledAt` and `updatedAt` on the row instead.
+ */
+export const releaseIfDue = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const row = await newestRow(ctx);
+    if (!row || !row.enabled) return { released: false };
+    if (row.disableAt === undefined) return { released: false };
+
+    const now = Date.now();
+    if (row.disableAt > now) {
+      // Re-armed rather than dropped: an extended deadline must still fire.
+      await ctx.scheduler.runAfter(row.disableAt - now, releaseIfDueJob, {});
+      return { released: false };
+    }
+
+    await ctx.db.patch(row._id, {
+      enabled: false,
+      enabledAt: undefined,
+      disableAt: undefined,
+      updatedAt: now,
+    });
+
+    return { released: true };
   },
 });

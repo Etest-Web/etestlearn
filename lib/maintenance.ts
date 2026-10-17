@@ -197,3 +197,43 @@ export const MAINTENANCE_OVERRIDE_OFF = "off";
 export function isMaintenanceOverridden(raw: string | undefined): boolean {
   return raw === MAINTENANCE_OVERRIDE_OFF;
 }
+
+/**
+ * How long maintenance lasts if the operator does not say.
+ *
+ * Two hours is a made-up number and it is meant to be: the alternative is a
+ * site that stays down until somebody remembers it. The gate is not a safety
+ * interlock — it already fails open on a Convex blip — so releasing early costs
+ * nothing except an unfinished job showing a half-migrated site, while a window
+ * that never latches back open costs the whole night.
+ */
+export const MAINTENANCE_AUTO_OFF_DEFAULT_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Bounds on the deadline, enforced at write time rather than trusted.
+ *
+ * The minimum is the shortest window in which a human could notice the outage,
+ * open the console and act: below it the switch appears to work and then
+ * releases underneath them. The maximum exists because a deadline pointing at
+ * next year is not an auto-off, and nobody would discover the typo until the
+ * site had been down for a very long time.
+ */
+export const MAINTENANCE_AUTO_OFF_MIN_MS = 5 * 60 * 1000;
+export const MAINTENANCE_AUTO_OFF_MAX_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The deadline to store: the requested one, the default, or a clamped value.
+ *
+ * Takes `now` rather than reading the clock so the arithmetic is testable and
+ * so the caller and the clamp can never disagree about what "now" was.
+ */
+export function resolveMaintenanceDeadline(
+  requested: number | undefined,
+  now: number,
+): number {
+  const desired = requested ?? now + MAINTENANCE_AUTO_OFF_DEFAULT_MS;
+  return Math.min(
+    Math.max(desired, now + MAINTENANCE_AUTO_OFF_MIN_MS),
+    now + MAINTENANCE_AUTO_OFF_MAX_MS,
+  );
+}

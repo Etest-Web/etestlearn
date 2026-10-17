@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
-import { isPathAllowedDuringMaintenance } from "@/lib/maintenance";
+import { isPathAllowedDuringMaintenance, MAINTENANCE_OVERRIDE_ENV } from "@/lib/maintenance";
 
 /**
  * The gate lives in `proxy.ts`, which the suite cannot execute — it is an Edge
@@ -218,5 +218,19 @@ describe("the admin console can always get back in", () => {
     );
     expect(page).toContain("api.maintenance.preflight");
     expect(page).toContain("bypassWorks");
+  });
+
+  test("the console explains an active kill-switch rather than showing a switch that disagrees", () => {
+    // With `MAINTENANCE_OVERRIDE=off` set, the stored switch still reads on while
+    // the site serves normally. Printing the variable name is what makes the
+    // lever findable again — "the site is up but the console says down" is
+    // otherwise an unexplained contradiction, and the fix is to remove the env
+    // var rather than to toggle anything.
+    const page = readFileSync(
+      join(REPO_ROOT, "app/dashboard/admin/maintenance/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("overrideActive");
+    expect(page).toContain(MAINTENANCE_OVERRIDE_ENV);
   });
 });

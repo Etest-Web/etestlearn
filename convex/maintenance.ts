@@ -10,6 +10,8 @@ import {
 import { logAudit } from "./helpers/audit";
 import {
   DEFAULT_MAINTENANCE_MESSAGE,
+  isMaintenanceOverridden,
+  MAINTENANCE_OVERRIDE_ENV,
   normalizeMaintenanceMessage,
 } from "../lib/maintenance";
 
@@ -20,7 +22,7 @@ import {
  * `lib/maintenance.ts` and is imported, not restated. This module is the stored
  * state plus the authorization around it.
  *
- * Three callers, and that split drives the shape of the file:
+ * Four callers, and that split drives the shape of the file:
  *
  *   · `proxy.ts` runs on the Edge runtime in front of every request and often
  *     with **no Clerk session at all**, so `getStatus` is deliberately public.
@@ -46,6 +48,13 @@ export type MaintenanceStatus = {
   allowInstructorApplications: boolean;
   /** `null` until an admin has saved once — i.e. on every fresh deployment. */
   updatedAt: number | null;
+  /**
+   * True while `MAINTENANCE_OVERRIDE` is forcing the site up. Reported separately
+   * from `enabled` so the admin console can say "the stored switch is on, but the
+   * deployment is overriding it" instead of showing a switch that appears to be
+   * lying about what it wrote.
+   */
+  overrideActive: boolean;
 };
 
 /**
@@ -62,6 +71,7 @@ const OFF: MaintenanceStatus = {
   message: DEFAULT_MAINTENANCE_MESSAGE,
   allowInstructorApplications: true,
   updatedAt: null,
+  overrideActive: false,
 };
 
 /**
@@ -83,14 +93,25 @@ async function newestRow(ctx: ReadCtx): Promise<Doc<"maintenanceMode"> | null> {
 }
 
 async function loadStatus(ctx: ReadCtx): Promise<MaintenanceStatus> {
+  // The kill-switch is folded in here rather than in the gate, so there is
+  // exactly one place that decides "is the site down". `proxy.ts`, the outage
+  // page and the admin console all read this query and therefore cannot
+  // disagree — and the gate's 5s cache cannot serve a stale answer to the one
+  // case the lever exists for.
+  const overrideActive = isMaintenanceOverridden(process.env[MAINTENANCE_OVERRIDE_ENV]);
   const newest = await newestRow(ctx);
-  if (!newest) return OFF;
+  if (!newest) return { ...OFF, overrideActive };
 
   return {
-    enabled: newest.enabled,
+    // Read-time only: the stored switch is left exactly as the admin left it,
+    // so pulling the env var re-closes the site rather than having to be
+    // toggled twice, and so the override is never mistaken for somebody
+    // turning it off.
+    enabled: newest.enabled && !overrideActive,
     message: newest.message,
     allowInstructorApplications: newest.allowInstructorApplications,
     updatedAt: newest.updatedAt,
+    overrideActive,
   };
 }
 

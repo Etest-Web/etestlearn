@@ -191,6 +191,21 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       `isPublicRoute` (else `auth.protect()` sends the outage page to sign-in). The toggle is at
       `/dashboard/admin/maintenance`; `proxy.ts` caches the flag for 5s per isolate, so flipping it
       is not instant.
+    - **Two backstops exist because the gate cannot heal itself from a lockout.** It fails open on
+      a Convex blip, but a readable flag plus a broken staff exemption is the case it cannot
+      recover from — the console that turns it off resolves its own permission through the same
+      `users` lookup that has stopped working. So:
+      - `MAINTENANCE_OVERRIDE=off` on the **Convex** deployment (not Next) force-releases the site
+        at read time in `loadStatus`, with no rebuild and no session. `npx convex env set/unset`
+        propagates in ~5s. One-directional and exact-match by design — it can only release, and
+        `"Off"`/`"1"` do nothing — see `isMaintenanceOverridden` in `lib/maintenance.ts`.
+      - `maintenance.preflight` reports why *this* caller would not get back in (no session, no
+        `users` row, duplicate rows, suspended, wrong role), and the admin console holds the switch
+        off until it reads true. It is deliberately **not** behind `requireAdmin`: an admin-gated
+        query throws exactly when the identity is broken, which is the only case it exists for.
+        It returns no id and no email, so it cannot be used to probe other accounts.
+      Both surfaces are asserted in `tests/maintenance-gate.test.ts`; do not delete one to "simplify"
+      the file.
 
 ---
 
@@ -259,6 +274,7 @@ Set Next-side vars in `.env` / `.env.local` (gitignored). Set Convex-side vars w
 | `VIDEO_PLAYBACK_SECRET` | `lib/video-playback-token.ts` (token HMAC, fail-closed), `convex/http.ts` playback gate |
 | `APP_ORIGIN` | `convex/http.ts` playback CORS allowlist (fail-closed) |
 | `UPLOADTHING_TOKEN` | `app/api/uploadthing/*` (upload route), `convex/videoTranscode.ts` source cleanup (Convex-side env) |
+| `MAINTENANCE_OVERRIDE` | `convex/maintenance.ts` — the maintenance kill-switch. Set to `off` **on the Convex deployment** to force the site back up regardless of the admin switch. Optional; anything other than exactly `off` is ignored |
 
 **Never print, echo, or commit values from `.env` / `.env.local` — they contain live-looking
 `pk_live_`/`sk_live_` keys.** Both files are gitignored (so is `/.clerk/`).

@@ -3,9 +3,11 @@ import { describe, expect, test } from "vitest";
 import {
     DEFAULT_MAINTENANCE_MESSAGE,
     isApiPath,
+    isMaintenanceOverridden,
     isPathAllowedDuringMaintenance,
     MAINTENANCE_ALLOWED_ROUTES,
     MAINTENANCE_APPLICATION_ROUTES,
+    MAINTENANCE_OVERRIDE_ENV,
     MAINTENANCE_RETRY_AFTER_SECONDS,
     MAX_MAINTENANCE_MESSAGE_LENGTH,
     normalizeMaintenanceMessage,
@@ -151,5 +153,35 @@ describe("Retry-After", () => {
         // value and a date-string would be silently wrong.
         expect(Number.isInteger(MAINTENANCE_RETRY_AFTER_SECONDS)).toBe(true);
         expect(MAINTENANCE_RETRY_AFTER_SECONDS).toBeGreaterThan(0);
+    });
+});
+
+describe("the env kill-switch predicate", () => {
+    // Read on the deployment, never in the browser: this is the lever an
+    // operator pulls when they are locked out, so it cannot depend on the app
+    // rendering or on a session resolving.
+    test("recognises only the documented value", () => {
+        expect(isMaintenanceOverridden("off")).toBe(true);
+    });
+
+    test("treats unset as no override", () => {
+        // The default. Maintenance has to work on a deployment where nobody has
+        // ever heard of this variable.
+        expect(isMaintenanceOverridden(undefined)).toBe(false);
+    });
+
+    test("does not treat a near-miss as a working lever", () => {
+        // Case, padding and the obvious synonyms are all mistakes a human makes
+        // typing into a dashboard at 3am. Each must leave the switch in charge
+        // rather than silently opening the site.
+        for (const value of ["Off", "OFF", " off", "off ", "true", "1", "", "disabled"]) {
+            expect(isMaintenanceOverridden(value), JSON.stringify(value)).toBe(false);
+        }
+    });
+
+    test("publishes the name of the variable it reads", () => {
+        // The console prints this so the operator knows what to type; a
+        // hardcoded copy in the UI would drift from the reader on the next edit.
+        expect(MAINTENANCE_OVERRIDE_ENV).toBe("MAINTENANCE_OVERRIDE");
     });
 });

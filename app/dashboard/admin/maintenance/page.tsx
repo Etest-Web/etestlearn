@@ -45,6 +45,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     DEFAULT_MAINTENANCE_MESSAGE,
+    MAINTENANCE_OVERRIDE_ENV,
     MAX_MAINTENANCE_MESSAGE_LENGTH,
     normalizeMaintenanceMessage,
 } from "@/lib/maintenance";
@@ -232,6 +233,43 @@ function MaintenanceBody() {
                         reversible from this console.
                     </p>
                 </div>
+            )}
+
+            {/* ── the kill-switch is holding the site up ──────────────────── */}
+            {/* Only ever a release, never a lockdown, so this cannot appear
+                without somebody having pulled the lever deliberately. Worth
+                saying plainly because the switch below will read "off" while
+                the row still says otherwise. */}
+            {status.overrideActive && (
+                <Card className="border-warning/40 bg-warning/5 rounded-2xl p-5">
+                    <div className="flex items-start gap-3">
+                        <ShieldAlert
+                            className="mt-0.5 h-4 w-4 shrink-0 text-warning"
+                            aria-hidden
+                        />
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">
+                                The kill-switch is holding the site up
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                <code className="text-xs">
+                                    {MAINTENANCE_OVERRIDE_ENV}=off
+                                </code>{" "}
+                                is set on this Convex deployment, so the stored switch below is
+                                being ignored and every visitor is seeing the site normally.
+                                Nothing was written &mdash; the switch is still exactly where you
+                                left it.
+                            </p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                To go back down, unset it with{" "}
+                                <code className="text-xs">
+                                    npx convex env unset {MAINTENANCE_OVERRIDE_ENV}
+                                </code>
+                                . The gate re-reads this within five seconds.
+                            </p>
+                        </div>
+                    </div>
+                </Card>
             )}
 
             {enabled && (

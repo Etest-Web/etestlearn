@@ -146,3 +146,39 @@ export function isApiPath(pathname: string): boolean {
 
 /** Seconds advertised in `Retry-After` on the 503. */
 export const MAINTENANCE_RETRY_AFTER_SECONDS = 3600;
+
+/**
+ * The kill-switch: an env var on the Convex deployment that forces the site
+ * back up regardless of the stored switch.
+ *
+ * This exists for one scenario and it is the reason it is not redundant with the
+ * admin console: **an operator who is locked out.** The gate fails open on a
+ * Convex blip, but a readable flag combined with a broken staff exemption is
+ * the case it cannot heal from — the site is down, and the console that turns it
+ * off resolves its own permission through the very lookup that has stopped
+ * working. Setting an env var on the deployment needs no session, no app and no
+ * rebuild (`npx convex env set` propagates in seconds), which is exactly what
+ * that situation allows.
+ *
+ * Deliberately one-directional. It can only *release* the site: forcing
+ * maintenance on through an env var would be a footgun with no audit trail and
+ * no console involved, and nobody has ever needed it.
+ */
+export const MAINTENANCE_OVERRIDE_ENV = "MAINTENANCE_OVERRIDE";
+
+/** The one value that means anything. See {@link isMaintenanceOverridden}. */
+export const MAINTENANCE_OVERRIDE_OFF = "off";
+
+/**
+ * Whether the deployment is forcing the site back up.
+ *
+ * Exact match, deliberately. The reader runs in a dashboard at 3am, so the
+ * tempting near-misses (`"Off"`, `" off"`, `"true"`, `"1"`) are all mistakes a
+ * person actually makes — and every one of them must leave the stored switch in
+ * charge. Silently opening the site because of a typo would be worse than
+ * having no lever at all, and treating a typo as "the lever is armed" would
+ * send whoever set it chasing a override that never existed.
+ */
+export function isMaintenanceOverridden(raw: string | undefined): boolean {
+  return raw === MAINTENANCE_OVERRIDE_OFF;
+}

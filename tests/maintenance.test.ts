@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { makeFunctionReference } from "convex/server";
 
@@ -25,6 +25,7 @@ type MaintenanceStatus = {
     message: string;
     allowInstructorApplications: boolean;
     updatedAt: number | null;
+    overrideActive: boolean;
 };
 
 /**
@@ -115,6 +116,7 @@ describe("maintenance.getStatus", () => {
         expect(status.message).toBe(DEFAULT_MAINTENANCE_MESSAGE);
         expect(status.allowInstructorApplications).toBe(true);
         expect(status.updatedAt).toBeNull();
+        expect(status.overrideActive).toBe(false);
     });
 
     test("is readable with no identity at all", async () => {
@@ -522,5 +524,106 @@ describe("maintenance.preflight", () => {
         expect(result).not.toHaveProperty("clerkId");
         expect(result).not.toHaveProperty("email");
         expect(result).not.toHaveProperty("_id");
+    });
+});
+
+describe("the env kill-switch", () => {
+    // The dead-man's lever. The whole gate fails OPEN on a Convex blip, but the
+    // one case it cannot self-heal from is an operator who is locked out while
+    // the flag itself is readable — the site is down, the console is reachable
+    // only to staff, and the staff exemption is exactly what has stopped
+    // working. An env var on the deployment is the one lever that survives that,
+    // because setting it needs no session, no app and no rebuild.
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    async function enableMaintenance(t: TestWorld) {
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+    }
+
+    test("forces the site up even when the stored switch says down", async () => {
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await enableMaintenance(t);
+
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "off");
+
+        const status = await t.query(getStatus, {});
+        expect(status.enabled).toBe(false);
+    });
+
+    test("reports that the override is the reason, not the switch", async () => {
+        // Without this the console renders "Maintenance mode is off" next to a
+        // stored switch that says otherwise, and the operator is left guessing
+        // which of the two is lying.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await enableMaintenance(t);
+
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "off");
+
+        expect((await t.query(getStatus, {})).overrideActive).toBe(true);
+    });
+
+    test("leaves the note and the applications setting alone", async () => {
+        // Releasing the site is not a reason to forget what it was going to say.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await as(t, "clerk_admin").mutation(setMode, {
+            enabled: true,
+            message: "Back by six.",
+            allowInstructorApplications: false,
+        });
+
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "off");
+
+        const status = await t.query(getStatus, {});
+        expect(status.message).toBe("Back by six.");
+        expect(status.allowInstructorApplications).toBe(false);
+    });
+
+    test("does not write to the switch it is overriding", async () => {
+        // The lever is a read-time override, so clearing the env var puts the
+        // site straight back down. Anything that patched the row would make the
+        // override indistinguishable from an admin turning it off, and would
+        // make it impossible to re-close after the lever is pulled.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await enableMaintenance(t);
+
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "off");
+        expect((await t.query(getStatus, {})).enabled).toBe(false);
+
+        vi.unstubAllEnvs();
+        expect((await t.query(getStatus, {})).enabled).toBe(true);
+
+        const rows = await t.run((ctx: TestCtx) => ctx.db.query("maintenanceMode").collect());
+        expect(rows).toHaveLength(1);
+        expect(rows[0].enabled).toBe(true);
+    });
+
+    test("is inert for any value other than the documented one", async () => {
+        // A typo in the deployment env must not silently open the site, and
+        // must not silently be mistaken for a working lever either.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+        await enableMaintenance(t);
+
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "Off");
+        expect((await t.query(getStatus, {})).enabled).toBe(true);
+        expect((await t.query(getStatus, {})).overrideActive).toBe(false);
+    });
+
+    test("does not leave the site up on its own", async () => {
+        // The override must never be the thing that takes the site down, and
+        // with no stored switch it must not manufacture one.
+        vi.stubEnv("MAINTENANCE_OVERRIDE", "off");
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        const status = await t.query(getStatus, {});
+        expect(status.enabled).toBe(false);
+        expect(status.overrideActive).toBe(true);
     });
 });

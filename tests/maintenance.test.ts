@@ -26,6 +26,7 @@ type MaintenanceStatus = {
     allowInstructorApplications: boolean;
     updatedAt: number | null;
     overrideActive: boolean;
+    enabledAt: number | null;
 };
 
 /**
@@ -117,6 +118,7 @@ describe("maintenance.getStatus", () => {
         expect(status.allowInstructorApplications).toBe(true);
         expect(status.updatedAt).toBeNull();
         expect(status.overrideActive).toBe(false);
+        expect(status.enabledAt).toBeNull();
     });
 
     test("is readable with no identity at all", async () => {
@@ -144,6 +146,46 @@ describe("maintenance.getStatus", () => {
         expect(status.message).toBe("Migrating the database — back by 6pm.");
         expect(status.updatedAt).not.toBeNull();
         expect(adminId).toBeDefined();
+    });
+
+    test("carries enabledAt, so an operator can say how long the site has been down", async () => {
+        // `setMode` has stamped this on the rising edge all along, with a comment
+        // promising the question stays answerable — and no reader returned it, so
+        // the console could only print "live since this switch was last turned
+        // on" with no time attached.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        expect((await t.query(getStatus, {})).enabledAt).toBeNull();
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        expect((await t.query(getStatus, {})).enabledAt).toBeGreaterThan(0);
+    });
+
+    test("keeps the same enabledAt while the note is edited mid-outage", async () => {
+        // Otherwise the readout restarts every time somebody rewords the notice,
+        // and "how long has this been down" stops being answerable at exactly the
+        // moment somebody is answering it.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        const first = (await t.query(getStatus, {})).enabledAt;
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true, message: "Still down." });
+
+        expect((await t.query(getStatus, {})).enabledAt).toBe(first);
+    });
+
+    test("clears enabledAt once the site is back", async () => {
+        // Left set, the console would keep reporting an outage that is over.
+        const t = convexTest(testSchema, modules);
+        await seedWorld(t);
+
+        await as(t, "clerk_admin").mutation(setMode, { enabled: true });
+        await as(t, "clerk_admin").mutation(setMode, { enabled: false });
+
+        expect((await t.query(getStatus, {})).enabledAt).toBeNull();
     });
 
     test("prefers the newest row if a duplicate ever exists", async () => {

@@ -90,6 +90,39 @@ function explainBypass(preflight: Preflight): string {
 }
 
 /**
+ * "Down since 17 Oct, 14:03 · 2 hours" — the same instant, twice.
+ *
+ * Rendered once rather than on an interval: the timestamp is the load-bearing
+ * half and it never changes, so a ticking counter would buy no accuracy and
+ * cost a re-render on a page whose only job is to be legible while something
+ * else is broken.
+ */
+function describeDownSince(startedAt: number | null): string {
+    if (startedAt === null) return "Live.";
+    const when = new Date(startedAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+    });
+    return `Down since ${when} · ${describeDuration(Date.now() - startedAt)}`;
+}
+
+function describeDuration(elapsedMs: number): string {
+    const minutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+    if (minutes < 1) return "under a minute";
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+        const rest = minutes % 60;
+        return `${hours} hour${hours === 1 ? "" : "s"}${rest ? ` ${rest}m` : ""}`;
+    }
+
+    const days = Math.floor(hours / 24);
+    const restHours = hours % 24;
+    return `${days} day${days === 1 ? "" : "s"}${restHours ? ` ${restHours}h` : ""}`;
+}
+
+/**
  * The maintenance switch.
  *
  * Three decisions worth naming, because all three are about the failure mode of
@@ -314,9 +347,15 @@ function MaintenanceBody() {
                                 <Label htmlFor="maintenance-switch" className="text-sm font-semibold">
                                     Maintenance mode
                                 </Label>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p
+                                    className={
+                                        enabled
+                                            ? "mt-1 text-xs font-medium text-foreground tabular"
+                                            : "mt-1 text-xs text-muted-foreground"
+                                    }
+                                >
                                     {enabled
-                                        ? "Live since this switch was last turned on."
+                                        ? describeDownSince(status.enabledAt)
                                         : bypassOk
                                           ? "The site is serving normally."
                                           : "Held off — see the note above."}

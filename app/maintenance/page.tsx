@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { ConvexHttpClient } from "convex/browser";
-import { ArrowRight, GraduationCap, Mail, Wrench } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/lib/site";
 import { supportMailto } from "@/lib/support";
@@ -68,6 +67,24 @@ async function readStatus(): Promise<MaintenanceStatus> {
   }
 }
 
+/**
+ * Composition.
+ *
+ * Deliberately quiet. The reader is either a learner who has lost access or an
+ * employer checking a certificate, and both are owed the message with nothing
+ * standing in front of it — so no decorative icon, no pill badge asserting a
+ * reason the operator may not have chosen, and no second round-trip to render.
+ *
+ * Two things are load-bearing beyond the copy:
+ *
+ *   · The status line above the headline carries no claim. An earlier version
+ *     labelled every outage as scheduled work, which is a lie during an
+ *     emergency — and the one thing a reader most needs to know accurately is
+ *     whether this was expected.
+ *   · The instructor-application block stays, because it is the one door the
+ *     gate deliberately leaves open (`MAINTENANCE_APPLICATION_ROUTES`). Showing
+ *     it is what keeps the allow-list from being a promise nobody can see.
+ */
 export default async function MaintenancePage() {
   const status = await readStatus();
   const message = normalizeMaintenanceMessage(status.message) || DEFAULT_MAINTENANCE_MESSAGE;
@@ -78,30 +95,24 @@ export default async function MaintenancePage() {
           notice is the only thing that reads as foreground. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_0%,var(--brand)_0%,transparent_70%)] opacity-[0.10]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_0%,var(--brand)_0%,transparent_70%)] opacity-[0.07]"
       />
 
-      <div className="w-full max-w-xl text-center">
-        <div
-          aria-hidden
-          className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand"
-        >
-          <Wrench className="h-6 w-6" />
-        </div>
+      <div className="w-full max-w-lg">
+        {/* A masthead rule rather than a badge: it states the category without
+            claiming a cause. */}
+        <p className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="h-px w-8 bg-rule" aria-hidden />
+          Maintenance
+        </p>
 
-        <Badge variant="secondary" className="mb-4">
-          Scheduled maintenance
-        </Badge>
-
-        <h1 className="text-balance text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">
+        <h1 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.03em] text-foreground sm:text-5xl">
           We&rsquo;ll be right back
         </h1>
 
-        <p className="mx-auto mt-4 max-w-md text-balance text-base leading-relaxed text-muted-foreground">
+        <p className="mt-4 max-w-md text-balance text-base leading-relaxed text-muted-foreground">
           {message}
         </p>
-
-        
 
         {/*
           The one door left open. Instructors are how the catalogue gets built,
@@ -110,16 +121,19 @@ export default async function MaintenancePage() {
           `lib/maintenance.ts` rather than blocked with everything else.
         */}
         {status.allowInstructorApplications && (
-          <div className="mt-10 flex flex-col items-center gap-3">
-            <Button size="lg" render={<a href="/become-instructor" />}>
-              <GraduationCap className="mr-2 h-4 w-4" aria-hidden />
+          <section className="mt-12 border-t border-rule pt-6">
+            <h2 className="text-sm font-semibold text-foreground">
+              Applications to teach are still open
+            </h2>
+            <p className="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Everything else returns when the work is done. In the meantime, applications keep
+              moving &mdash; so if you were going to apply, go ahead.
+            </p>
+            <Button className="mt-5" render={<a href="/become-instructor" />}>
               Apply to teach on {siteConfig.name}
               <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Applications are the one thing still open. Everything else returns when we&rsquo;re back.
-            </p>
-          </div>
+          </section>
         )}
 
         <p className="mt-12 text-xs text-muted-foreground">

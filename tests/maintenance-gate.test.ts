@@ -188,6 +188,17 @@ describe("the maintenance page is reachable and the gate's destination is allowl
     );
     expect(page).toMatch(/robots:\s*\{[^}]*index:\s*false/);
   });
+
+  test("the page does not claim the outage was scheduled", () => {
+    // The badge was hardcoded, so an emergency outage announced itself as
+    // planned work — the one thing the reader most needs to know accurately is
+    // whether this was expected. Neutral copy is true in both cases.
+    const page = readFileSync(
+      join(REPO_ROOT, "app/maintenance/page.tsx"),
+      "utf8",
+    );
+    expect(page).not.toContain("Scheduled maintenance");
+  });
 });
 
 describe("the admin console can always get back in", () => {
@@ -232,5 +243,19 @@ describe("the admin console can always get back in", () => {
     );
     expect(page).toContain("overrideActive");
     expect(page).toContain(MAINTENANCE_OVERRIDE_ENV);
+  });
+
+  test("the console says when the site went down, not merely that it is down", () => {
+    // `setMode` has stamped `enabledAt` on the rising edge since the switch was
+    // written, and nothing read it. The line it replaced — "live since this
+    // switch was last turned on" — could not answer the question the field was
+    // added for, so an outage had no start time in the one place an operator
+    // would look.
+    const page = readFileSync(
+      join(REPO_ROOT, "app/dashboard/admin/maintenance/page.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("enabledAt");
+    expect(page).not.toContain("Live since this switch was last turned on.");
   });
 });

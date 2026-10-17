@@ -57,9 +57,52 @@ describe("isPathAllowedDuringMaintenance", () => {
         expect(isPathAllowedDuringMaintenance("/maintenance", withoutApplications)).toBe(true);
     });
 
+    test("keeps an in-flight payment landing on its receipt", () => {
+        // `convex/paystack.ts` sends Paystack's redirect to
+        // `/courses/paid/[reference]`, which is where a learner lands *after* the
+        // money has moved. Blocking it is not a cosmetic annoyance: the webhook
+        // still settles on the Convex origin and still grants the enrollment, so
+        // the learner is charged and enrolled while looking at a page saying the
+        // site is down. That is a support ticket and a chargeback, from the one
+        // flow an admin is most likely to interrupt by flipping the switch
+        // during a deploy.
+        for (const path of ["/courses/paid", "/courses/paid/PKCK_2026_9x2"]) {
+            expect(isPathAllowedDuringMaintenance(path, withoutApplications), path).toBe(true);
+        }
+    });
+
+    test("does not open the rest of the catalogue alongside the payment callback", () => {
+        // A `(.*)` entry must stay a real path boundary, or `/courses/paided`
+        // and the course pages themselves come back up with it.
+        expect(isPathAllowedDuringMaintenance("/courses", withoutApplications)).toBe(false);
+        expect(isPathAllowedDuringMaintenance("/courses/web-development", withoutApplications)).toBe(false);
+        expect(isPathAllowedDuringMaintenance("/courses/paid-tools", withoutApplications)).toBe(false);
+    });
+
     test("keeps the crawler surfaces so a 503 is not read as a disallow", () => {
         for (const path of ["/robots.txt", "/sitemap.xml", "/manifest.json", "/llms.txt"]) {
             expect(isPathAllowedDuringMaintenance(path, withoutApplications), path).toBe(true);
+        }
+    });
+
+    test("keeps an in-flight checkout's landing page, so a payment cannot end on the outage notice", () => {
+        // `convex/paystack.ts` sends Paystack's redirect to
+        // `/courses/paid/[reference]`, which verifies and then renders the
+        // receipt. Blocking it is not "the catalogue is down": the webhook still
+        // settles on the Convex origin and still grants the enrollment, so the
+        // learner is charged and enrolled while being told the site is broken.
+        // The one flow an admin is most likely to interrupt by flipping the
+        // switch mid-deploy is the one that must survive it.
+        for (const path of ["/courses/paid/PKCK_2026_abc123", "/courses/paid"]) {
+            expect(isPathAllowedDuringMaintenance(path, withoutApplications), path).toBe(true);
+        }
+    });
+
+    test("does not open the rest of the catalogue alongside that landing page", () => {
+        // A `(.*)` entry must still respect segment boundaries, or the fix above
+        // quietly reopens the whole storefront.
+        for (const path of ["/courses", "/courses/web-development", "/courses/paid-tools"]) {
+            expect(isPathAllowedDuringMaintenance(path, withoutApplications), path).toBe(false);
         }
     });
 

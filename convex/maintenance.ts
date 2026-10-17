@@ -46,8 +46,13 @@ export type MaintenanceStatus = {
   enabled: boolean;
   message: string;
   allowInstructorApplications: boolean;
-  /** `null` until an admin has saved once — i.e. on every fresh deployment. */
   updatedAt: number | null;
+  /**
+   * When the site went down — stamped on the rising edge only, so it survives
+   * edits to the note made mid-outage and is cleared on the way back up.
+   * `null` whenever the site is up.
+   */
+  enabledAt: number | null;
   /**
    * True while `MAINTENANCE_OVERRIDE` is forcing the site up. Reported separately
    * from `enabled` so the admin console can say "the stored switch is on, but the
@@ -72,6 +77,7 @@ const OFF: MaintenanceStatus = {
   allowInstructorApplications: true,
   updatedAt: null,
   overrideActive: false,
+  enabledAt: null,
 };
 
 /**
@@ -112,6 +118,11 @@ async function loadStatus(ctx: ReadCtx): Promise<MaintenanceStatus> {
     allowInstructorApplications: newest.allowInstructorApplications,
     updatedAt: newest.updatedAt,
     overrideActive,
+    // Null while overridden: `enabledAt` exists to answer "how long has this
+    // been down?", and reporting a start time next to `enabled: false` would
+    // contradict the flag beside it. The console's override banner is where
+    // that state gets explained.
+    enabledAt: newest.enabled && !overrideActive ? newest.enabledAt ?? null : null,
   };
 }
 

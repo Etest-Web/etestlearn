@@ -61,6 +61,9 @@ export function normalizeMaintenanceMessage(raw: string): string {
  *   · `/api/instructor-applications/notify` — where that form posts. Allowing
  *     the page without the endpoint would give applicants a form that appears
  *     to succeed and notifies nobody.
+ *   · `/courses/paid` — where Paystack redirects a learner *after* the money has
+ *     moved. See the note beside the entry: blocking it strands a paid, enrolled
+ *     learner on the outage notice.
  *   · `robots.txt`, `sitemap.xml`, `manifest.json`, `llms.txt` — crawler
  *     surfaces. A 503 on robots.txt is read as "disallow everything"; serving
  *     the sitemap while the pages themselves answer 503 is the correct signal
@@ -74,6 +77,18 @@ export const MAINTENANCE_ALLOWED_ROUTES: readonly string[] = [
   "/sign-up(.*)",
   "/sso-callback(.*)",
   "/api/instructor-applications/notify",
+  // The payment callback, not the catalogue. `convex/paystack.ts` sets this as
+  // Paystack's `callback_url`, and the page verifies the reference and renders
+  // the receipt. The failure it prevents is specific and expensive: the webhook
+  // settles on the Convex origin, which this gate never sees, so the enrollment
+  // is granted either way — blocking the landing page just means a learner is
+  // charged and enrolled while being shown a page saying the site is down. That
+  // reads as "my payment failed" and ends in a chargeback.
+  //
+  // It is not a hole in the catalogue: the page only resolves one reference, and
+  // `matchesRoute` keeps this to `/courses/paid` and below rather than
+  // reopening `/courses` itself.
+  "/courses/paid(.*)",
   "/robots.txt",
   "/sitemap.xml",
   "/manifest.json",

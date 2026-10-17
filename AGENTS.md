@@ -131,6 +131,26 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    which has no pdf-lib import so the renderer and the admin editor read the same
    numbers. Every reader of the installed row goes through `getInstalledTemplate`
    in `convex/helpers/certificateTemplate.ts`.
+   **Placement is edited on a canvas, not in coordinate boxes.**
+   `components/certificate-canvas.tsx` draws the real background (pdf.js
+   rasterises page 1 in the browser; `pdfjs-dist` is a client dependency, loaded
+   through `import()` so it never runs during SSR) and the six fields sit on it
+   as drag/resize objects. That only stays honest if both sides read one source,
+   so `lib/certificate-layout.ts` also owns the typography the canvas paints
+   with — font roles, colours, `wrapText`/`wrapCharBudget`, the truncation limit
+   and `CANVAS_BASELINE_NUDGE` (the correction between pdf-lib's baseline and a
+   CSS line box). Two things worth knowing before touching it:
+   - The raw `x,y`/`off` syntax still exists — `parseAnchor`/`formatAnchor` and
+     their tests — but it is now behind the "Paste coordinates" disclosure rather
+     than being the primary control.
+   - `updateTemplateLayout` **replaces** the layout, so the editor always saves
+     all six fields resolved (including explicit `null`s). With no artwork
+     uploaded there is no row to store against, so dragging works but Save is
+     hidden; the preview action still renders what the built-in page would print.
+   Convex storage is fetched cross-origin for the raster: `cors()` in
+   `convex-backend`'s `local_backend/src/router.rs` mirrors the request origin on
+   `/api/storage/{storage_id}`, so `fetch()` succeeds. If it ever fails the canvas
+   falls back to the built-in artwork and says so rather than going blank.
 8. **CSP is per-request; the rest of the security headers are static.** `lib/csp.ts` builds the
    Content-Security-Policy from a fresh nonce per request and `proxy.ts` writes it to both the
    response header (what the browser enforces) and the request header `X-Nonce` (what Next.js and

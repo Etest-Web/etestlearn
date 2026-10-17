@@ -91,6 +91,19 @@ describe("renderCertificatePdf without a template", () => {
     const doc = await PDFDocument.load(bytes);
     expect(doc.getPageCount()).toBe(1);
   });
+
+  it("truncates a long learner name where the editor does", async () => {
+    // The canvas shows the same clip, so the two only stay in step while the
+    // shared maxLength is the one doing the cutting.
+    const bytes = await renderCertificatePdf({
+      ...base,
+      holderName: "A".repeat(80),
+    });
+    const drawn = pageText(await PDFDocument.load(bytes), 0);
+
+    expect(drawn).toContain("A".repeat(46));
+    expect(drawn).not.toContain("A".repeat(47));
+  });
 });
 
 describe("renderCertificatePdf with a template", () => {

@@ -12,10 +12,17 @@
  */
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage, rgb } from "pdf-lib";
 import {
+  CERTIFICATE_INK,
+  CERTIFICATE_MUTED,
   DEFAULT_LAYOUT,
+  LINE_HEIGHT_RATIO,
   TEMPLATE_DEFAULTS,
+  certificateFieldLines,
+  wrapCharBudget,
+  wrapText,
   type CertificateLayout,
   type FieldAnchor,
+  type RgbTriple,
 } from "./certificate-layout";
 
 export interface CertificatePdfInput {
@@ -29,30 +36,15 @@ export interface CertificatePdfInput {
   revocationReason?: string;
 }
 
+/**
+ * Colours come from the shared layout module: the on-screen editor paints with
+ * the same triples, so what an admin matches on the canvas is what prints.
+ */
+const toRgb = ({ r, g, b }: RgbTriple) => rgb(r, g, b);
 const PURPLE = rgb(148 / 255, 93 / 255, 163 / 255);
-const INK = rgb(31 / 255, 27 / 255, 29 / 255);
-const MUTED = rgb(107 / 255, 101 / 255, 112 / 255);
+const INK = toRgb(CERTIFICATE_INK);
+const MUTED = toRgb(CERTIFICATE_MUTED);
 const DANGER = rgb(0.75, 0.25, 0.25);
-
-/** Wraps text to a character budget so long course titles stay inside the page. */
-function wrap(text: string, maxChars: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = "";
-
-  for (const word of words) {
-    if (line.length === 0) {
-      line = word;
-    } else if (line.length + 1 + word.length <= maxChars) {
-      line += ` ${word}`;
-    } else {
-      lines.push(line);
-      line = word;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
 
 interface Fonts {
   regular: PDFFont;
@@ -88,11 +80,11 @@ function drawCenteredWrapped(
   color: ReturnType<typeof rgb>,
 ) {
   const size = anchor.size ?? 22;
-  const lineHeight = size * 1.2;
-  // 80% of page width is the safe area a template's own border usually allows.
-  const maxChars = Math.max(20, Math.floor((page.getWidth() * 0.8) / (size * 0.5)));
+  const lineHeight = size * LINE_HEIGHT_RATIO;
+  // SAFE_WIDTH_RATIO of the page is the area a template's own border allows.
+  const maxChars = wrapCharBudget(page.getWidth(), size);
 
-  wrap(text, maxChars).forEach((line, i) => {
+  wrapText(text, maxChars).forEach((line, i) => {
     drawCentered(
       page,
       line,
@@ -223,7 +215,18 @@ export async function renderCertificatePdf(
     INK,
   );
 
-  draw("recipient", input.holderName.slice(0, 46), fonts.italic, INK);
+  // Truncated through the shared field rules rather than an inline constant,
+  // so the canvas and the PDF clip a long name at the same character.
+  const recipientAt = anchor("recipient");
+  if (recipientAt) {
+    const [line] = certificateFieldLines(
+      "recipient",
+      input.holderName,
+      page.getWidth(),
+      recipientAt.size ?? 40,
+    );
+    drawCentered(page, line, recipientAt, fonts.italic, INK);
+  }
 
   const courseAt = anchor("course");
   if (courseAt) {

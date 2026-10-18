@@ -30,6 +30,16 @@ export interface PublicInstructor {
   pronouns?: string;
   /** When the account was created — rendered as "Instructor since …". */
   joinedAt: number;
+  /**
+   * The running total behind the profile's star average.
+   *
+   * Carried on the card as well as the full profile so the header stars and the
+   * review block cannot disagree — they are the same two numbers read once. The
+   * comment on each field is on `users` in `schema.ts`; nothing outside this file
+   * needs to know how the pair is maintained.
+   */
+  instructorRatingSum?: number;
+  instructorRatingCount?: number;
 }
 
 /** A listing as the profile shows it: enough for a card, nothing internal. */
@@ -45,6 +55,13 @@ export interface PublicProfileCourse {
   currency?: string;
   featured?: boolean;
   createdAt: number;
+  /**
+   * The course's own rating total, so a profile card can print stars without a
+   * per-course read. Same sum/count pair as `users`, maintained by
+   * `convex/reviews.ts`.
+   */
+  ratingSum?: number;
+  ratingCount?: number;
 }
 
 /**
@@ -85,6 +102,8 @@ function toPublicInstructor(user: Doc<"users">): PublicInstructor {
     website: user.website?.trim() || undefined,
     pronouns: user.pronouns?.trim() || undefined,
     joinedAt: user.createdAt,
+    instructorRatingSum: user.instructorRatingSum,
+    instructorRatingCount: user.instructorRatingCount,
   };
 }
 
@@ -149,6 +168,8 @@ export const getPublicProfile = query({
           currency: course.currency,
           featured: course.featured,
           createdAt: course.createdAt,
+          ratingSum: course.ratingSum,
+          ratingCount: course.ratingCount,
         }),
       ),
       // The count the page prints. Equal to `courses.length` today; named so a

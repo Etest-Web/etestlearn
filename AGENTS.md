@@ -78,8 +78,8 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    - Public: `export const name = query | mutation | action` in `convex/<module>.ts`.
    - Internal: `internalQuery/internalMutation/internalAction`, called as `internal.<module>.<name>`.
    - Validate every argument with `v.*` validators.
-   - Read through indexes (`withIndex(...)`); the schema defines ~32 indexes (`by_clerk_id`,
-     `by_slug`, `by_user_course`, `by_serial`, `by_key`, …). Add an index in `convex/schema.ts` if
+   - Read through indexes (`withIndex(...)`); the schema defines ~40 indexes (`by_clerk_id`,
+     `by_slug`, `by_user_course`, `by_serial`, `by_key`, `by_instructor_published`, …). Add an index in `convex/schema.ts` if
      you need a new lookup path.
    - HTTP endpoints live in `convex/http.ts` (`httpRouter()` + `httpAction`):
      `POST /webhook/paystack` (HMAC-SHA512 signature), `POST /webhook/clerk` (svix verification).
@@ -235,6 +235,44 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
         It returns no id and no email, so it cannot be used to probe other accounts.
       Both surfaces are asserted in `tests/maintenance-gate.test.ts`; do not delete one to "simplify"
       the file.
+11. **Ratings, bookmarks and projects are one system, not three.** Course reviews
+    (`convex/reviews.ts`), instructor reviews (`convex/instructorReviews.ts`) and bookmarks
+    (`convex/bookmarks.ts`) share one shape on purpose — one row per person per subject,
+    enforced by looking up the pair before inserting rather than by a unique constraint, plus a
+    hand-written public projection that never carries the author's `userId`. Anything that
+    changes one should change all three, or the platform grows a second dialect of "review".
+    Things worth knowing before touching them:
+    - **The rating policy is `lib/reviews.ts` and only there.** `reviewEligibility` (a course)
+      and `instructorReviewEligibility` (a person) are separate functions because the question
+      differs — *are you enrolled in this course* versus *did this person ever teach you* — but
+      they share the rating range, the comment cap, `reviewDraftError` and `averageRating`.
+      The instructor gate resolves the teaching history with two capped index walks
+      (`enrollments.by_user` ∩ `courses.by_instructor`) rather than denormalizing an instructor
+      id onto every enrollment, because a second source of truth for "who teaches what" would
+      have to be updated every time a course changes hands.
+    - **`ratingPatchOf(current, delta, fields)`, not `ratingPatch`, for instructors.** The
+      sum/count pair lives under different field names on `courses` and `users`, and a defaulted
+      generic that silently picks the wrong ones produces an average that drifts from its rows
+      for a year with nothing in the logs. `ratingPatch` is a named wrapper for the course pair
+      only; `ratingPatchOf` is the general form. Both go back to `undefined` at zero so an
+      unrated row is byte-identical to a never-reviewed one.
+    - **`internal.reviews.recomputeCourseRating` / `internal.instructorReviews.recomputeInstructorRating`
+      exist only for tests.** They are how the suite proves the incremental arithmetic still
+      matches a full recount. Do not wire them to UI; if the total ever drifts, that is a bug in
+      the mutation, not a call for a repair button.
+    - **Ratings send no notification and write no audit row.** A star is learner self-service, and
+      a bell per star is noise. This is stated in both modules — don't "helpfully" add one.
+    - **A bookmark requires a session** (unlike a review, which is public content readable signed
+      out), and `bookmarks.toggleBookmark` returns the resulting state so an optimistic heart can
+      settle from the server's answer. `BookmarkButton` (one course) and `BookmarkListButton` (a
+      list, one shared id set) are deliberately separate: fifty cards must not mean fifty
+      subscriptions.
+    - **Course projects are display-only.** `courseProjects` is instructor-authored marketing on
+      the course page — ordered, with a cap of `MAX_PROJECTS_PER_COURSE` — and a learner cannot
+      submit work there. Every write goes through `canManageCourse`. `reorderProjects` replaces the
+      whole order and re-checks every id's course, so a crafted id cannot renumber a showcase the
+      caller cannot see. If learner submissions are ever wanted that is a **new table** (storage,
+      review state, its own permissions), not a `status` column here.
 
 ---
 
@@ -410,6 +448,10 @@ The seven
 - Naming: components kebab-case (`video-player.tsx`); Convex modules camelCase domain names
   (`certificateTemplates.ts`); internal functions camelCase verbs (`issueIfEligible`,
   `markPurchasePaid`).
+- **There is no `deleteCourse`.** Only `courses.deleteLesson`, which cascades its quiz, questions,
+  options and attempts. Whenever one is added it must sweep `courseReviews`, `bookmarks`,
+  `courseProjects` and `instructorReviews` rows too — a saved-courses list and a public showcase
+  both read straight through to their parent and would otherwise 404 or throw.
 - `convex/emailCampaignsData.ts` holds the reads the mail actions need, because a `"use node"`
   module may only export actions. Keep it `internal` only.
 - Prefer changing existing docs over creating new Markdown files (because of the `*.md` ignore).

@@ -17,6 +17,7 @@ import { SearchX } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { StarRating } from "@/components/star-rating";
+import { BookmarkListButton } from "@/components/bookmark-button";
 import { averageRating, formatRating } from "@/lib/reviews";
 
 function CoursesWrapper() {
@@ -31,6 +32,11 @@ function CoursesWrapper() {
     query ? { query } : "skip",
   );
   const allCourses = useQuery(api.courses.listPublishedCourses);
+  // One bookmark set for the whole catalog rather than a subscription per card:
+  // fifty hearts asking the same question fifty times is fifty round trips on a
+  // page that is otherwise a single query.
+  const bookmarkedIds = useQuery(api.bookmarks.listBookmarkedCourseIds, {});
+  const savedCourseIds = bookmarkedIds ? new Set(bookmarkedIds) : null;
   const filteredCourses =
     (query ? (searchedCourses ?? []) : (allCourses ?? [])) ?? [];
 
@@ -78,7 +84,12 @@ function CoursesWrapper() {
           {filteredCourses.map((course) => {
             const average = averageRating(course.ratingSum, course.ratingCount);
             return (
-              <Card key={course._id} variant="interactive">
+              <Card key={course._id} variant="interactive" className="relative">
+                <BookmarkListButton
+                  courseId={course._id}
+                  bookmarkedIds={savedCourseIds}
+                  className="absolute right-3 top-3 z-10"
+                />
                 <CardHeader>
                   <Image src={course.thumbnailUrl || "/certf.jpeg"} alt={course.title} width={500} height={500} className="mb-2 h-48 w-full rounded-sm object-cover" />
                   <div className="flex flex-wrap gap-2">

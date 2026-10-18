@@ -175,6 +175,12 @@ export const NOTIFICATION_TYPES = [
   "quiz_graded",
   "streak_milestone",
   "discussion_reply",
+  // Class discussion — a learner finished the course and posted about it, and
+  // somebody answered. The instructor hears about a new post; the learner hears
+  // about a reply. Nothing inside a thread notifies, so a busy conversation does
+  // not become a busy inbox.
+  "class_comment",
+  "class_comment_reply",
   "task_assigned",
   "task_graded",
   "group_invite",
@@ -215,6 +221,8 @@ export const notificationTypeValidator = v.union(
   v.literal("quiz_graded"),
   v.literal("streak_milestone"),
   v.literal("discussion_reply"),
+  v.literal("class_comment"),
+  v.literal("class_comment_reply"),
   v.literal("task_assigned"),
   v.literal("task_graded"),
   v.literal("group_invite"),

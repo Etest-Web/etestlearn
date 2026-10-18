@@ -63,6 +63,18 @@ export default defineSchema({
     // again after N months" rule has something to compare against without a
     // migration. Re-runnable at any time from Settings.
     tourCompletedAt: v.optional(v.number()),
+    // ── Instructor ratings (denormalized) ────────────────────────────────────
+    // The running total behind the star average on a public instructor profile.
+    // Kept as a sum/count *pair* for exactly the reason `courses.ratingSum` is:
+    // a stored average rounds on every write and slowly drifts away from the
+    // reviews it claims to summarise.
+    //
+    // Only ever written by `convex/instructorReviews.ts`, in the same mutation
+    // that writes the review, and absent on everyone who has never been rated —
+    // which is also what an instructor whose last review was deleted must look
+    // like (see `lib/reviews.ts#ratingPatch`).
+    instructorRatingSum: v.optional(v.number()),
+    instructorRatingCount: v.optional(v.number()),
     createdAt: v.number(),
     // Customization & accessibility preferences
     preferences: v.optional(v.object({
@@ -297,6 +309,109 @@ export default defineSchema({
     userId: v.id("users"),
     rating: v.number(),
     comment: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_course", ["courseId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_user", ["userId"]),
+
+  // ── Instructor reviews ────────────────────────────────────────────────────
+  // One row per learner per instructor, denormalized onto
+  // `users.instructorRatingSum` / `instructorRatingCount` exactly as a course
+  // review is onto its course. Same "one row" mechanism (`by_user_instructor`
+  // is looked up before insert or patch), same optional comment.
+  //
+  // Deliberately *not* derivable from `courseReviews` on read: an instructor's
+  // rating aggregates every course they have ever taught, which a learner may
+  // only be able to see a fraction of, and a profile page cannot afford a
+  // per-course walk. The gate that decides who may write one lives in
+  // `lib/reviews.ts#instructorReviewEligibility`.
+  instructorReviews: defineTable({
+    instructorId: v.id("users"),
+    userId: v.id("users"),
+    rating: v.number(),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_instructor", ["instructorId"])
+    .index("by_user_instructor", ["userId", "instructorId"])
+    .index("by_user", ["userId"]),
+
+  // ── Bookmarks ─────────────────────────────────────────────────────────────
+  // "Save this course for later." One row per learner per course, enforced the
+  // same way as the two review tables: `by_user_course` is looked up before the
+  // toggle inserts, so a double-tap edits nothing and leaves no duplicate.
+  //
+  // No rating or note on this row. A bookmark is a private intent ("come back
+  // to this"), and putting a review field next to it invites the question of
+  // what a bookmark that also carries a star means.
+  bookmarks: defineTable({
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_user_course", ["userId", "courseId"]),
+
+  // ── Course projects ───────────────────────────────────────────────────────
+  // What a learner can *make* by the end of the course — the instructor's
+  // showcase, shown on the public course page next to the syllabus.
+  //
+  // Display-only on purpose: a learner cannot submit work here. That would need
+  // its own storage, permissions, review state and dashboard, which is a
+  // different feature from "show me what I'll be able to build".
+  //
+  // `order` is an explicit integer rather than relying on `_creationTime`,
+  // because an instructor reordering their showcase must not require rewriting
+  // every row they did not touch.
+  courseProjects: defineTable({
+    courseId: v.id("courses"),
+    title: v.string(),
+    description: v.string(),
+    /** Screenshot or finished-artwork URL. Optional: a text-only project is valid. */
+    imageUrl: v.optional(v.string()),
+    /** Tools/technologies used, as short labels — "Next.js", "Postgres". */
+    techStack: v.optional(v.array(v.string())),
+    /** The takeaway, in a sentence: "a deployed app you can send to anyone". */
+    outcome: v.optional(v.string()),
+    order: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_course_order", ["courseId", "order"]),
+
+  // ── Class discussion (post-completion learner feedback) ───────────────────
+  // "How did this class actually go?", written by learners who **finished** the
+  // course, with the instructor replying. Public and readable signed out — it is
+  // the section a prospective buyer reads to judge whether a course is worth
+  // the money, which is why it lives on the public course page rather than in
+  // the dashboard.
+  //
+  // Deliberately separate from both existing learner-voice tables:
+  //
+  // · `courseReviews` gates on *enrolled*, is tied to a star rating, and one row
+  //   per learner cannot hold a reply.
+  // · `discussionThreads`/`discussionMessages` is lesson Q&A ("why does this
+  //   return undefined?"), lives in the dashboard, and is about being stuck
+  //   rather than about how the course turned out.
+  //
+  // **One top-level post per learner per course** — `by_user_course` is what
+  // makes that true, checked before insert. Replies are unrestricted; a learner
+  // answering somebody's post is ordinary and the rate limiter covers volume.
+  //
+  // `depth` is stored rather than computed by walking up `parentId`, so the
+  // reply guard is one field read instead of a walk that a deep thread would
+  // turn into a chain of reads on the hot path. See `lib/class-discussion.ts`.
+  courseComments: defineTable({
+    courseId: v.id("courses"),
+    userId: v.id("users"),
+    /** Absent on a top-level post; set on every reply. */
+    parentId: v.optional(v.id("courseComments")),
+    /** 0 for a top-level post, parent's depth + 1 for a reply. */
+    depth: v.number(),
+    body: v.string(),
+    // Soft delete rather than removal, because the thread *is* the structure:
+    // deleting a parent row would orphan every reply beneath it. A removed post
+    // keeps its slot, loses its text, and its replies stay where they are.
+    deletedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_course", ["courseId"])
@@ -849,6 +964,12 @@ export default defineSchema({
       v.literal("quiz_graded"),
       v.literal("streak_milestone"),
       v.literal("discussion_reply"),
+      // Class discussion (see `convex/courseComments.ts`). The instructor is
+      // told when a learner posts about the course they taught; the learner is
+      // told when someone answers. These are the only two places this surface
+      // rings a bell — replies inside a thread do not each notify.
+      v.literal("class_comment"),
+      v.literal("class_comment_reply"),
       v.literal("task_assigned"),
       v.literal("task_graded"),
       v.literal("group_invite"),

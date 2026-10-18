@@ -22,6 +22,9 @@ import {
 } from "@/components/ui";
 import { CourseSchema } from "@/components/seo/course-schema";
 import { CourseReviews } from "@/components/course-reviews";
+import { CourseClassDiscussion } from "@/components/course-class-discussion";
+import { CourseProjects } from "@/components/course-projects";
+import { BookmarkButton } from "@/components/bookmark-button";
 import { StarRating } from "@/components/star-rating";
 import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
@@ -73,6 +76,14 @@ export default function CoursePage() {
     api.instructors.getInstructorCard,
     data?.course ? { instructorId: data.course.instructorId } : "skip",
   );
+  // Read here purely to decide whether the Projects tab exists at all. The tab's
+  // own content subscribes separately, so switching tabs is instant, but the
+  // trigger cannot be conditional on a value the panel has not asked for yet.
+  const projectCount = useQuery(
+    api.courseProjects.listForCourse,
+    data?.course ? { courseId: data.course._id } : "skip",
+  );
+  const hasProjects = (projectCount?.length ?? 0) > 0;
   const createPendingPurchase = useMutation(api.payments.createPendingPurchase);
   const initializeCheckout = useAction(api.paystack.initializeCheckout);
 
@@ -633,6 +644,10 @@ export default function CoursePage() {
                 <TabsTrigger value="reviews">
                   Reviews {course.ratingCount ? `(${course.ratingCount})` : ""}
                 </TabsTrigger>
+                {/* Hidden entirely rather than shown empty: a "Projects" tab with
+                    nothing in it reads as a gap in the course, not as a decision
+                    the instructor has not made yet. */}
+                {hasProjects && <TabsTrigger value="projects">Projects</TabsTrigger>}
               </TabsList>
 
               {/* ABOUT TAB */}
@@ -851,12 +866,22 @@ export default function CoursePage() {
               </TabsContent>
 
               {/* REVIEWS TAB */}
-              <TabsContent value="reviews">
+              <TabsContent value="reviews" className="space-y-8">
                 <CourseReviews
                   courseId={course._id}
                   ratingSum={course.ratingSum}
                   ratingCount={course.ratingCount}
                 />
+                {/* Below the stars, not in a tab of its own: it is the longer
+                    account of the same question ("how was it?") and separating it
+                    would put the learner's retrospective one click away from the
+                    average it supports. */}
+                <CourseClassDiscussion courseId={course._id} />
+              </TabsContent>
+
+              {/* PROJECTS TAB */}
+              <TabsContent value="projects">
+                <CourseProjects courseId={course._id} />
               </TabsContent>
             </Tabs>
           </div>
@@ -864,7 +889,14 @@ export default function CoursePage() {
           {/* Right: Sticky Checkout Card */}
           <div className="lg:col-span-4">
             <div className="sticky top-20 space-y-4">
-              <Card className="border-border shadow-lg">
+              <Card className="relative border-border shadow-lg">
+                {/* Sits in the card's own corner rather than in the pricing
+                    column: saving a course is a decision about the future, not
+                    about whether to buy it today. */}
+                <BookmarkButton
+                  courseId={course._id}
+                  className="absolute right-3 top-3 z-10"
+                />
                 <CardHeader className="pb-3">
                   <div className="space-y-1">
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

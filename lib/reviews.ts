@@ -138,22 +138,107 @@ export function reviewEligibility(input: {
 }
 
 /**
- * The rating fields to write on a course after a review change.
+ * Whether this person may review this instructor, and if not, why not.
  *
- * Returned as a patch rather than applied here so there is one place that knows
- * the shape of the running total — `ratingSum` and `ratingCount` are the pair,
- * because a stored average would round on every write and drift away from the
- * reviews it summarises.
+ * The course gate cannot be reused, because the interesting question is
+ * different: a learner may review a course they are *enrolled in*, whereas an
+ * instructor is rated by people who took *any* of their courses. So the rule
+ * asks the question the profile page actually needs answered — "has this person
+ * been taught by this person?" — and that is a fact about the database, not
+ * about the request. The caller resolves it (see
+ * `convex/instructorReviews.ts#loadInstructorEligibility`) and passes the answer
+ * in; this function stays pure.
  *
- * Both fields go back to `undefined` at zero, so a course whose last review was
+ * Two of the three gates are inherited deliberately:
+ *
+ * **Instructors and admins do not rate.** Same reason as the course gate: staff
+ * enrolling is free (`enrollInCourse` exempts them), so an instructor rating a
+ * competitor would be a free, unlimited way to attack a rival's profile without
+ * ever paying for anything. Self-rating is refused first and separately, since
+ * "you cannot review yourself" is a clearer sentence than "only learners can
+ * rate an instructor" when the reader is looking at their own profile.
+ *
+ * **Taking a course is the bar.** A signed-out visitor cannot rate, and a
+ * signed-in student who has never enrolled in anything by this instructor
+ * cannot either. That is stricter than it sounds and it is the point: it is what
+ * makes the average mean "people who were actually taught this" rather than
+ * "people with an account and an opinion".
+ */
+export function instructorReviewEligibility(input: {
+  signedIn: boolean;
+  role: string | undefined;
+  isSelf: boolean;
+  tookTheirCourse: boolean;
+}): ReviewEligibility {
+  if (!input.signedIn) {
+    return { eligible: false, reason: "Sign in to leave a review." };
+  }
+  if (input.isSelf) {
+    return { eligible: false, reason: "You cannot review yourself." };
+  }
+  if (input.role !== "student") {
+    return {
+      eligible: false,
+      reason: "Only learners can review an instructor.",
+    };
+  }
+  if (!input.tookTheirCourse) {
+    return {
+      eligible: false,
+      reason: "Enroll in one of this instructor's courses to leave a review.",
+    };
+  }
+  return { eligible: true };
+}
+
+/**
+ * The rating fields to write after a review change, for any sum/count pair.
+ *
+ * Serves both denormalized totals on the platform — a course's and an
+ * instructor's — because they are the same pair under the same arithmetic, and
+ * the arithmetic is the part that must not exist twice. Returned as a patch
+ * rather than applied here so there is one place that knows the shape of the
+ * running total: the two fields travel together, because a stored average would
+ * round on every write and drift away from the reviews it summarises.
+ *
+ * Both fields go back to `undefined` at zero, so a row whose last review was
  * deleted is byte-identical to one that never had a review.
+ *
+ * The field names are a parameter because `users` cannot also carry
+ * `ratingSum`/`ratingCount` for the same value it already uses for its own
+ * purposes — the names say *whose* rating this is, and the two denormalizations
+ * coexist on the platform.
+ */
+export function ratingPatchOf<K extends string>(
+  current: { [P in K]?: number },
+  delta: { sum: number; count: number },
+  fields: { sum: K; count: K },
+): { [P in K]: number | undefined } {
+  const count = (current[fields.count] ?? 0) + delta.count;
+  const sum = (current[fields.sum] ?? 0) + delta.sum;
+
+  if (count <= 0) {
+    // Computed rather than written literally so the returned object is keyed by
+    // whatever names the caller passed, not by the course ones.
+    return { [fields.sum]: undefined, [fields.count]: undefined } as {
+      [P in K]: number | undefined;
+    };
+  }
+  return { [fields.sum]: sum, [fields.count]: count } as { [P in K]: number | undefined };
+}
+
+/**
+ * The rating patch for a **course**'s running total.
+ *
+ * A named wrapper over {@link ratingPatchOf} rather than a default argument,
+ * because a defaulted generic that silently picks the wrong field names is the
+ * kind of helper that produces an instructor whose average drifts from their
+ * reviews for a year with nothing in the logs. Callers that are not about a
+ * course say which fields they mean.
  */
 export function ratingPatch(
   current: { ratingSum?: number; ratingCount?: number },
   delta: { sum: number; count: number },
 ): { ratingSum: number | undefined; ratingCount: number | undefined } {
-  const count = (current.ratingCount ?? 0) + delta.count;
-  const sum = (current.ratingSum ?? 0) + delta.sum;
-  if (count <= 0) return { ratingSum: undefined, ratingCount: undefined };
-  return { ratingSum: sum, ratingCount: count };
+  return ratingPatchOf(current, delta, { sum: "ratingSum", count: "ratingCount" });
 }

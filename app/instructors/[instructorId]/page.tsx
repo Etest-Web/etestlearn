@@ -17,6 +17,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, Globe, MapPin, SearchX } from "lucide-react";
 import { isConvexId, websiteHref, websiteLabel } from "@/lib/instructors";
+import { InstructorReviews } from "@/components/instructor-reviews";
+import { StarRating } from "@/components/star-rating";
+import { BookmarkListButton } from "@/components/bookmark-button";
+import { averageRating, formatRating } from "@/lib/reviews";
 
 /**
  * A public instructor profile.
@@ -57,6 +61,10 @@ export default function InstructorProfilePage() {
     api.instructors.getPublicProfile,
     instructorId ? { instructorId } : "skip",
   );
+  // One set for every card on the profile, for the same reason the catalog does
+  // it that way.
+  const bookmarkedIds = useQuery(api.bookmarks.listBookmarkedCourseIds, {});
+  const savedCourseIds = bookmarkedIds ? new Set(bookmarkedIds) : null;
 
   // A malformed id is a 404, not a blank page: there is nothing to retry.
   if (!instructorId) notFound();
@@ -68,6 +76,11 @@ export default function InstructorProfilePage() {
   if (data === null) notFound();
 
   const { instructor, courses } = data;
+  const ratingAverage = averageRating(
+    instructor.instructorRatingSum,
+    instructor.instructorRatingCount,
+  );
+  const ratingCount = instructor.instructorRatingCount ?? 0;
   const joined = new Date(instructor.joinedAt).toLocaleDateString("en-NG", {
     month: "long",
     year: "numeric",
@@ -103,6 +116,21 @@ export default function InstructorProfilePage() {
               <BookOpen className="h-4 w-4" />
               {data.courseCount} {data.courseCount === 1 ? "published course" : "published courses"}
             </span>
+            {/* Hidden entirely when unrated: "0.0 stars" from nobody is a worse
+                first impression than no number at all. The aggregate arrives on
+                the profile query itself, so this costs no extra read. */}
+            {ratingAverage !== null && (
+              <span className="inline-flex items-center gap-1.5">
+                <StarRating value={ratingAverage} size="sm" />
+                <span className="font-medium text-foreground">
+                  {formatRating(ratingAverage)}
+                </span>
+                <span>
+                  ({ratingCount}{" "}
+                  {ratingCount === 1 ? "review" : "reviews"})
+                </span>
+              </span>
+            )}
             {instructor.location && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-4 w-4" />
@@ -142,7 +170,12 @@ export default function InstructorProfilePage() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
             {courses.map((course) => (
-              <Card key={course._id} variant="interactive">
+              <Card key={course._id} variant="interactive" className="relative">
+                <BookmarkListButton
+                  courseId={course._id}
+                  bookmarkedIds={savedCourseIds}
+                  className="absolute right-3 top-3 z-10"
+                />
                 <CardHeader>
                   <Image
                     src={course.thumbnailUrl || "/certf.jpeg"}
@@ -156,6 +189,18 @@ export default function InstructorProfilePage() {
                     {course.level && <Badge variant="outline">{course.level}</Badge>}
                   </div>
                   <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  {(() => {
+                    const average = averageRating(course.ratingSum, course.ratingCount);
+                    return average !== null ? (
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <StarRating value={average} size="xs" />
+                        <span className="tabular text-xs text-muted-foreground">
+                          {formatRating(average)}
+                          {course.ratingCount ? ` · ${course.ratingCount}` : ""}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-4">
                   <p className="text-sm leading-body text-muted-foreground line-clamp-3">
@@ -173,6 +218,14 @@ export default function InstructorProfilePage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Reviews come after the listings, not before: someone arrives at a
+          profile to see what is taught, and the rating is context for that
+          rather than the reason to be here. */}
+      <section className="space-y-6">
+        <h2 className="font-outfit text-2xl">Reviews</h2>
+        <InstructorReviews instructorId={instructor._id} />
       </section>
     </main>
   );

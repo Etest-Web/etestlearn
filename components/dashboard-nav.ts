@@ -18,6 +18,7 @@ import {
     Banknote,
     BarChart3,
     BookOpen,
+    Bookmark,
     ClipboardList,
     EyeOff,
     FileCheck2,
@@ -109,6 +110,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
             { href: "/dashboard/inbox", label: "Inbox", icon: Inbox, badge: "unread" },
             { href: "/dashboard/courses", label: "Lessons", icon: BookOpen },
+            // The bookmark feature's only read-back surface; without this
+            // entry a saved course would be unreachable.
+            { href: "/dashboard/saved", label: "Saved", icon: Bookmark },
             { href: "/dashboard/certificates", label: "Certificates", icon: Award },
             { href: "/dashboard/tasks", label: "Tasks", icon: ClipboardList },
             { href: "/dashboard/groups", label: "Groups", icon: Users },

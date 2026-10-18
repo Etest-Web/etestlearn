@@ -24,6 +24,7 @@ import { slugify } from "@/lib/slug";
 import { CertificatesPanel } from "@/components/course-certificates-panel";
 import { CourseAnnouncementsManager } from "@/components/course-announcements-manager";
 import { CourseCouponsManager } from "@/components/course-coupons-manager";
+import { CourseProjectsManager } from "@/components/course-projects-manager";
 import { BulkLessonImport } from "@/components/bulk-lesson-import";
 
 export default function CourseEditPage() {
@@ -375,6 +376,7 @@ export default function CourseEditPage() {
           <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
           <TabsTrigger value="coupons">Coupons</TabsTrigger>
+          <TabsTrigger value="projects">Projects</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="pt-6">
           <div className="flex flex-col gap-6">
@@ -718,6 +720,9 @@ export default function CourseEditPage() {
         </TabsContent>
         <TabsContent value="coupons" className="pt-6">
           <CourseCouponsManager courseId={courseData.course._id as Id<"courses">} />
+        </TabsContent>
+        <TabsContent value="projects" className="pt-6">
+          <CourseProjectsManager courseId={courseData.course._id as Id<"courses">} />
         </TabsContent>
       </Tabs>
     </PageShell>

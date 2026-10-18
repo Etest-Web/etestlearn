@@ -3,9 +3,11 @@ import {
   REVIEW_COMMENT_MAX_LENGTH,
   averageRating,
   formatRating,
+  instructorReviewEligibility,
   normalizeComment,
   ratingLabel,
   ratingPatch,
+  ratingPatchOf,
   reviewDraftError,
   reviewEligibility,
   starFill,
@@ -217,5 +219,126 @@ describe("ratingPatch", () => {
     const remaining = [5, 3, 4, 4, 5, 2];
     expect(course.ratingSum).toBe(remaining.reduce((a, b) => a + b, 0));
     expect(averageRating(course.ratingSum, course.ratingCount)).toBeCloseTo(23 / 6);
+  });
+
+  test("ratingPatch is the course pair and nothing else", () => {
+    // The wrapper exists so a caller that is *not* about a course has to name its
+    // fields. If this ever starts accepting instructor names, the two
+    // denormalizations on `users` and `courses` can silently swap.
+    expect(
+      ratingPatch({ ratingSum: 5, ratingCount: 1 }, { sum: 1, count: 1 }),
+    ).toEqual({ ratingSum: 6, ratingCount: 2 });
+  });
+});
+
+describe("ratingPatchOf", () => {
+  const TOTAL = { sum: "instructorRatingSum", count: "instructorRatingCount" } as const;
+
+  test("writes the names it was given, not the course ones", () => {
+    const patch = ratingPatchOf({}, { sum: 5, count: 1 }, TOTAL);
+    expect(patch).toEqual({ instructorRatingSum: 5, instructorRatingCount: 1 });
+    expect(patch).not.toHaveProperty("ratingSum");
+  });
+
+  test("does the same arithmetic as the course pair", () => {
+    expect(
+      ratingPatchOf(
+        { instructorRatingSum: 5, instructorRatingCount: 1 },
+        { sum: 3, count: 1 },
+        TOTAL,
+      ),
+    ).toEqual({ instructorRatingSum: 8, instructorRatingCount: 2 });
+  });
+
+  test("an edited rating moves the sum by the delta and not the count", () => {
+    expect(
+      ratingPatchOf(
+        { instructorRatingSum: 8, instructorRatingCount: 2 },
+        { sum: -3, count: 0 },
+        TOTAL,
+      ),
+    ).toEqual({ instructorRatingSum: 5, instructorRatingCount: 2 });
+  });
+
+  test("the last review removed clears both fields under their own names", () => {
+    const patch = ratingPatchOf(
+      { instructorRatingSum: 5, instructorRatingCount: 1 },
+      { sum: -5, count: -1 },
+      TOTAL,
+    );
+    expect(patch).toEqual({
+      instructorRatingSum: undefined,
+      instructorRatingCount: undefined,
+    });
+    expect(patch).not.toHaveProperty("ratingSum");
+  });
+
+  test("stays exact across a long run of writes and undos", () => {
+    let instructor: { instructorRatingSum?: number; instructorRatingCount?: number } = {};
+    for (const r of [5, 3, 4, 4, 1, 5, 2]) {
+      instructor = ratingPatchOf(instructor, { sum: r, count: 1 }, TOTAL);
+    }
+    expect(instructor).toEqual({ instructorRatingSum: 24, instructorRatingCount: 7 });
+    instructor = ratingPatchOf(instructor, { sum: 4, count: 0 }, TOTAL);
+    instructor = ratingPatchOf(instructor, { sum: -5, count: -1 }, TOTAL);
+    expect(instructor).toEqual({ instructorRatingSum: 23, instructorRatingCount: 6 });
+  });
+});
+
+describe("instructorReviewEligibility", () => {
+  const eligible = {
+    signedIn: true,
+    role: "student",
+    isSelf: false,
+    tookTheirCourse: true,
+  };
+
+  test("a student who took one of their courses may rate them", () => {
+    expect(instructorReviewEligibility(eligible)).toEqual({ eligible: true });
+  });
+
+  test("a signed-out visitor is offered a sign-in", () => {
+    expect(
+      instructorReviewEligibility({ ...eligible, signedIn: false }),
+    ).toEqual({ eligible: false, reason: "Sign in to leave a review." });
+  });
+
+  test("you cannot rate yourself, and the message says so rather than blaming the role", () => {
+    // The self check runs before the role check so the person looking at their
+    // own profile reads "you cannot review yourself", not the confusing "only
+    // learners can review an instructor".
+    expect(instructorReviewEligibility({ ...eligible, role: "instructor", isSelf: true })).toEqual({
+      eligible: false,
+      reason: "You cannot review yourself.",
+    });
+  });
+
+  test("a rival instructor is refused on role, not on what they have taken", () => {
+    expect(
+      instructorReviewEligibility({ ...eligible, role: "instructor", tookTheirCourse: true }),
+    ).toEqual({ eligible: false, reason: "Only learners can review an instructor." });
+  });
+
+  test("an admin is refused too — the gate is the role, not seniority", () => {
+    expect(
+      instructorReviewEligibility({ ...eligible, role: "admin", tookTheirCourse: true }),
+    ).toEqual({ eligible: false, reason: "Only learners can review an instructor." });
+  });
+
+  test("a student who has taken nothing of theirs is refused", () => {
+    expect(
+      instructorReviewEligibility({ ...eligible, tookTheirCourse: false }),
+    ).toEqual({
+      eligible: false,
+      reason: "Enroll in one of this instructor's courses to leave a review.",
+    });
+  });
+
+  test("the role is checked before the enrollment, so the refusal names the real obstacle", () => {
+    // Both gates fail here; the message should be the one a reader can act on
+    // first, which is the role, not an enrollment they would still not qualify
+    // for.
+    expect(instructorReviewEligibility({ ...eligible, role: "admin", tookTheirCourse: false }))
+      .toEqual({ eligible: false, reason: "Only learners can review an instructor." });
   });
 });

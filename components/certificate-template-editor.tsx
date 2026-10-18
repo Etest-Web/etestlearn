@@ -73,6 +73,15 @@ export function CertificateTemplateEditor() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showCoordinates, setShowCoordinates] = useState(false);
   const [coordEpoch, setCoordEpoch] = useState(0);
+  /**
+   * Whether the installed artwork is a PDF or an image.
+   *
+   * Reported by the canvas once it has read the bytes — asking the server
+   * would mean loading the whole file into a query on every render, and the
+   * canvas has already fetched it to draw it. Used only to name the artefact
+   * in the links and toasts, never to decide how to render it.
+   */
+  const [assetKind, setAssetKind] = useState<"pdf" | "image" | null>(null);
 
   /**
    * Where each field was the last time it was visible.
@@ -167,7 +176,7 @@ export function CertificateTemplateEditor() {
   /**
    * Upload → validate server-side → save. The file goes to storage first via a
    * signed URL (as avatars and thumbnails do), then the action checks the bytes
-   * really are a parseable PDF before the design is installed.
+   * really are a PDF, PNG or JPEG before the design is installed.
    */
   async function handleFile(file: File) {
     setUploading(true);
@@ -175,7 +184,10 @@ export function CertificateTemplateEditor() {
       const url = await generateUploadUrl();
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": file.type || "application/pdf" },
+        // The declared type is what the picker guessed; the action reads the
+        // magic bytes and rejects anything that is not artwork on its own
+        // terms, so this is a hint rather than an assertion.
+        headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
       if (!res.ok) throw new Error("Upload failed");
@@ -184,7 +196,7 @@ export function CertificateTemplateEditor() {
       const validated = await prepareUpload({ storageId });
 
       await save({
-        name: file.name.replace(/\.pdf$/i, "") || "Certificate design",
+        name: file.name.replace(/\.(pdf|png|jpe?g)$/i, "") || "Certificate design",
         pdfStorageId: validated.storageId,
         pageWidth: validated.pageWidth,
         pageHeight: validated.pageHeight,
@@ -196,10 +208,11 @@ export function CertificateTemplateEditor() {
       setSelected(null);
       lastPositions.current = {};
       setPreviewUrl(null);
+      setAssetKind(validated.assetKind === "image" ? "image" : "pdf");
       toast.success(
         template
-          ? "Design replaced — drag the fields back into place"
-          : "Design uploaded",
+          ? `Design replaced (${validated.assetKind === "image" ? "image" : "PDF"}) — drag the fields back into place`
+          : `Design uploaded (${validated.assetKind === "image" ? "image" : "PDF"})`,
       );
     } catch (err) {
       toast.error(getErrorMessage(err, "Upload failed"));
@@ -245,9 +258,9 @@ export function CertificateTemplateEditor() {
       <CardHeader>
         <CardTitle>Certificate design</CardTitle>
         <CardDescription>
-          One background PDF for every certificate. Uploading replaces it —
-          certificates already issued keep the design they were rendered with.
-          Only page 1 is used.
+          One background for every certificate — a PDF or an image. Uploading
+          replaces it; certificates already issued keep the design they were
+          rendered with. Only page 1 of a PDF is used.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -259,11 +272,15 @@ export function CertificateTemplateEditor() {
             {uploading
               ? "Uploading…"
               : template
-                ? "Replace design (PDF)"
-                : "Upload design (PDF)"}
+                ? "Replace design"
+                : "Upload design"}
             <input
               type="file"
-              accept="application/pdf,.pdf"
+              // SVG is deliberately absent: it can carry script. GIF and WebP
+              // are absent because pdf-lib cannot embed them, and a background
+              // that renders differently in the finished PDF than it did in the
+              // editor is worse than one that has to be converted first.
+              accept="application/pdf,.pdf,image/png,.png,image/jpeg,.jpg,.jpeg"
               className="sr-only"
               disabled={uploading}
               onChange={(e) => {
@@ -303,7 +320,7 @@ export function CertificateTemplateEditor() {
                 rel="noopener noreferrer"
                 className="link-quiet text-primary"
               >
-                Open the background PDF
+                Open the background {assetKind === "image" ? "image" : "PDF"}
               </a>
             </>
           ) : (
@@ -317,6 +334,7 @@ export function CertificateTemplateEditor() {
               pageWidth={template?.pageWidth ?? 841.89}
               pageHeight={template?.pageHeight ?? 595.28}
               backgroundUrl={template?.previewUrl ?? null}
+              onAssetKind={setAssetKind}
               layout={working}
               selected={selected}
               onSelect={setSelected}

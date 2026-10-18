@@ -48,11 +48,27 @@ broken SMTP config never blocks the certificate itself.
 
 ## The template
 
-There is **one** certificate design. An admin uploads a designed PDF background
-at `/dashboard/admin/certificates` (top card, "Certificate design"), and every
-new certificate is stamped onto **page 1** of it
-(`lib/certificate-pdf.ts#renderCertificatePdf`). With no template installed, the
-built-in bordered A4 landscape artwork is drawn instead.
+There is **one** certificate design. An admin uploads a designed background at
+`/dashboard/admin/certificates` (top card, "Certificate design"), and every new
+certificate is stamped onto **page 1 of it** (`lib/certificate-pdf.ts`). With
+no template installed, the built-in bordered A4 landscape artwork is drawn
+instead.
+
+**The background may be a PDF, a PNG or a JPEG.** The kind is read from the
+file's magic bytes by `lib/certificate-background.ts` — never from a content
+type, since that is a claim the uploader makes and every decision below depends
+on getting it right. SVG is deliberately refused (it can carry script); so are
+GIF and WebP, which pdf-lib cannot embed, because a background that renders
+differently in the finished PDF than it did in the editor is worse than one
+that has to be converted first.
+
+An image needs a page size it does not bring with it. `imagePageSize` scales it
+onto a page whose **long edge is 1123.15pt** (A4 landscape's), preserving the
+aspect ratio. That is not cosmetic: field sizes are absolute in page units, so
+storing raw pixel dimensions would make a 2000px export print its recipient's
+name at twice the size of the same design exported at 1000px. The recorded size
+is what the renderer uses, so a later change to the rule cannot silently move
+every already-saved placement.
 
 Because there is only ever one, there is no gallery and nothing to choose from:
 no activate, no deactivate, no list. `saveTemplate` patches the single row in
@@ -65,16 +81,26 @@ Upload goes through three steps so a bad file can never become the live design:
 1. `files.generateUploadUrl` → POST the file (same pattern as avatars and
    thumbnails)
 2. `certificateTemplateActions.prepareTemplateUpload` — a node action that checks
-   the `%PDF-` magic bytes, that pdf-lib can actually parse the file, that it has
-   a page, and that it is under 20 MB
+   the magic bytes, that the file parses, that it has a page (PDF) or sane
+   dimensions (image), and that it is under 20 MB
 3. `certificateTemplates.saveTemplate` with the verified page geometry
+
+One check is worth spelling out. **An image's size is read from its headers
+before pdf-lib is allowed near it.** `embedPng` expands the file to RGBA in
+memory, so a 1×1 PNG with a forged 40000×40000 IHDR is a few kilobytes on the
+wire and several gigabytes of heap before a size check could object.
+`readImageSize` parses the IHDR (or the JPEG frame header) directly, and the
+10000px ceiling is applied against that — decoding only happens once the file
+is known to be small enough to decode. Do not "simplify" this back to measuring
+by embedding.
 
 Two defaults matter here:
 
 - **The heading is suppressed when a template is installed.** A designed
   background normally prints its own title, and drawing ours on top is what
   produces overlapping text. `TEMPLATE_DEFAULTS` in `lib/certificate-layout.ts`
-  omits it; `DEFAULT_LAYOUT` keeps it for the no-template case.
+  omits it; `DEFAULT_LAYOUT` keeps it for the no-template case. An image gets the
+  same treatment as a PDF — one default serves both.
 - **Field positions are fractions of the page**, so one set of numbers works for
   any template size. An admin can override any field, and setting a field to
   `null` keeps it off the certificate entirely.
@@ -89,14 +115,20 @@ server-side by `updateTemplateLayout`, so that rule has one home.
 
 Placement is edited **on a canvas, not in coordinate boxes**
 (`components/certificate-canvas.tsx`). The canvas draws the installed
-background — pdf.js rasterises page 1 in the browser — and the six fields sit on
-it as objects: drag to move, drag the blue dot on a selected field to resize its
-text, arrow keys to nudge (Shift for ten steps), and a magnetic centre line
-catches a field as it passes the middle of the page. A panel alongside offers
-exact percentages and a point size, a per-field visibility switch (the old
-`off`, without spelling it), centre and reset controls, a page-guides toggle,
-and the raw `x,y` boxes behind a "Paste coordinates" disclosure for anyone
-working from written numbers.
+background at its true proportions — pdf.js rasterises a PDF page, an image is
+drawn from its decoded bitmap — and the six fields sit on it as objects: drag to
+move, drag the blue dot on a selected field to resize its text, arrow keys to
+nudge (Shift for ten steps), and a magnetic centre line catches a field as it
+passes the middle of the page. A panel alongside offers exact percentages and a
+point size, a per-field visibility switch (the old `off`, without spelling it),
+centre and reset controls, a page-guides toggle, and the raw `x,y` boxes behind
+a "Paste coordinates" disclosure for anyone working from written numbers.
+
+The background bytes are **fetched once and sniffed**, then handed to whichever
+decoder the magic bytes call for — pdf.js gets the same buffer the sniff looked
+at, an image gets a blob URL built from it. Nothing downloads twice; these files
+run to 20MB. When the bytes turn out to be neither, the canvas falls back to the
+built-in artwork and says so rather than going blank.
 
 For that to be truthful rather than approximate, the typography lives in the
 same shared module as the positions: font roles and colours, `wrapText` /
@@ -199,10 +231,28 @@ downloadable — only the email is skipped, with a warning in the logs.
 - `lib/certificate-layout.test.ts` — placement parse/format round-trip, default
   positions, mistyped-input rejection, plus the canvas's shared typography:
   wrapping, the char budget, truncation, colours and every field's sample text
+- `lib/certificate-background.test.ts` — magic-byte sniffing (PDF/PNG/JPEG, and
+  the null answer for everything else), the image→page normalisation including
+  that the same design at two resolutions lays out identically, and the
+  header-only size readers
 - `lib/certificate-pdf.test.ts` — template overlay, page-1-only, fallback on a
   bad template, heading suppression, field overrides, and that a long learner
-  name is clipped where the editor clips it
+  name is clipped where the editor clips it. Also the image background: that it
+  renders at the *recorded* page size rather than its pixel size, that a file
+  merely claiming to be a PNG falls back, and that the heading rules are the
+  same for both kinds
 - `tests/certificates.test.ts` — issuance, idempotency, auto-issue, template
   snapshotting, access control, public verification
 - `tests/certificateTemplates.test.ts` — template RBAC, replace-in-place, stable
   id, layout validation, delete cleans up storage
+- `tests/http-hardening.test.ts` — the active-content scan on PDFs, plus the
+  image path: normalisation, JPEG acceptance, the size ceiling refused against a
+  forged IHDR, and a file that only claims to be a PNG
+
+Real image fixtures (a correctly-encoded PNG built byte by byte, and a baseline
+JPEG) live in `tests/helpers/png.ts`. They are encoded properly rather than
+pasted as base64 because the assertions are about genuine images going through
+the pipeline — a subtly malformed constant would turn a downstream failure into
+a mystery. They caught a real bug while this was being written: the PNG reader
+was checking `IHDR` as `49 48 52 44` rather than `49 48 44 52`, which no amount
+of reading the code by eye would have shown.

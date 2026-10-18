@@ -122,15 +122,15 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    `enrollments.completeLesson` and `quizzes.submitQuizAttempt`. Read `docs/CERTIFICATES.md`
    before touching this subsystem.
    **There is exactly one certificate template**, not a collection: the admin
-   uploads a background PDF and it becomes the design for every new certificate.
-   So there is no gallery, no activate/deactivate, and no separate admin page —
-   `saveTemplate` patches the one row in place (keeping its id stable, because
-   certificates snapshot it at issuance), and the editor is the "Certificate
-   design" card on `/dashboard/admin/certificates`. Field positions are fractions
-   of the page and live with both default sets in `lib/certificate-layout.ts`,
-   which has no pdf-lib import so the renderer and the admin editor read the same
-   numbers. Every reader of the installed row goes through `getInstalledTemplate`
-   in `convex/helpers/certificateTemplate.ts`.
+   uploads a background — **a PDF, a PNG or a JPEG** — and it becomes the design
+   for every new certificate. So there is no gallery, no activate/deactivate, and
+   no separate admin page — `saveTemplate` patches the one row in place (keeping
+   its id stable, because certificates snapshot it at issuance), and the editor is
+   the "Certificate design" card on `/dashboard/admin/certificates`. Field
+   positions are fractions of the page and live with both default sets in
+   `lib/certificate-layout.ts`, which has no pdf-lib import so the renderer and
+   the admin editor read the same numbers. Every reader of the installed row goes
+   through `getInstalledTemplate` in `convex/helpers/certificateTemplate.ts`.
    **Placement is edited on a canvas, not in coordinate boxes.**
    `components/certificate-canvas.tsx` draws the real background (pdf.js
    rasterises page 1 in the browser; `pdfjs-dist` is a client dependency, loaded
@@ -147,6 +147,17 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
      all six fields resolved (including explicit `null`s). With no artwork
      uploaded there is no row to store against, so dragging works but Save is
      hidden; the preview action still renders what the built-in page would print.
+   **The background's format is sniffed from its bytes, never from a content
+   type**, in `lib/certificate-background.ts` (pdf-lib-free, shared by the
+   browser canvas and the node renderer). Two rules there are worth not
+   undoing: an image is scaled onto a page whose long edge is A4 landscape's
+   (1123.15pt) because field sizes are absolute in page units — raw pixel
+   dimensions would make a 2000px export print its name at twice the size of the
+   same design at 1000px; and the 10000px ceiling is checked against the
+   **headers** via `readImageSize` *before* pdf-lib is handed the file, because
+   `embedPng` expands to RGBA in memory, so a forged IHDR would be decoded
+   before a size check could object. SVG is refused (it carries script), as are
+   GIF/WebP (pdf-lib cannot embed them).
    Convex storage is fetched cross-origin for the raster: `cors()` in
    `convex-backend`'s `local_backend/src/router.rs` mirrors the request origin on
    `/api/storage/{storage_id}`, so `fetch()` succeeds. If it ever fails the canvas

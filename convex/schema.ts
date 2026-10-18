@@ -341,9 +341,16 @@ export default defineSchema({
   // existing rows — see convex/helpers/certificateTemplate.ts.
   certificateTemplates: defineTable({
     name: v.string(),
+    // Holds whatever the background artwork turned out to be — a PDF, a PNG or
+    // a JPEG. Named for the PDF it started as; renaming would be a migration
+    // for a label, and every reader already goes through getInstalledTemplate.
     pdfStorageId: v.id("_storage"),
-    // Page 1 dimensions, captured at upload so text anchors can be stored as
+    // Page dimensions, captured at upload so text anchors can be stored as
     // fractions of the page and stay correct if the template is re-uploaded.
+    // A PDF brings its own page size; an image is measured in pixels and
+    // normalised onto a page of the same aspect ratio — see
+    // lib/certificate-background.ts for why raw pixel dimensions cannot be
+    // the page size.
     pageWidth: v.number(),
     pageHeight: v.number(),
     // Always true on the installed template. A row that predates the

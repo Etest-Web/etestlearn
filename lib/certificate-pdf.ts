@@ -5,12 +5,19 @@
  * pdf-lib needs the node runtime, and the result is stored in Convex storage so
  * the download link survives redeploys.
  *
- * An admin-uploaded template PDF supplies the artwork (border, guilloche, logo,
- * typography). We stamp the certificate's data onto page 1 of it. Field
- * positions are fractions of the page, so one set of defaults works for any
- * template size, and an admin can nudge individual fields in the template UI.
+ * An admin-uploaded template — a PDF or an image — supplies the artwork
+ * (border, guilloche, logo, typography). We stamp the certificate's data onto
+ * it; for a PDF that means page 1, for an image the whole frame scaled onto a
+ * page of the recorded size. Field positions are fractions of the page, so one
+ * set of defaults works for any template size, and an admin can nudge
+ * individual fields in the template UI.
  */
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage, rgb } from "pdf-lib";
+import {
+  imagePageSize,
+  sniffBackgroundKind,
+  type BackgroundPageSize,
+} from "./certificate-background";
 import {
   CERTIFICATE_INK,
   CERTIFICATE_MUTED,
@@ -126,49 +133,97 @@ async function drawFallbackArtwork(
   return page;
 }
 
+interface BackgroundOptions {
+  /** The admin's uploaded artwork, whatever it turned out to be. */
+  templateBytes?: Uint8Array;
+  /**
+   * The page size recorded when the artwork was uploaded.
+   *
+   * An image needs this: the layout was authored as fractions of *that* page,
+   * so the rendered page has to be the same one or every field lands in the
+   * wrong place. For a PDF it is redundant — the page arrives with the
+   * artwork — and is ignored.
+   */
+  templatePageSize?: BackgroundPageSize;
+}
+
 /**
- * Stamps certificate data onto a template.
+ * Builds the page certificate data is stamped onto, from the uploaded artwork.
  *
- * `templateBytes` is the admin's uploaded background. When absent the built-in
- * fallback artwork is drawn instead. Only page 1 is used — extra pages in the
- * template are dropped so a stray second page can never leak into a
- * learner's certificate.
+ * Both an image and a PDF are backgrounds here, which is the point: an admin
+ * with a PNG does not have to print it to PDF first. Anything unreadable —
+ * corrupt bytes, an unsupported format, an image pdf-lib cannot embed — draws
+ * the built-in artwork rather than throwing, because a broken background must
+ * never cost a learner their certificate.
  */
-export async function renderCertificatePdf(
-  input: CertificatePdfInput,
-  options: { templateBytes?: Uint8Array; layout?: CertificateLayout } = {},
-): Promise<Uint8Array> {
-  const revoked = typeof input.revokedAt === "number";
+async function createBackgroundPage(
+  doc: PDFDocument,
+  options: BackgroundOptions,
+  revoked: boolean,
+): Promise<{ page: PDFPage; usedTemplate: boolean }> {
+  const bytes = options.templateBytes;
+  if (!bytes || bytes.length === 0) {
+    return { page: await drawFallbackArtwork(doc, revoked), usedTemplate: false };
+  }
 
-  let doc: PDFDocument;
-  let page: PDFPage;
-  let usedTemplate = false;
+  const kind = sniffBackgroundKind(bytes);
 
-  if (options.templateBytes && options.templateBytes.length > 0) {
+  if (kind === "png" || kind === "jpeg") {
+    try {
+      const image =
+        kind === "png" ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+      const { width, height } =
+        options.templatePageSize ?? imagePageSize(image.width, image.height);
+      const page = doc.addPage([width, height]);
+      // Fills the page rather than stretching to it. The recorded page size
+      // comes from this same file at upload, so the two agree by construction;
+      // were they ever to disagree, filling keeps the artwork undistorted
+      // instead of smearing it across the wrong aspect ratio.
+      page.drawImage(image, { x: 0, y: 0, width, height });
+      return { page, usedTemplate: true };
+    } catch {
+      return { page: await drawFallbackArtwork(doc, revoked), usedTemplate: false };
+    }
+  }
+
+  if (kind === "pdf") {
     try {
       // IgnoreEncryption: admins often export protected PDFs, and we only read
       // the artwork. A template we cannot open falls back to plain artwork
       // rather than failing the whole certificate.
-      const template = await PDFDocument.load(options.templateBytes, {
-        ignoreEncryption: true,
-      });
+      const template = await PDFDocument.load(bytes, { ignoreEncryption: true });
       if (template.getPageCount() > 0) {
-        doc = await PDFDocument.create();
         const [copied] = await doc.copyPages(template, [0]);
-        page = doc.addPage(copied);
-        usedTemplate = true;
-      } else {
-        doc = await PDFDocument.create();
-        page = await drawFallbackArtwork(doc, revoked);
+        return { page: doc.addPage(copied), usedTemplate: true };
       }
     } catch {
-      doc = await PDFDocument.create();
-      page = await drawFallbackArtwork(doc, revoked);
+      // fall through to the built-in artwork
     }
-  } else {
-    doc = await PDFDocument.create();
-    page = await drawFallbackArtwork(doc, revoked);
   }
+
+  return { page: await drawFallbackArtwork(doc, revoked), usedTemplate: false };
+}
+
+/**
+ * Stamps certificate data onto a template.
+ *
+ * `options.templateBytes` is the admin's uploaded background — a PDF or an
+ * image; the kind is sniffed, never trusted from a label. When absent the
+ * built-in fallback artwork is drawn instead. Only page 1 of a PDF template is
+ * used, so a stray second page can never leak into a learner's certificate.
+ */
+export async function renderCertificatePdf(
+  input: CertificatePdfInput,
+  options: BackgroundOptions & { layout?: CertificateLayout } = {},
+): Promise<Uint8Array> {
+  const revoked = typeof input.revokedAt === "number";
+
+  const doc = await PDFDocument.create();
+  const { page, usedTemplate } = await createBackgroundPage(
+    doc,
+    options,
+    revoked,
+  );
 
   // With a template the artwork already supplies the title, so our default
   // heading is suppressed unless the admin positioned one explicitly.

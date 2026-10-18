@@ -15,10 +15,28 @@ import type { GenericActionCtx } from "convex/server";
 import { PDFDocument } from "pdf-lib";
 import type { DataModel } from "./_generated/dataModel";
 import { renderCertificatePdf } from "../lib/certificate-pdf";
+import {
+  imagePageSize,
+  readImageSize,
+  sniffBackgroundKind,
+} from "../lib/certificate-background";
 import { layoutValidator } from "./certificateTemplates";
 
-/** Vector artwork, so generous — but not unbounded. */
+/** Artwork rather than a photo library, so generous — but not unbounded. */
 const MAX_TEMPLATE_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Largest edge an image background may have, in pixels.
+ *
+ * A memory ceiling as much as a practical one: pdf-lib expands a PNG to RGBA
+ * in memory when embedding it, so an unbounded edge means an unbounded
+ * allocation on the server that issues the certificate. 10000px is roughly 33
+ * inches at 300dpi — far beyond any real certificate, and about 300MB of
+ * decoded RGBA at the ceiling, which is the number this cap exists to bound.
+ *
+ * Checked against the headers before decoding; see `measureImage`.
+ */
+const MAX_IMAGE_EDGE_PX = 10000;
 
 /**
  * PDF object keys that turn a passive document into an active one.
@@ -103,16 +121,72 @@ async function requireAdminAction(ctx: GenericActionCtx<DataModel>) {
 }
 
 /**
+ * Reads an image's intrinsic pixel size from its headers, then checks the
+ * ceiling, and only then lets pdf-lib embed it.
+ *
+ * The order is the whole point. `embedPng` expands the file to RGBA in memory
+ * — a few kilobytes claiming 40000×40000 would be several gigabytes of heap
+ * before a size check could object, so measuring by embedding is not something
+ * to do twice, and not at all before the ceiling has been passed.
+ */
+async function measureImage(
+  bytes: Uint8Array,
+  kind: "png" | "jpeg",
+): Promise<{ width: number; height: number }> {
+  const size = readImageSize(bytes, kind);
+  if (!size) {
+    throw new Error(
+      kind === "png"
+        ? "That PNG could not be read — it may be truncated"
+        : "That JPEG could not be read — it may be truncated",
+    );
+  }
+
+  if (size.width > MAX_IMAGE_EDGE_PX || size.height > MAX_IMAGE_EDGE_PX) {
+    throw new Error(
+      `That image is ${size.width}×${size.height}px. The maximum is ${MAX_IMAGE_EDGE_PX}px on either edge.`,
+    );
+  }
+
+  // Past the ceiling, so decoding is bounded by it. This also validates the
+  // file properly: an image whose headers are fine but whose data is not
+  // fails here rather than at the moment a learner downloads their
+  // certificate.
+  try {
+    const scratch = await PDFDocument.create();
+    if (kind === "png") {
+      await scratch.embedPng(bytes);
+    } else {
+      await scratch.embedJpg(bytes);
+    }
+  } catch {
+    throw new Error(
+      kind === "png"
+        ? "That PNG could not be read — it may be corrupt or use an unsupported colour type"
+        : "That JPEG could not be read — it may be corrupt",
+    );
+  }
+
+  return size;
+}
+
+/**
  * Verifies an uploaded template and returns its storage id plus page geometry.
  *
- * Checks that matter here rather than in the client:
- *  - the bytes really are a PDF (magic `%PDF-`, not a claimed content type)
- *  - the PDF carries no active content (JavaScript/launch actions) — checked
+ * The background may be a PDF, a PNG or a JPEG; the kind is read from the
+ * bytes, never from the file's claimed type, because every decision below
+ * depends on getting it right. Checks that matter here rather than in the
+ * client:
+ *  - the bytes really are one of those three formats (magic bytes, not a
+ *    content type)
+ *  - a PDF carries no active content (JavaScript/launch actions) — checked
  *    on the raw bytes and before parsing, so a hostile file never reaches the
  *    parser; see `findActiveContent` for why the scan looks the way it does
- *  - the PDF actually parses, so a corrupt file fails at upload not at render
- *  - it has a page to draw on
+ *  - it actually parses, so a corrupt file fails at upload not at render
+ *  - a PDF has a page to draw on; an image has sane dimensions
  *  - it is not absurdly large
+ *
+ * `assetKind` comes back so the editor can say which of the two it installed.
  */
 export const prepareTemplateUpload = action({
   args: { storageId: v.id("_storage") },
@@ -129,9 +203,27 @@ export const prepareTemplateUpload = action({
     }
 
     const bytes = new Uint8Array(await blob.arrayBuffer());
+    const kind = sniffBackgroundKind(bytes);
 
-    if (new TextDecoder("latin1").decode(bytes.slice(0, 5)) !== "%PDF-") {
-      throw new Error("That file is not a valid PDF");
+    // An image is measured and normalised onto a page of its own; a PDF brings
+    // its page with it. Anything else — a renamed executable, an SVG, a
+    // truncated upload — is refused before any parser sees it.
+    if (kind === "png" || kind === "jpeg") {
+      const pixels = await measureImage(bytes, kind);
+
+      // Recorded now so field positions can be stored as fractions of a page
+      // that will not move — the renderer scales the image onto exactly this.
+      const page = imagePageSize(pixels.width, pixels.height);
+      return {
+        storageId: args.storageId,
+        pageWidth: page.width,
+        pageHeight: page.height,
+        assetKind: "image" as const,
+      };
+    }
+
+    if (kind !== "pdf") {
+      throw new Error("That file is not a PDF, PNG or JPEG");
     }
 
     // Refuse JavaScript/launch/OpenAction payloads before pdf-lib sees them.
@@ -160,7 +252,12 @@ export const prepareTemplateUpload = action({
 
     const { width, height } = doc.getPage(0).getSize();
 
-    return { storageId: args.storageId, pageWidth: width, pageHeight: height };
+    return {
+      storageId: args.storageId,
+      pageWidth: width,
+      pageHeight: height,
+      assetKind: "pdf" as const,
+    };
   },
 });
 
@@ -197,7 +294,17 @@ export const previewTemplate = action({
         issuedAt: Date.UTC(2026, 0, 1),
         verifyUrl: "https://example.com/verify/GL-2026-PREVIEW1",
       },
-      { templateBytes, layout: args.layout ?? undefined },
+      {
+        templateBytes,
+        // The page the placement was authored against. A PDF re-derives it
+        // from the artwork itself; an image needs it told, or a high-resolution
+        // export would render at its pixel size with every field still at the
+        // fractions that were measured for the smaller one.
+        templatePageSize: template
+          ? { width: template.pageWidth, height: template.pageHeight }
+          : undefined,
+        layout: args.layout ?? undefined,
+      },
     );
 
     const storageId = await ctx.storage.store(

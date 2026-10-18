@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { createHmac } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
+import { TINY_JPEG, buildPng } from "./helpers/png";
 import { api } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import type {
@@ -461,7 +462,7 @@ describe("certificate template upload — active content", () => {
     expect(result.pageHeight).toBe(792);
   });
 
-  it("accepts an ordinary generated PDF and still rejects non-PDFs", async () => {
+  it("accepts an ordinary generated PDF and still rejects non-artwork", async () => {
     const t = convexTest(testSchema, modules);
     await seedAdmin(t);
     const asAdmin = t.withIdentity({
@@ -478,13 +479,95 @@ describe("certificate template upload — active content", () => {
       storageId: goodId,
     });
     expect(good.pageWidth).toBeCloseTo(841.89, 1);
+    expect(good.assetKind).toBe("pdf");
 
-    const notPdfId = await storeFile(t, "hello, not a pdf");
+    const notArtworkId = await storeFile(t, "hello, not a pdf");
     await expect(
       asAdmin.action(api.certificateTemplateActions.prepareTemplateUpload, {
-        storageId: notPdfId,
+        storageId: notArtworkId,
       }),
-    ).rejects.toThrow(/not a valid PDF/);
+    ).rejects.toThrow(/not a PDF, PNG or JPEG/);
+  });
+
+  it("accepts an image background and normalises its pixel size onto a page", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedAdmin(t);
+    const asAdmin = t.withIdentity({
+      subject: "clerk_admin",
+      tokenIdentifier: "clerk_admin",
+    });
+
+    const storageId = await storeFile(t, buildPng(1600, 1200));
+    const result = await asAdmin.action(
+      api.certificateTemplateActions.prepareTemplateUpload,
+      { storageId },
+    );
+
+    expect(result.assetKind).toBe("image");
+    // Pixels are not a page size: a 1600×1200 upload must not make the
+    // certificate print its name at 1600pt. The long edge lands on A4's.
+    expect(result.pageWidth).toBeCloseTo(1123.15, 1);
+    expect(result.pageHeight).toBeCloseTo((1200 / 1600) * 1123.15, 1);
+  });
+
+  it("accepts a JPEG as well as a PNG", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedAdmin(t);
+    const asAdmin = t.withIdentity({
+      subject: "clerk_admin",
+      tokenIdentifier: "clerk_admin",
+    });
+
+    const storageId = await storeFile(t, TINY_JPEG);
+    const result = await asAdmin.action(
+      api.certificateTemplateActions.prepareTemplateUpload,
+      { storageId },
+    );
+
+    expect(result.assetKind).toBe("image");
+    expect(result.pageWidth).toBeGreaterThan(0);
+  });
+
+  it("refuses an image whose edges exceed the cap", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedAdmin(t);
+    const asAdmin = t.withIdentity({
+      subject: "clerk_admin",
+      tokenIdentifier: "clerk_admin",
+    });
+
+    // A 1×1 PNG with a forged IHDR. Claiming an enormous size without
+    // shipping the bytes is exactly the shape a decompression bomb takes, and
+    // it is refused on the claimed geometry rather than after the decode.
+    const bomb = buildPng(1, 1);
+    new DataView(bomb.buffer).setUint32(16, 40000);
+    new DataView(bomb.buffer).setUint32(20, 40000);
+
+    const storageId = await storeFile(t, bomb);
+    await expect(
+      asAdmin.action(api.certificateTemplateActions.prepareTemplateUpload, {
+        storageId,
+      }),
+    ).rejects.toThrow(/maximum is 10000px/);
+  });
+
+  it("refuses a file that only claims to be a PNG", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedAdmin(t);
+    const asAdmin = t.withIdentity({
+      subject: "clerk_admin",
+      tokenIdentifier: "clerk_admin",
+    });
+
+    const storageId = await storeFile(
+      t,
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]),
+    );
+    await expect(
+      asAdmin.action(api.certificateTemplateActions.prepareTemplateUpload, {
+        storageId,
+      }),
+    ).rejects.toThrow(/PNG could not be read/);
   });
 
   it("still refuses non-admin callers", async () => {

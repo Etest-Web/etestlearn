@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { sniffBackgroundKind } from "@/lib/certificate-background";
 import {
   CANVAS_BASELINE_NUDGE,
   CERTIFICATE_COLORS,
@@ -28,8 +29,14 @@ import {
  * the font size, the wrap width, the truncation — is read from
  * `lib/certificate-layout.ts` and reproduced here in CSS, so what an admin
  * drags is where the PDF will actually print. The background is the real
- * uploaded artwork, rasterised with pdf.js, because positioning text against a
- * grey rectangle is guesswork.
+ * uploaded artwork, drawn at the browser's own fidelity — a PDF rasterised
+ * with pdf.js, an image straight from its decoded bitmap — because positioning
+ * text against a grey rectangle is guesswork.
+ *
+ * The bytes are fetched once and sniffed from their magic number rather than
+ * from a content type, so the decision is made on the same bytes the renderer
+ * will be handed, and a mislabelled upload cannot put the editor and the PDF
+ * on different pages.
  *
  * With no artwork installed it draws the built-in bordered page instead, which
  * is exactly what a certificate would be stamped onto today.
@@ -37,11 +44,16 @@ import {
 
 type BackgroundStatus = "idle" | "loading" | "ready" | "failed";
 
+/** What the installed artwork turned out to be, once the bytes have spoken. */
+export type BackgroundAssetKind = "pdf" | "image" | null;
+
 interface Props {
   pageWidth: number;
   pageHeight: number;
-  /** The background PDF's URL, or null to draw the built-in artwork. */
+  /** The background artwork's URL, or null to draw the built-in artwork. */
   backgroundUrl: string | null;
+  /** Reported once the bytes are read, so the editor can name the artwork. */
+  onAssetKind?: (kind: BackgroundAssetKind) => void;
   /** Every field resolved to an anchor, or null when it is switched off. */
   layout: Required<CertificateLayout>;
   selected: CertificateFieldKey | null;
@@ -127,6 +139,7 @@ export function CertificateCanvas({
   pageWidth,
   pageHeight,
   backgroundUrl,
+  onAssetKind,
   layout,
   selected,
   onSelect,
@@ -152,9 +165,18 @@ export function CertificateCanvas({
   >(null);
 
   const docRef = useRef<PDFDocumentProxy | null>(null);
+  /** A decoded image background. A PDF leaves this null, and vice versa. */
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  // Held in a ref so the reporting effect depends on the kind alone — an
+  // inline prop would otherwise re-fire on every render of the parent.
+  const onAssetKindRef = useRef(onAssetKind);
+  onAssetKindRef.current = onAssetKind;
 
   const [width, setWidth] = useState(0);
   const [status, setStatus] = useState<BackgroundStatus>("idle");
+  const [assetKind, setAssetKind] = useState<BackgroundAssetKind>(null);
   const [dragging, setDragging] = useState<CertificateFieldKey | null>(null);
   const [snapped, setSnapped] = useState(false);
 
@@ -174,10 +196,24 @@ export function CertificateCanvas({
     return () => observer.disconnect();
   }, []);
 
-  /** Loads the background artwork, or falls back to the built-in page. */
+  /**
+   * Loads the background artwork, or falls back to the built-in page.
+   *
+   * The file is fetched exactly once and handed to whichever decoder the magic
+   * bytes call for: pdf.js gets the same ArrayBuffer the sniff looked at, and
+   * an image gets an object URL built from it. Nothing is downloaded twice —
+   * these backgrounds run to 20MB.
+   */
   useEffect(() => {
     let cancelled = false;
     docRef.current = null;
+    imageRef.current = null;
+    setAssetKind(null);
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
 
     if (!backgroundUrl) {
       setStatus("ready");
@@ -188,13 +224,47 @@ export function CertificateCanvas({
     setStatus("loading");
     (async () => {
       try {
-        const pdfjs = await loadPdfjs();
         const response = await fetch(backgroundUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const bytes = new Uint8Array(await response.arrayBuffer());
-        const doc = await pdfjs.getDocument({ data: bytes }).promise;
+        const kind = sniffBackgroundKind(bytes);
+
+        if (kind === "png" || kind === "jpeg") {
+          const blob = new Blob([bytes], {
+            type: kind === "png" ? "image/png" : "image/jpeg",
+          });
+          // Held on the ref so an unmount mid-decode can still release it.
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrlRef.current = objectUrl;
+
+          const image = new Image();
+          image.src = objectUrl;
+          // `decode()` rather than `onload`: it rejects on a malformed file
+          // and resolves only once the bitmap is actually drawable, so the
+          // first paint is not a blank frame.
+          await image.decode();
+
+          // The bitmap lives on the element once decoded, so the blob URL can
+          // be released immediately rather than waiting for the next load.
+          URL.revokeObjectURL(objectUrl);
+          objectUrlRef.current = null;
+
+          if (cancelled) return;
+          imageRef.current = image;
+          setAssetKind("image");
+        } else if (kind === "pdf") {
+          const pdfjs = await loadPdfjs();
+          const doc = await pdfjs.getDocument({ data: bytes }).promise;
+          if (cancelled) return;
+          docRef.current = doc;
+          setAssetKind("pdf");
+        } else {
+          // Not artwork at all — a mislabeled upload, or a file the browser
+          // was tricked into offering. The renderer refuses it the same way.
+          throw new Error("Unrecognised background artwork");
+        }
+
         if (cancelled) return;
-        docRef.current = doc;
         setStatus("ready");
         setPaintToken((t) => t + 1);
       } catch {
@@ -206,8 +276,16 @@ export function CertificateCanvas({
 
     return () => {
       cancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     };
   }, [backgroundUrl]);
+
+  useEffect(() => {
+    onAssetKindRef.current?.(assetKind);
+  }, [assetKind]);
 
   /** Draws the background at the current device-pixel size. */
   useEffect(() => {
@@ -224,7 +302,17 @@ export function CertificateCanvas({
     canvas.height = Math.max(1, Math.round(cssHeight * dpr));
 
     const doc = docRef.current;
+    const image = imageRef.current;
+
     if (!doc) {
+      if (image) {
+        const ctx = canvas.getContext("2d");
+        // Cover, not stretch: the page was sized from this image's own aspect
+        // ratio at upload, so this fills exactly. Were the row to disagree
+        // (an artwork swap without a re-save), cropping beats distortion.
+        if (ctx) ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return;
+      }
       paintFallbackArtwork(canvas, pageWidth, pageHeight);
       return;
     }

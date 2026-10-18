@@ -3,6 +3,7 @@ import { PDFArray, PDFDocument, PDFRawStream, StandardFonts, rgb } from "pdf-lib
 import zlib from "node:zlib";
 import { DEFAULT_LAYOUT } from "./certificate-layout";
 import { renderCertificatePdf, type CertificatePdfInput } from "./certificate-pdf";
+import { TINY_JPEG, buildPng } from "@/tests/helpers/png";
 
 /**
  * Text drawn on a page, decoded from the content stream.
@@ -222,5 +223,97 @@ describe("renderCertificatePdf with a template", () => {
     const bytes = await renderCertificatePdf(base);
     const drawn = pageText(await PDFDocument.load(bytes), 0);
     expect(drawn).toContain("CERTIFICATE OF COMPLETION");
+  });
+});
+
+describe("renderCertificatePdf with an image background", () => {
+  it("renders at the recorded page size, not at the image's pixel size", async () => {
+    // The image is 40×30px; the page it prints on is whatever the upload
+    // recorded. This is the assertion that separates "image scaled onto the
+    // page" from "page sized after the image" — the built-in artwork would
+    // also produce 842pt, so the size alone is not the proof.
+    const bytes = await renderCertificatePdf(base, {
+      templateBytes: buildPng(40, 30),
+      templatePageSize: { width: 1000, height: 700 },
+    });
+    const doc = await PDFDocument.load(bytes);
+
+    const { width, height } = doc.getPage(0).getSize();
+    expect(Math.round(width)).toBe(1000);
+    expect(Math.round(height)).toBe(700);
+  });
+
+  it("keeps the certificate's own text on top of the image", async () => {
+    const bytes = await renderCertificatePdf(base, {
+      templateBytes: buildPng(40, 30),
+      templatePageSize: { width: 841.89, height: 595.28 },
+    });
+    const drawn = pageText(await PDFDocument.load(bytes), 0);
+
+    expect(drawn).toContain("Okonkwo");
+    expect(drawn).toContain(base.serial);
+  });
+
+  it("normalises an image with no recorded size onto the A4 long edge", async () => {
+    // The upload always records a size, so this is the rule the upload itself
+    // applies — asserted here so a change to it is a visible decision rather
+    // than a silent drift between the two.
+    const bytes = await renderCertificatePdf(base, {
+      templateBytes: buildPng(40, 30),
+    });
+    const { width, height } = (await PDFDocument.load(bytes)).getPage(0).getSize();
+
+    expect(Math.round(width)).toBe(1123);
+    expect(height).toBeGreaterThan(0);
+    expect(height).toBeLessThan(width);
+  });
+
+  it("embeds a JPEG as readily as a PNG", async () => {
+    const bytes = await renderCertificatePdf(base, {
+      templateBytes: TINY_JPEG,
+      templatePageSize: { width: 900, height: 600 },
+    });
+    const doc = await PDFDocument.load(bytes);
+
+    expect(doc.getPage(0).getSize().width).toBeCloseTo(900, 1);
+    expect(pageText(doc, 0)).toContain("Okonkwo");
+  });
+
+  it("falls back when the file only claims to be an image", async () => {
+    // PNG magic, then nothing a decoder would accept — a renamed file, or an
+    // upload cut short.
+    const fake = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const bytes = await renderCertificatePdf(base, {
+      templateBytes: fake,
+      templatePageSize: { width: 1000, height: 700 },
+    });
+    const doc = await PDFDocument.load(bytes);
+
+    // The built-in artwork's page, not the 1000pt one that was asked for —
+    // so this proves the embed was attempted and refused, not skipped.
+    expect(Math.round(doc.getPage(0).getSize().width)).toBe(842);
+  });
+
+  it("suppresses its own heading over an image, and restores it on request", async () => {
+    const page = { width: 841.89, height: 595.28 };
+
+    const suppressed = await renderCertificatePdf(base, {
+      templateBytes: buildPng(40, 30),
+      templatePageSize: page,
+    });
+    expect(
+      pageText(await PDFDocument.load(suppressed), 0),
+    ).not.toContain("CERTIFICATE OF COMPLETION");
+
+    // An image usually has a title of its own printed into it, which is the
+    // same reasoning as for a PDF — one default serves both kinds.
+    const restored = await renderCertificatePdf(base, {
+      templateBytes: buildPng(40, 30),
+      templatePageSize: page,
+      layout: { heading: { x: 0.5, y: 0.1, size: 22 } },
+    });
+    expect(pageText(await PDFDocument.load(restored), 0)).toContain(
+      "CERTIFICATE OF COMPLETION",
+    );
   });
 });

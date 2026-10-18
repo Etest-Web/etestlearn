@@ -32,6 +32,7 @@ export const issueCertificateArtifacts = internalAction({
       // this check fails is the design being removed in the moment between
       // issuance and render — and plain artwork is the honest answer there.
       let templateBytes: Uint8Array | undefined;
+      let templatePageSize: { width: number; height: number } | undefined;
       let layout = undefined;
 
       if (args.templateId) {
@@ -41,6 +42,10 @@ export const issueCertificateArtifacts = internalAction({
         );
         if (template && template._id === args.templateId) {
           layout = template.layout ?? undefined;
+          templatePageSize = {
+            width: template.pageWidth,
+            height: template.pageHeight,
+          };
           const blob = await ctx.storage.get(template.storageId);
           if (blob) templateBytes = new Uint8Array(await blob.arrayBuffer());
         }
@@ -55,7 +60,7 @@ export const issueCertificateArtifacts = internalAction({
           issuedAt: args.issuedAt,
           verifyUrl,
         },
-        { templateBytes, layout },
+        { templateBytes, templatePageSize, layout },
       );
       const storageId = await ctx.storage.store(
         new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }),

@@ -1,10 +1,11 @@
 /**
  * The certificate template (queries and mutations).
  *
- * There is exactly one. It is the background PDF an admin uploads and every new
- * certificate is stamped onto, and there is no gallery to choose from — so
- * nothing here activates, deactivates, or renames anything. Uploading again
- * *replaces* the design, which is what an admin means by "I fixed the border".
+ * There is exactly one. It is the background artwork an admin uploads — a PDF,
+ * a PNG or a JPEG — and every new certificate is stamped onto it, and there is
+ * no gallery to choose from — so nothing here activates, deactivates, or
+ * renames anything. Uploading again *replaces* the design, which is what an
+ * admin means by "I fixed the border".
  *
  * Upload validation and previews need the node runtime and live in
  * `convex/certificateTemplateActions.ts` — a `"use node"` module cannot also

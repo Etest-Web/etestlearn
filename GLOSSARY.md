@@ -37,3 +37,15 @@ _Avoid_: teacher rating, tutor review
 An instructor-curated example of something a learner can have built by the end
 of a course. Display-only: a learner cannot submit their own work here.
 _Avoid_: assignment, capstone, submission
+
+**Class discussion**:
+Learner posts about how a course they *finished* actually went, with the
+instructor's replies. Public, on the course page. Distinct from a course
+review (enrolled, rated, no replies) and from discussions (lesson Q&A, private
+to the cohort).
+_Avoid_: comments, questions, feedback, reviews
+
+**Finished**:
+Every lesson completed *and* every quiz passed — the same bar as a certificate.
+Not "watched all the videos".
+_Avoid_: completed, done, enrolled

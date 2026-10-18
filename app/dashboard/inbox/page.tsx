@@ -129,6 +129,16 @@ const NOTIFICATION_ICONS: Record<
     tint: "text-info bg-info/10",
     verb: "Discussion reply",
   },
+  class_comment: {
+    icon: MessageSquare,
+    tint: "text-info bg-info/10",
+    verb: "Class discussion post",
+  },
+  class_comment_reply: {
+    icon: MessageSquare,
+    tint: "text-info bg-info/10",
+    verb: "Reply on your post",
+  },
   task_assigned: {
     icon: ClipboardList,
     tint: "text-warning bg-warning/10",

@@ -20,6 +20,7 @@ import type * as certificateTemplates from "../certificateTemplates.js";
 import type * as certificates from "../certificates.js";
 import type * as coupons from "../coupons.js";
 import type * as courseAnnouncements from "../courseAnnouncements.js";
+import type * as courseComments from "../courseComments.js";
 import type * as courseProjects from "../courseProjects.js";
 import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
@@ -82,6 +83,7 @@ declare const fullApi: ApiFromModules<{
   certificates: typeof certificates;
   coupons: typeof coupons;
   courseAnnouncements: typeof courseAnnouncements;
+  courseComments: typeof courseComments;
   courseProjects: typeof courseProjects;
   courses: typeof courses;
   crons: typeof crons;

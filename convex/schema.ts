@@ -378,6 +378,46 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_course_order", ["courseId", "order"]),
 
+  // ── Class discussion (post-completion learner feedback) ───────────────────
+  // "How did this class actually go?", written by learners who **finished** the
+  // course, with the instructor replying. Public and readable signed out — it is
+  // the section a prospective buyer reads to judge whether a course is worth
+  // the money, which is why it lives on the public course page rather than in
+  // the dashboard.
+  //
+  // Deliberately separate from both existing learner-voice tables:
+  //
+  // · `courseReviews` gates on *enrolled*, is tied to a star rating, and one row
+  //   per learner cannot hold a reply.
+  // · `discussionThreads`/`discussionMessages` is lesson Q&A ("why does this
+  //   return undefined?"), lives in the dashboard, and is about being stuck
+  //   rather than about how the course turned out.
+  //
+  // **One top-level post per learner per course** — `by_user_course` is what
+  // makes that true, checked before insert. Replies are unrestricted; a learner
+  // answering somebody's post is ordinary and the rate limiter covers volume.
+  //
+  // `depth` is stored rather than computed by walking up `parentId`, so the
+  // reply guard is one field read instead of a walk that a deep thread would
+  // turn into a chain of reads on the hot path. See `lib/class-discussion.ts`.
+  courseComments: defineTable({
+    courseId: v.id("courses"),
+    userId: v.id("users"),
+    /** Absent on a top-level post; set on every reply. */
+    parentId: v.optional(v.id("courseComments")),
+    /** 0 for a top-level post, parent's depth + 1 for a reply. */
+    depth: v.number(),
+    body: v.string(),
+    // Soft delete rather than removal, because the thread *is* the structure:
+    // deleting a parent row would orphan every reply beneath it. A removed post
+    // keeps its slot, loses its text, and its replies stay where they are.
+    deletedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_course", ["courseId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_user", ["userId"]),
+
   quizzes: defineTable({
     lessonId: v.id("lessons"),
     title: v.string(),
@@ -917,6 +957,12 @@ export default defineSchema({
       v.literal("quiz_graded"),
       v.literal("streak_milestone"),
       v.literal("discussion_reply"),
+      // Class discussion (see `convex/courseComments.ts`). The instructor is
+      // told when a learner posts about the course they taught; the learner is
+      // told when someone answers. These are the only two places this surface
+      // rings a bell — replies inside a thread do not each notify.
+      v.literal("class_comment"),
+      v.literal("class_comment_reply"),
       v.literal("task_assigned"),
       v.literal("task_graded"),
       v.literal("group_invite"),

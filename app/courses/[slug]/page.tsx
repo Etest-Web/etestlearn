@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { CourseSchema } from "@/components/seo/course-schema";
 import { CourseReviews } from "@/components/course-reviews";
+import { CourseClassDiscussion } from "@/components/course-class-discussion";
 import { CourseProjects } from "@/components/course-projects";
 import { BookmarkButton } from "@/components/bookmark-button";
 import { StarRating } from "@/components/star-rating";
@@ -865,12 +866,17 @@ export default function CoursePage() {
               </TabsContent>
 
               {/* REVIEWS TAB */}
-              <TabsContent value="reviews">
+              <TabsContent value="reviews" className="space-y-8">
                 <CourseReviews
                   courseId={course._id}
                   ratingSum={course.ratingSum}
                   ratingCount={course.ratingCount}
                 />
+                {/* Below the stars, not in a tab of its own: it is the longer
+                    account of the same question ("how was it?") and separating it
+                    would put the learner's retrospective one click away from the
+                    average it supports. */}
+                <CourseClassDiscussion courseId={course._id} />
               </TabsContent>
 
               {/* PROJECTS TAB */}

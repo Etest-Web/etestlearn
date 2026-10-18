@@ -273,6 +273,40 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       whole order and re-checks every id's course, so a crafted id cannot renumber a showcase the
       caller cannot see. If learner submissions are ever wanted that is a **new table** (storage,
       review state, its own permissions), not a `status` column here.
+12. **The class discussion is the third learner-voice surface, and the gate is
+    certificate-grade.** `courseComments` (rendered inside the course page's Reviews tab, below
+    the stars) holds "how did this course actually go?" from people who **finished** it, with the
+    instructor replying. It is deliberately not a variant of either existing surface:
+    - `courseReviews` gates on *enrolled* and is tied to a star, and one row per learner cannot
+      hold a reply — so the instructor's answer, which is the part a prospective buyer is actually
+      reading for, had nowhere to live.
+    - `discussions` is lesson Q&A ("why does this return undefined?"), lives in the dashboard, and
+      is about being stuck rather than about how the course turned out.
+    Three things worth knowing before touching it:
+    - **The gate is `evaluateCertificateCompletion` (every lesson *and* every quiz), not
+      `progressPercent === 100`.** Those are different questions — progress is lessons only — and
+      the certificate definition is already documented as the platform's single notion of
+      "completed". `getViewerState` resolves it through the shared `helpers/completion.ts` and
+      skips it entirely for anyone with no enrollment, because completion walks the lessons, the
+      course's quizzes and the learner's attempts. `tests/course-comments.test.ts` asserts both
+      halves separately (all lessons/no quizzes, all quizzes/missing lesson) because that
+      distinction is the feature.
+    - **Depth is stored on the row, not walked.** Each reply copies `parent.depth + 1`, so "may
+      this reply be written?" is one field read instead of a climb to the root. Unbounded depth is
+      a product fact; only storage and *rendering* are capped (`MAX_COMMENT_DEPTH`,
+      `MAX_RENDERED_DEPTH`), and `buildTree` assembles the forest in memory from one bounded walk
+      rather than recursing with a `by_parent` query per node.
+    - **Removal is soft, and there is no edit.** A removed post keeps its row and loses its text,
+      because the thread *is* the structure — hard-deleting a parent would orphan every reply
+      beneath it. Editing is deliberately absent: a retrospective edited after the instructor
+      answered it is a different statement, and the reply would read as though it answered
+      something the author no longer believes.
+    - **Two bells and no email.** The instructor is told about a new top-level post and the post's
+      author about a reply; nothing inside a thread notifies. Neither is mirrored into email —
+    `emailCampaignsData.ts` mirrors only `discussion_reply`, and a learner post is not a message
+      somebody asked for. **Replying is not gated on having finished**, only on having a session:
+      a thread only the completed may enter is a testimonial wall, and the people most likely to
+      reply to a teacher's answer are still working through the course.
 
 ---
 
@@ -450,8 +484,9 @@ The seven
   `markPurchasePaid`).
 - **There is no `deleteCourse`.** Only `courses.deleteLesson`, which cascades its quiz, questions,
   options and attempts. Whenever one is added it must sweep `courseReviews`, `bookmarks`,
-  `courseProjects` and `instructorReviews` rows too — a saved-courses list and a public showcase
-  both read straight through to their parent and would otherwise 404 or throw.
+  `courseProjects`, `instructorReviews` and `courseComments` rows too — a saved-courses list, a
+  public showcase and a public discussion all read straight through to their parent and would
+  otherwise 404 or throw.
 - `convex/emailCampaignsData.ts` holds the reads the mail actions need, because a `"use node"`
   module may only export actions. Keep it `internal` only.
 - Prefer changing existing docs over creating new Markdown files (because of the `*.md` ignore).

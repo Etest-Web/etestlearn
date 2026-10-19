@@ -376,8 +376,11 @@ export default function LessonEditPage() {
                     />
                   </TabsContent>
                   <TabsContent value="preview">
+                    {/* The preview box scrolls rather than pushing the card
+                        sideways: `overflow-x-auto` keeps a wide GFM table or a
+                        long code line inside it. */}
                     {formData.content.trim() ? (
-                      <div className="min-h-[240px] border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
+                      <div className="min-h-[240px] overflow-x-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {formData.content}
                         </ReactMarkdown>

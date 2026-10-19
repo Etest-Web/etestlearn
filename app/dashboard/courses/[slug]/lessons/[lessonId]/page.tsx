@@ -116,7 +116,10 @@ function LessonContent({
   }
 
   return (
-    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+    // The body scrolls rather than pushing the card sideways:
+    // `overflow-x-auto` keeps a wide GFM table or a long code line inside
+    // it, which the typography plugin does not do on its own.
+    <div className="overflow-x-auto prose prose-sm sm:prose-base dark:prose-invert max-w-none">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );

@@ -2,6 +2,16 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* The Markdown surfaces (lesson body, course description, the instructor's
+   own preview) all asked for `prose`, but the plugin was never installed, so
+   those classes compiled to nothing: headings came out the same size as
+   body text, lists lost their markers, and a fenced code block kept
+   `white-space: pre` with no `overflow-x`, so a long line painted straight
+   out of the card and off the screen.
+
+   The plugin is build-time only, hence a devDependency. */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

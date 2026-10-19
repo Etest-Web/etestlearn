@@ -14,7 +14,7 @@ certificates with PDF/email/public verification, Paystack payments, instructor &
 | Framework | **Next.js 16.1.6** (App Router) + **React 19.2.3** | `next build`, `next dev` |
 | Backend | **Convex** (`convex ^1.45.0`) | All domain logic lives in `convex/` |
 | Auth | **Clerk** (`@clerk/nextjs ^7.0.4`) | Route protection in root `proxy.ts` |
-| Styling | **Tailwind CSS v4** (CSS-first config) | No `tailwind.config.*`; see `app/globals.css` |
+| Styling | **Tailwind CSS v4** (CSS-first config) | No `tailwind.config.*`; see `app/globals.css`. `@tailwindcss/typography` is a devDependency (it is what makes the `prose` classes work) |
 | UI kit | shadcn-style components on **Base UI** (`style: base-vega`) | NOT Radix. Primitives in `components/ui/` |
 | Language | TypeScript 5, `strict: true` | Path alias `@/*` → project root |
 | Tests | **Vitest 4** + `convex-test` | Node environment only, no DOM/component tests |
@@ -353,6 +353,41 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       somebody asked for. **Replying is not gated on having finished**, only on having a session:
       a thread only the completed may enter is a testimonial wall, and the people most likely to
       reply to a teacher's answer are still working through the course.
+13. **A responsive grid declares its base column count, and a `truncate`d string is a
+    layout bug waiting to happen.** These are the same bug and they were found together, on the
+    instructor overview's "Recent activity" card.
+    - **`grid` with only a breakpoint variant is an auto track, and an auto track is floored at
+      its content's min-content width.** `grid gap-6 lg:grid-cols-2` has *no* `grid-template-columns`
+      below `lg`, so the implicit track is `auto` — and `auto` cannot shrink below min-content. One
+      wide child therefore widens the track past the viewport and the **whole page scrolls
+      sideways**. `grid-cols-1` is `minmax(0, 1fr)`, which cannot be pushed open. Every grid in the
+      console now names its base column count; a new one must too.
+    - **`truncate` is `white-space: nowrap`, and a nowrap string contributes its *whole* width to
+      its ancestors' intrinsic sizing.** `min-w-0` is a floor, not a ceiling, so it does not stop
+      that contribution. This is why the activity row used to blow the layout out: the sentence was
+      truncated, so the card's min-content was the full sentence. **Let text wrap and cap it with
+      `line-clamp-N` instead** — a wrapping string's min-content is its longest word, and the row
+      then *gains* width in a narrow column instead of losing it.
+    - **A container query, not a media query, when the thing that changes is the card and not the
+      window.** The "Your learners" counters sit in a two-column grid, so their four-up layout has
+      to follow the *card's* width. `CardContent` carries `@container` and the counters use
+      `@xl:grid-cols-4`; the same is true of `StatTile`, whose naira figure is
+      `text-[clamp(1rem,calc(7cqw_+_0.5rem),1.75rem)]` because a money amount is one unbreakable
+      token that must fit the tile it is in.
+    - **Tailwind v4 specifics worth knowing:** `divide-x` uses *logical* properties (the rule lands
+      on the inline-**end** edge, not the left), `break-words` was renamed `wrap-break-word`, and
+      `prose` only works because `@tailwindcss/typography` is installed (it is a **devDependency** —
+      build-time only — and it is enabled by `@plugin "@tailwindcss/typography";` in
+      `app/globals.css`). Without it those classes compiled to nothing: headings came out the same
+      size as body text, lists lost their markers, and a fenced code block had no `overflow-x`, so
+      a long line painted straight out of the card.
+    - **The instructor console was audited viewport by viewport** (320 → 1920) against the real
+      compiled CSS, and the fixes are in: the activity feed wraps instead of truncating, every grid
+      names its base column count, the stat tiles scale, the tab strip on the course editor scrolls
+      instead of widening the document, the chart axes abbreviate and the funnel axis thins its
+      labels, and `truncate` on a `<td>` was moved onto a block inside the cell (in the automatic
+      table layout a cell's `max-width` is not honoured, so the ellipsis never appeared and the
+      table grew instead).
 
 ---
 

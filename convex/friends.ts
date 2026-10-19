@@ -2,6 +2,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
+import { relationshipStates } from "./helpers/relationships";
+import { readSearchableUsers } from "./helpers/users";
 import {
   requireUser,
   type Doc,
@@ -14,7 +16,6 @@ import {
   clampCount,
   compareSearchResults,
   displayName,
-  FRIENDSHIP_STATUSES,
   isSearchableTerm,
   normalizeSearchTerm,
   orderByBefriended,
@@ -24,6 +25,7 @@ import {
   summarizeActivity,
   utcDayKey,
 } from "../lib/friends";
+import { MAX_SEARCH_TERM_LENGTH } from "../lib/search";
 import type {
   DiscoverUser,
   FriendSummary,
@@ -84,12 +86,6 @@ const FEED_OVERSCAN = 2;
  * beyond that the number is a guess nobody can act on.
  */
 const STREAK_SCAN_LIMIT = 400;
-
-/**
- * How many `users` rows one `searchUsers` call will look at. See the long note
- * on that query for why a scan is unavoidable today and what would replace it.
- */
-const USER_SCAN_LIMIT = 300;
 
 /**
  * The nav badge saturates here. Convex has no count aggregation, so counting is
@@ -188,33 +184,16 @@ function dedupeByParty(
  * status. Used by `searchUsers` so discover never offers someone you have
  * already sent to, already accepted, or already turned down.
  *
- * Six small range reads (three statuses × two directions) because the indexes
- * are `(userId, status)` — there is no single range covering all three statuses.
+ * This is the "which ids" view of `relationshipStates` in
+ * `convex/helpers/relationships.ts` — the same six range reads, read once and
+ * shared with the search page, which needs the same set to know what it may
+ * offer each result.
  */
 async function relatedUserIds(
   ctx: ReadCtx,
   userId: Id<"users">,
 ): Promise<Set<Id<"users">>> {
-  const ids = new Set<Id<"users">>();
-  for (const status of FRIENDSHIP_STATUSES) {
-    const [outgoing, incoming] = await Promise.all([
-      ctx.db
-        .query("friendships")
-        .withIndex("by_requester_status", (q) =>
-          q.eq("requesterId", userId).eq("status", status),
-        )
-        .collect(),
-      ctx.db
-        .query("friendships")
-        .withIndex("by_addressee_status", (q) =>
-          q.eq("addresseeId", userId).eq("status", status),
-        )
-        .collect(),
-    ]);
-    for (const row of outgoing) ids.add(row.addresseeId);
-    for (const row of incoming) ids.add(row.requesterId);
-  }
-  return ids;
+  return new Set((await relationshipStates(ctx, userId)).keys());
 }
 
 /** Resolves a row's counterpart, or null when that account is gone. */
@@ -438,18 +417,23 @@ export const getPendingRequestCount = query({
 /**
  * Discover people by name or email substring.
  *
- * **Why this scans.** `users` has exactly one index, `by_clerk_id`, and no
- * index can serve `LIKE '%term%'` — a substring predicate is a full scan by
- * construction, and the schema forbids adding a `searchIndex` to an existing
- * table from a feature branch. So the read is bounded instead:
- * `.take(USER_SCAN_LIMIT)` caps the documents examined, `.take(limit)` caps what
- * comes back, and a term shorter than {@link MIN_SEARCH_LENGTH} short-circuits
- * before any read at all.
+ * **Why this scans.** `users` has no search index, and no index can serve a
+ * substring match — a `LIKE '%term%'` predicate is a scan by construction, and
+ * the schema forbids adding a `searchIndex` to an existing table from a feature
+ * branch. So the read is bounded instead: the scan window caps the documents
+ * examined, `.take(limit)` caps what comes back, and a term shorter than
+ * {@link MIN_SEARCH_LENGTH} short-circuits before any read at all.
  *
- * **What that costs, honestly.** Results are in insertion order, so a match
- * beyond the scan window is invisible rather than merely unranked. That is an
- * acceptable trade at the current user-table size (one row per Clerk account,
- * low hundreds) but it is the first thing to break. **At scale, replace the scan
+ * The window itself comes from `convex/helpers/users.ts` — the **same** one the
+ * search page uses. That is deliberate: two directories on the same platform
+ * that answered "who is on Glypha?" differently would be a bug waiting to be
+ * reported, and the same name returning different people depending on which
+ * box you typed it in is exactly that bug. One window, one answer.
+ *
+ * **What that costs, honestly.** The window is the newest accounts, so a match
+ * beyond it is invisible rather than merely unranked. That is an acceptable
+ * trade at the current user-table size (one row per Clerk account, low
+ * hundreds) but it is the first thing to break. **At scale, replace the scan
  * with a `searchIndex` on a normalised `searchText` field — `courses` already
  * has exactly that pattern — or move discovery to a real search service.** The
  * exclusion set should move to an index-backed lookup at the same time; today it
@@ -464,7 +448,7 @@ export const searchUsers = query({
   handler: async (ctx, args): Promise<DiscoverUser[]> => {
     const user = await requireUser(ctx);
 
-    const term = normalizeSearchTerm(args.query);
+    const term = normalizeSearchTerm(args.query).slice(0, MAX_SEARCH_TERM_LENGTH);
     if (!isSearchableTerm(term)) return [];
 
     const limit = clampCount(args.limit, 1, DISCOVER_MAX, DISCOVER_DEFAULT);
@@ -472,7 +456,7 @@ export const searchUsers = query({
     const excluded = await relatedUserIds(ctx, user._id);
     excluded.add(user._id);
 
-    const scanned = await ctx.db.query("users").take(USER_SCAN_LIMIT);
+    const scanned = await readSearchableUsers(ctx);
 
     const matches: Array<{
       rank: number;

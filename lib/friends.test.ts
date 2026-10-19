@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import type { Id } from "../convex/_generated/dataModel";
 import {
   clampCount,
   compareSearchResults,
@@ -7,9 +8,11 @@ import {
   initialsFor,
   isSearchableTerm,
   MIN_SEARCH_LENGTH,
+  mergeRelationship,
   normalizeSearchTerm,
   orderByBefriended,
   planSendRequest,
+  relationshipLabel,
   roleLabel,
   searchMatchRank,
   sendRequestBlockedMessage,
@@ -95,6 +98,119 @@ describe("sendRequestBlockedMessage", () => {
     expect(sendRequestBlockedMessage("request_received", "Ada")).toMatch(
       /Ada has already sent you a friend request/,
     );
+  });
+});
+
+describe("mergeRelationship", () => {
+  // The two rows for a pair, as they are stored. The id is a `friendships`
+  // row id, but the rule only ever passes it through — so a stand-in is fine.
+  const row = (status: "pending" | "accepted" | "declined", id: string) => ({
+    status,
+    friendshipId: id as Id<"friendships">,
+  });
+
+  test("no row in either direction means no relationship", () => {
+    expect(mergeRelationship(null, null)).toEqual({ kind: "none" });
+  });
+
+  test("an accepted row in either direction wins", () => {
+    expect(mergeRelationship(row("accepted", "f1"), null)).toEqual({
+      kind: "accepted",
+      friendshipId: "f1",
+    });
+    expect(mergeRelationship(null, row("accepted", "f2"))).toEqual({
+      kind: "accepted",
+      friendshipId: "f2",
+    });
+  });
+
+  test("an accepted friendship beats a pending row in the other direction", () => {
+    // Defensive precedence, same shape as `planSendRequest`: the state is
+    // unreachable, but "friends" is the honest answer rather than "ask again".
+    expect(mergeRelationship(row("declined", "f1"), row("accepted", "f2"))).toEqual({
+      kind: "accepted",
+      friendshipId: "f2",
+    });
+  });
+
+  test("a pending row you sent is outgoing; one they sent is incoming", () => {
+    expect(mergeRelationship(row("pending", "f1"), null)).toEqual({
+      kind: "pending",
+      direction: "outgoing",
+      friendshipId: "f1",
+    });
+    expect(mergeRelationship(null, row("pending", "f2"))).toEqual({
+      kind: "pending",
+      direction: "incoming",
+      friendshipId: "f2",
+    });
+  });
+
+  test("a pending row you sent wins over one they sent", () => {
+    // `planSendRequest` blocks this shape with "they asked first", so the
+    // merge has to agree: the caller's own attempt is the one to report.
+    expect(mergeRelationship(row("pending", "f1"), row("pending", "f2"))).toEqual({
+      kind: "pending",
+      direction: "outgoing",
+      friendshipId: "f1",
+    });
+  });
+
+  test("a declined row in either direction reads as declined, keeping the direction", () => {
+    // The direction is what decides whether the request may be re-asked: one
+    // you sent may, one they sent may not.
+    expect(mergeRelationship(row("declined", "f1"), null)).toEqual({
+      kind: "declined",
+      direction: "outgoing",
+      friendshipId: "f1",
+    });
+    expect(mergeRelationship(null, row("declined", "f2"))).toEqual({
+      kind: "declined",
+      direction: "incoming",
+      friendshipId: "f2",
+    });
+  });
+
+  test("a declined row outranks a pending one in the other direction", () => {
+    // Unreachable in practice — `planSendRequest` refuses to create it — but
+    // the priority must be total, or the same pair could read two ways.
+    expect(mergeRelationship(row("declined", "f1"), row("pending", "f2"))).toEqual({
+      kind: "pending",
+      direction: "incoming",
+      friendshipId: "f2",
+    });
+  });
+});
+
+describe("relationshipLabel", () => {
+  // A stand-in row id — the label only ever reads `kind` and `direction`.
+  const id = "f1" as Id<"friendships">;
+
+  test("names every state, so the status is never colour-alone", () => {
+    expect(relationshipLabel({ kind: "none" })).toBe("Not connected");
+    expect(
+      relationshipLabel({
+        kind: "pending",
+        direction: "outgoing",
+        friendshipId: id,
+      }),
+    ).toBe("Request sent");
+    expect(
+      relationshipLabel({
+        kind: "pending",
+        direction: "incoming",
+        friendshipId: id,
+      }),
+    ).toBe("Request received");
+    expect(relationshipLabel({ kind: "accepted", friendshipId: id })).toBe(
+      "Friends",
+    );
+    expect(
+      relationshipLabel({ kind: "declined", direction: "incoming", friendshipId: id }),
+    ).toBe("Not connected");
+    expect(
+      relationshipLabel({ kind: "declined", direction: "outgoing", friendshipId: id }),
+    ).toBe("Not connected");
   });
 });
 

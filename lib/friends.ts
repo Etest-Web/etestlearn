@@ -1,3 +1,4 @@
+import type { Id } from "../convex/_generated/dataModel";
 import type { FriendActivitySummary, UserRole } from "./friends-api";
 
 /**
@@ -95,6 +96,135 @@ export function sendRequestBlockedMessage(
       return `You already sent ${otherName} a friend request. Wait for them to respond.`;
     case "request_received":
       return `${otherName} has already sent you a friend request — accept it instead.`;
+  }
+}
+
+// ── Relationship state ────────────────────────────────────────────────────
+
+/** Which way a pending request points, from the caller's side. */
+export type RelationshipDirection = "outgoing" | "incoming";
+
+/**
+ * Where one person stands with another.
+ *
+ * `"none"` is a real value rather than an absent key: the search page renders
+ * an action for every person it shows, so "no relationship" has to be
+ * expressible — and a missing key would have to be read as "not connected"
+ * anyway, which is the same rule stated more quietly.
+ *
+ * `direction` is carried on the two states where it changes what a person may
+ * do. A request you sent is waiting on them; one they sent is waiting on you.
+ * A decline you sent is re-askable (`planSendRequest` re-opens it); a decline
+ * they sent is **not** — the platform does not re-offer somebody you turned
+ * down, and the difference has to survive all the way to the button.
+ */
+export type RelationshipState =
+  | { kind: "none" }
+  | {
+      kind: "pending";
+      direction: RelationshipDirection;
+      friendshipId: Id<"friendships">;
+    }
+  | { kind: "accepted"; friendshipId: Id<"friendships"> }
+  | {
+      kind: "declined";
+      direction: RelationshipDirection;
+      friendshipId: Id<"friendships">;
+    };
+
+/** One side of a pair, as it is stored on the row. */
+export interface RelationshipRowState {
+  status: FriendshipStatus;
+  friendshipId: Id<"friendships">;
+}
+
+/**
+ * Collapses the two possible rows for a pair into the one state a person is in.
+ *
+ * The priority is deliberately the same as {@link planSendRequest}'s, because
+ * the two questions are the same question asked twice: "is there a usable row
+ * between us, and what may I do about it?". A rule that ordered these two
+ * differently would let the search page offer a button that the friends page
+ * then refuses.
+ *
+ *  1. An accepted row in either direction wins — one row per pair, and the
+ *     person you are already friends with is not a new candidate.
+ *  2. A pending row you sent → `"outgoing"`. The other way round →
+ *     `"incoming"`, because the useful action is to accept it rather than to
+ *     open a second request and leave both dangling.
+ *  3. A declined row in either direction → `"declined"`, with the direction
+ *     that produced it. Which direction it was changes what may be done
+ *     about it: a request **you** sent and they declined may be re-asked
+ *     (`planSendRequest` re-opens it), whereas a request **they** sent and you
+ *     declined may not — the platform does not re-offer somebody you turned
+ *     down.
+ *
+ * `"none"` therefore means *no row at all* — which is the only case in which
+ * a brand new request may be inserted.
+ */
+export function mergeRelationship(
+  forward: RelationshipRowState | null,
+  reverse: RelationshipRowState | null,
+): RelationshipState {
+  const accepted =
+    forward?.status === "accepted"
+      ? forward
+      : reverse?.status === "accepted"
+        ? reverse
+        : null;
+  if (accepted) {
+    return { kind: "accepted", friendshipId: accepted.friendshipId };
+  }
+
+  if (forward?.status === "pending") {
+    return {
+      kind: "pending",
+      direction: "outgoing",
+      friendshipId: forward.friendshipId,
+    };
+  }
+  if (reverse?.status === "pending") {
+    return {
+      kind: "pending",
+      direction: "incoming",
+      friendshipId: reverse.friendshipId,
+    };
+  }
+
+  if (forward?.status === "declined") {
+    return {
+      kind: "declined",
+      direction: "outgoing",
+      friendshipId: forward.friendshipId,
+    };
+  }
+  if (reverse?.status === "declined") {
+    return {
+      kind: "declined",
+      direction: "incoming",
+      friendshipId: reverse.friendshipId,
+    };
+  }
+
+  return { kind: "none" };
+}
+
+/**
+ * The word a person is described by.
+ *
+ * Never a colour or an icon alone — the label is the message, so it survives
+ * greyscale and colour-blindness.
+ */
+export function relationshipLabel(state: RelationshipState): string {
+  switch (state.kind) {
+    case "none":
+      return "Not connected";
+    case "pending":
+      return state.direction === "outgoing" ? "Request sent" : "Request received";
+    case "accepted":
+      return "Friends";
+    case "declined":
+      return "Not connected";
   }
 }
 
@@ -214,6 +344,17 @@ export interface SearchableUser {
   name?: string;
   email?: string;
 }
+
+/**
+ * The first rank {@link searchMatchRank} gives to an address match.
+ *
+ * The ranks are ordered: name matches are 0–2 and address matches are 3–5, so
+ * "the address is what matched" is `rank >= EMAIL_MATCH_RANK`. A caller that
+ * needs to know *which field* matched — the search page, which shows an
+ * address only when the address is what was searched for — reads this rather
+ * than hard-coding a number that would silently drift if the ranking changed.
+ */
+export const EMAIL_MATCH_RANK = 3;
 
 /**
  * Match quality, best first. Name beats email because someone searching

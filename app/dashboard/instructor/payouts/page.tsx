@@ -85,7 +85,7 @@ function PayoutStatusBadge({ status }: { status: PayoutStatus }) {
 function PayoutsSkeleton() {
   return (
     <PageShell>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
@@ -283,7 +283,7 @@ export default function InstructorPayoutsPage() {
 
       <section
         aria-label="Payout summary"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <StatTile
           tone="brand"
@@ -459,8 +459,16 @@ export default function InstructorPayoutsPage() {
                       <td className="px-5 py-3 text-sm text-muted-foreground">
                         {payout.reference ?? "—"}
                       </td>
-                      <td className="max-w-56 truncate px-5 py-3 text-sm text-muted-foreground">
-                        {payout.note ?? "—"}
+                      {/* The cap goes on a block *inside* the cell, not on the
+                          cell. In the automatic table layout a cell's
+                          min-content width is the min-content width of its
+                          content, and `truncate` makes that the whole
+                          string — `max-width` on a cell is not honoured, so
+                          the note was sized to its full 500 characters and
+                          the scroll region grew with it. A block wrapper caps
+                          the cell's contribution and the ellipsis works. */}
+                      <td className="px-5 py-3 text-sm text-muted-foreground">
+                        <div className="max-w-56 truncate">{payout.note ?? "—"}</div>
                       </td>
                       <td className="tabular px-5 py-3 text-right text-sm font-semibold text-foreground">
                         {formatNaira(payout.amountKobo)}

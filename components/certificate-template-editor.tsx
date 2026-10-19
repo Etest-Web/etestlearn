@@ -864,7 +864,7 @@ export function CertificateTemplateEditor() {
             keep a field off the certificate. Each box replaces just that
             field, and a blank one leaves it as it is.
           </p>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {CERTIFICATE_FIELDS.map((field) => (
               <div key={field.key} className="space-y-1.5">
                 <Label htmlFor={`cert-field-${field.key}`} className="eyebrow">

@@ -155,6 +155,14 @@ export function DeltaChip({
  * `tone` is for when a number is the point of the card (earnings) rather than
  * one of several peers, which is the only place the brand plate is justified —
  * a grid of four identical brand plates is a template, not a hierarchy.
+ *
+ * The figure is sized against the *tile*, not the viewport, because the tile
+ * is what changes: the same component sits in a three-up row on the overview
+ * and a four-up row on the earnings page, and a naira amount is one
+ * unbreakable token that cannot wrap. At a fixed 1.75rem it was wider than
+ * the tile in a four-up row and painted straight over the neighbouring card.
+ * A container query lets the figure shrink with the tile it is in, so the
+ * number stays whole and inside its box at every width.
  */
 export function StatTile({
   label,
@@ -178,7 +186,7 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "flex flex-col justify-between gap-4 p-5",
+        "@container flex flex-col justify-between gap-4 p-5",
         brand
           ? "bg-brand text-brand-foreground"
           : "border border-rule bg-card",
@@ -204,10 +212,10 @@ export function StatTile({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 flex-col gap-1">
         <p
           className={cn(
-            "tabular text-[1.75rem] font-semibold leading-none tracking-[-0.02em]",
+            "tabular text-[clamp(1rem,calc(7cqw_+_0.5rem),1.75rem)] font-semibold leading-none tracking-[-0.02em]",
             brand ? "text-brand-foreground" : "text-foreground",
           )}
         >
@@ -265,6 +273,28 @@ type MonthSeriesPoint = {
 };
 
 /**
+ * A compact naira figure for a chart axis.
+ *
+ * The axis gutter is a fixed slice of the plot, and `formatNaira` prints the
+ * full amount — "₦12,345,678" — so on a phone the label was wider than the
+ * gutter it had to live in and got clipped. Axes read magnitudes, not exact
+ * amounts, and the tooltip still carries the exact figure, so the axis
+ * abbreviates. Below a hundred thousand the full amount is short enough to
+ * keep as it is.
+ */
+function axisNaira(kobo: number): string {
+  const naira = kobo / 100;
+  const magnitude = Math.abs(naira);
+  if (magnitude >= 1_000_000) {
+    return `₦${(naira / 1_000_000).toFixed(1)}M`;
+  }
+  if (magnitude >= 100_000) {
+    return `₦${Math.round(naira / 1_000)}k`;
+  }
+  return formatNaira(kobo);
+}
+
+/**
  * Earnings over time: gross collected as bars, the instructor's share as the
  * line above it.
  *
@@ -300,8 +330,8 @@ export function EarningsChart({
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
-            width={72}
-            tickFormatter={(value: number) => formatNaira(value)}
+            width={56}
+            tickFormatter={(value: number) => axisNaira(value)}
           />
           <RechartsTooltip
             cursor={{ fill: "transparent" }}
@@ -364,7 +394,13 @@ export function EnrollmentFunnelChart({
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             axisLine={false}
             tickLine={false}
-            interval={0}
+            // Not `interval={0}`. That forces every tick to render, and with
+            // up to eight course titles on a phone-width chart the labels
+            // overlap into a smear and the first and last are clipped by the
+            // chart edge. Recharts thins to the ends instead, which keeps the
+            // extremes — the ones that anchor the scale — and drops the
+            // middle.
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
@@ -512,6 +548,30 @@ function activitySentence(
  * One row per event with a kind badge rather than four separate feeds: an
  * instructor's real question is "what just happened", and interleaving sales
  * with completions is what answers it.
+ *
+ * **The row is a stack, not a line, and that is a layout decision rather than
+ * a fallback.** It used to be one line: badge, sentence, amount, timestamp,
+ * arrow, all side by side with the sentence truncated. That line needs about
+ * 600px before it stops being cramped, so the moment the card went into a
+ * two-column grid — which is where it lives — the sentence was squeezed to a
+ * few characters and the course name, the one part worth reading, was
+ * truncated away. The single-line version was only ever right on a very wide
+ * screen, which is not where this card is.
+ *
+ * So the sentence wraps (capped at three lines) and the amount and timestamp
+ * ride underneath it, the same shape the "needs your attention" list uses. A
+ * narrow column now gives the sentence *more* room instead of less, and the
+ * wrapping is also what keeps the row's min-content width small — a
+ * truncated (`white-space: nowrap`) sentence contributes its full width to
+ * its ancestors' intrinsic sizing, which is how this card used to push the
+ * whole dashboard sideways on a phone.
+ *
+ * Three lines is the cap, not the norm: a short event is still one line, and
+ * a long course title is bounded rather than free. Two was not enough — a
+ * forty-five character event is the *shortest* realistic one ("Chinedu
+ * Okafor bought Advanced Next.js Patterns"), and it needs three lines in a
+ * phone-width column, which is exactly the width where the reader most needs
+ * to see it in full.
  */
 export function ActivityFeed({
   events,
@@ -536,21 +596,39 @@ export function ActivityFeed({
           <li key={event.key}>
             <Link
               href={event.href}
-              className="flex items-center gap-3 py-3 transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              className="flex items-start gap-3 py-3 transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
             >
-              <Badge variant={meta.badge}>{meta.label}</Badge>
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                {activitySentence(event.kind, event.actorName, event.courseTitle)}
+              <span className="mt-0.5 shrink-0">
+                <Badge variant={meta.badge}>{meta.label}</Badge>
               </span>
-              {event.amountKobo !== null ? (
-                <span className="tabular shrink-0 text-sm font-semibold text-foreground">
-                  {formatNaira(event.amountKobo)}
+
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-3 text-sm leading-snug text-foreground">
+                  {activitySentence(event.kind, event.actorName, event.courseTitle)}
                 </span>
-              ) : null}
-              <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
-                {formatTime(event.at)}
+                <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
+                  {event.amountKobo !== null ? (
+                    <span className="tabular text-sm font-semibold text-foreground">
+                      {formatNaira(event.amountKobo)}
+                    </span>
+                  ) : null}
+                  <span>{formatTime(event.at)}</span>
+                  {/* Below `sm` the arrow has nowhere to sit without
+                      stealing the sentence's width, and 28px is the
+                      difference between the course name fitting and being
+                      ellipsised. It rides the metadata line instead, and
+                      returns to the right of the row from `sm` up. */}
+                  <ArrowRight
+                    className="ml-auto size-4 shrink-0 text-muted-foreground sm:hidden"
+                    aria-hidden
+                  />
+                </span>
               </span>
-              <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+
+              <ArrowRight
+                className="mt-0.5 hidden size-4 shrink-0 text-muted-foreground sm:block"
+                aria-hidden
+              />
             </Link>
           </li>
         );

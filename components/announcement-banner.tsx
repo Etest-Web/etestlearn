@@ -39,8 +39,12 @@ export function AnnouncementBanner({ className }: { className?: string }) {
     >
       <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{announcement.body}</p>
+        <p className="text-sm font-semibold text-foreground wrap-break-word">
+          {announcement.title}
+        </p>
+        <p className="mt-0.5 text-sm text-muted-foreground wrap-break-word">
+          {announcement.body}
+        </p>
       </div>
       <button
         type="button"

@@ -346,7 +346,7 @@ export default function CourseEditPage() {
         title="Edit course"
         description={courseData.course.title}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant={courseData.course.published ? "default" : "secondary"}>
               {courseData.course.published ? "Published" : "Draft"}
             </Badge>
@@ -365,19 +365,28 @@ export default function CourseEditPage() {
           </div>
         }
       />
-      
+
       <Tabs defaultValue="details" className="w-full">
         {/* Section switching, so the `rule` variant: a hairline under the strip
             with a brand bar on the selected tab. Selection reads as position
-            and weight. */}
-        <TabsList variant="rule" className="touch-target">
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="content">Curriculum</TabsTrigger>
-          <TabsTrigger value="certificates">Certificates</TabsTrigger>
-          <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          <TabsTrigger value="coupons">Coupons</TabsTrigger>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-        </TabsList>
+            and weight.
+
+            Six triggers need roughly 570px, which no phone or tablet has
+            once the sidebar is taken off the top, and a `rule` list is
+            `whitespace-nowrap` — the triggers cannot shrink, so without a
+            scroll container the strip widens the document. It bleeds to the
+            screen edge so the scroll is discoverable, and the gutter comes
+            back from `sm` up, where the strip already fits. */}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList variant="rule" className="touch-target">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="content">Curriculum</TabsTrigger>
+            <TabsTrigger value="certificates">Certificates</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+            <TabsTrigger value="coupons">Coupons</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+          </TabsList>
+        </div>
         <TabsContent value="details" className="pt-6">
           <div className="flex flex-col gap-6">
             {publishing === undefined ? (
@@ -443,8 +452,12 @@ export default function CourseEditPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="thumbnailUrl">Thumbnail Image</Label>
-                  <div className="flex gap-4 items-start">
-                    <div className="flex-1 space-y-2">
+                  {/* The preview sits beside the field on a wide screen and
+                      under it on a narrow one. Beside it, the two buttons and
+                      the 128px preview are one unshrinkable block wider than
+                      a phone — they painted straight out of the card. */}
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                    <div className="min-w-0 flex-1 space-y-2">
                       <Input
                         id="thumbnailUrl"
                         name="thumbnailUrl"
@@ -452,7 +465,7 @@ export default function CourseEditPage() {
                         onChange={handleChange}
                         placeholder="https://images.unsplash.com/... or upload below"
                       />
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="file"
                           accept="image/*"
@@ -475,10 +488,10 @@ export default function CourseEditPage() {
                           Upload Image
                         </Button>
                         {formData.thumbnailUrl && (
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setFormData(prev => ({ ...prev, thumbnailUrl: "" }))}
                           >
                             Clear
@@ -488,9 +501,9 @@ export default function CourseEditPage() {
                     </div>
                     {formData.thumbnailUrl && (
                       <div className="w-32 h-20 shrink-0 overflow-hidden border border-rule bg-surface-sunken">
-                        <img 
-                          src={formData.thumbnailUrl} 
-                          alt="Thumbnail preview" 
+                        <img
+                          src={formData.thumbnailUrl}
+                          alt="Thumbnail preview"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -581,13 +594,17 @@ export default function CourseEditPage() {
         <TabsContent value="content" className="pt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              {/* Stacks on a phone: "Import CSV" and "Add Lesson" are two
+                  unshrinkable buttons, and beside the title they were wider
+                  than the card. Every sibling header in the console already
+                  wraps its action cluster; this one did not. */}
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle>Curriculum</CardTitle>
                   <CardDescription>Manage the modules and lessons for this course.</CardDescription>
                 </div>
-              <div className="flex items-center gap-2">
-                <BulkLessonImport courseId={courseData.course._id as Id<"courses">} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <BulkLessonImport courseId={courseData.course._id as Id<"courses">} />
                 <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
                   <DialogTrigger render={
                     <Button size="sm" type="button">

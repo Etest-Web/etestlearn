@@ -236,7 +236,11 @@ export default function InstructorCoursesPage() {
                           ].map((stat) => (
                             <div key={stat.label} className="px-2 first:pl-0 last:pr-0">
                               <dt className="eyebrow">{stat.label}</dt>
-                              <dd className="tabular text-sm font-semibold text-foreground">
+                              {/* A naira amount is one unbreakable token, and
+                                  three of these share a phone-width card, so
+                                  the money runs a size smaller than the
+                                  counts until there is room for it. */}
+                              <dd className="tabular text-[13px] font-semibold text-foreground sm:text-sm">
                                 {stat.value}
                               </dd>
                             </div>

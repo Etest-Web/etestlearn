@@ -60,7 +60,7 @@ const RANGES = [
 function EarningsSkeleton() {
   return (
     <PageShell>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
@@ -374,7 +374,10 @@ export default function InstructorEarningsPage() {
         }
       />
 
-      <section aria-label="Earnings summary" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section
+        aria-label="Earnings summary"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <StatTile
           tone="brand"
           label="Last 30 days"
@@ -645,8 +648,14 @@ export default function InstructorEarningsPage() {
                       <td className="px-5 py-3 text-sm text-foreground">
                         {sale.buyerName ?? "A learner"}
                       </td>
-                      <td className="max-w-56 truncate px-5 py-3 text-sm text-muted-foreground">
-                        {sale.courseTitle}
+                      {/* The cap goes on a block *inside* the cell, not on the
+                          cell: in the automatic table layout a cell's
+                          min-content width is the min-content width of its
+                          content, and `truncate` makes that the whole
+                          string, so a long course title widened the table
+                          instead of being ellipsised. */}
+                      <td className="px-5 py-3 text-sm text-muted-foreground">
+                        <div className="max-w-56 truncate">{sale.courseTitle}</div>
                       </td>
                       <td className="px-5 py-3">
                         {sale.refunded ? (

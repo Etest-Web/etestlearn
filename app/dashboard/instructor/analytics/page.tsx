@@ -59,13 +59,13 @@ const TABLE_HEADINGS = [
 function AnalyticsSkeleton() {
   return (
     <PageShell>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
       </div>
       <Skeleton className="h-72" />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Skeleton className="h-64" />
         <Skeleton className="h-64" />
       </div>
@@ -82,7 +82,10 @@ function CohortTiles() {
   const { learners, quizPerformance, certificates, engagement } = pulse;
 
   return (
-    <section aria-label="Cohort totals" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section
+      aria-label="Cohort totals"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+    >
       <StatTile
         label="Enrolled learners"
         icon={Users}
@@ -546,7 +549,7 @@ function LearnerFeedback() {
                           </>
                         ) : null}
                       </div>
-                      <p className="text-sm leading-[1.7] whitespace-pre-line">
+                      <p className="text-sm leading-[1.7] whitespace-pre-line wrap-break-word">
                         {review.comment}
                       </p>
                     </li>
@@ -598,7 +601,7 @@ export default function InstructorAnalyticsPage() {
         <>
           <CohortTiles />
           <FunnelCard />
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <QuizHealth />
             <CourseHealth />
           </div>

@@ -146,7 +146,7 @@ export function CourseCouponsManager({ courseId }: { courseId: Id<"courses"> }) 
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="coupon-kind">Discount type</Label>
               <Select value={kind} onValueChange={(value) => setKind(value as CouponKind)}>
@@ -184,7 +184,7 @@ export function CourseCouponsManager({ courseId }: { courseId: Id<"courses"> }) 
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="coupon-limit">Redemption limit (optional)</Label>
               <Input

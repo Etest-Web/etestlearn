@@ -47,7 +47,7 @@ export function RoleGuard({
         return (
             <div className="mx-auto w-full max-w-6xl space-y-8">
                 <Skeleton className="h-9 w-64" />
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Skeleton className="h-40 rounded-2xl" />
                     <Skeleton className="h-40 rounded-2xl" />
                     <Skeleton className="h-40 rounded-2xl" />

@@ -43,6 +43,14 @@ import {
  * Everything below that is the supporting evidence for those four answers,
  * which is why the course list is deliberately last: it is a management
  * surface, not a summary.
+ *
+ * **Every grid on this page declares its base column count.**
+ * `grid` alone gives the page an implicit `auto` track, and an `auto` track
+ * is floored at its content's min-content width — so a single wide child
+ * (a truncated activity row, a long unbroken title) widens the track past the
+ * viewport and the whole dashboard scrolls sideways. `grid-cols-1` is
+ * `minmax(0, 1fr)`, which cannot be pushed open. The rest of the console
+ * already does this; these grids were the ones that did not.
  */
 
 const ATTENTION_ICON = {
@@ -57,13 +65,13 @@ const ATTENTION_ICON = {
 function OverviewSkeleton() {
   return (
     <PageShell>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Skeleton className="h-32" />
         <Skeleton className="h-32" />
         <Skeleton className="h-32" />
       </div>
       <Skeleton className="h-72" />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Skeleton className="h-64" />
         <Skeleton className="h-64" />
       </div>
@@ -107,7 +115,13 @@ function LearnerBlock() {
             : `${pluralize(learners.activeThisWeek, "learner")} active in the last 7 days of ${learners.enrolled} enrolled.`}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+      {/* A query container, because the four counters below have to know how
+          wide THIS card is, not how wide the window is. The card sits in a
+          two-column grid, so at 1024px it is 340px wide and four columns of
+          85px would wrap every label to three lines. The container query
+          reads the card's own width and keeps it at two columns until there
+          is room for four. */}
+      <CardContent className="@container flex flex-col gap-5">
         <ProgressRow
           label="Completed every lesson"
           value={learners.completionRate}
@@ -135,8 +149,17 @@ function LearnerBlock() {
         />
 
         {/* Hairline-divided row: the rules do the separating, which is why
-            these can be set large and tabular without reading as four cards. */}
-        <dl className="grid grid-cols-2 divide-x divide-rule border-y border-rule sm:grid-cols-4">
+            these can be set large and tabular without reading as four cards.
+
+            The rule follows the shape of the grid, and so does the number of
+            columns. `divide-x` draws a rule on every child but the last,
+            which is right for four columns of one row and wrong for two
+            columns of two rows — the third child, which starts the second
+            row, would carry a rule hanging off the left edge. So below the
+            container's `xl` the rule runs across the rows instead, and from
+            `xl` up it runs down the columns, which is also where the four
+            counters fit side by side. */}
+        <dl className="grid grid-cols-2 divide-y divide-rule border-y border-rule @xl:grid-cols-4 @xl:divide-y-0 @xl:divide-x">
           {[
             { label: "New this month", value: learners.newThisMonth },
             { label: "Still going", value: learners.inProgress },
@@ -425,7 +448,7 @@ function CourseListPreview() {
           </div>
           <Link
             href="/dashboard/instructor/courses"
-            className="shrink-0 text-sm font-medium text-brand link-quiet"
+            className="touch-target inline-flex shrink-0 items-center text-sm font-medium text-brand link-quiet"
           >
             See all
           </Link>
@@ -517,7 +540,10 @@ export default function InstructorOverviewPage() {
         <OverviewSkeleton />
       ) : (
         <>
-          <section aria-label="Headline numbers" className="grid gap-4 lg:grid-cols-3">
+          <section
+            aria-label="Headline numbers"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          >
             <EarningsPlate />
             <StatTile
               label="Collected — all time"
@@ -564,14 +590,20 @@ export default function InstructorOverviewPage() {
         </>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LearnerBlock />
         <AttentionBlock />
       </div>
 
       <TopCourses />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* These two stack until there is room for them side by side, and the
+          room needed is more than it looks. A feed row is a sentence plus a
+          badge: in a 340px column — what a 1:1 split leaves at 1024px — the
+          event had about twelve characters to work with, and the course
+          title next to it had about as much. Equal columns from `xl` give
+          both a full sentence and a full title. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <RecentActivity />
         <CourseListPreview />
       </div>

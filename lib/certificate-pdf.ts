@@ -13,21 +13,26 @@
  * individual fields in the template UI.
  */
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { certificateFontBytes } from "./certificate-fonts-data";
 import {
   imagePageSize,
   sniffBackgroundKind,
   type BackgroundPageSize,
 } from "./certificate-background";
 import {
-  CERTIFICATE_INK,
-  CERTIFICATE_MUTED,
+  CERTIFICATE_TEXT_DEFAULTS,
   DEFAULT_LAYOUT,
   LINE_HEIGHT_RATIO,
   TEMPLATE_DEFAULTS,
+  certificateField,
   certificateFieldLines,
-  wrapCharBudget,
-  wrapText,
+  certificateFont,
+  resolveColor,
+  type CertificateFieldKey,
+  type CertificateFontId,
   type CertificateLayout,
+  type CertificateTexts,
   type FieldAnchor,
   type RgbTriple,
 } from "./certificate-layout";
@@ -49,14 +54,41 @@ export interface CertificatePdfInput {
  */
 const toRgb = ({ r, g, b }: RgbTriple) => rgb(r, g, b);
 const PURPLE = rgb(148 / 255, 93 / 255, 163 / 255);
-const INK = toRgb(CERTIFICATE_INK);
-const MUTED = toRgb(CERTIFICATE_MUTED);
-const DANGER = rgb(0.75, 0.25, 0.25);
+/**
+ * The revoked watermark colour, as the hex form `resolveColor` understands —
+ * rgb(0.75, 0.25, 0.25). Named rather than written inline so the revoked
+ * certificate has one definition of "this is no longer valid".
+ */
+const DANGER = "#bf4040";
 
-interface Fonts {
-  regular: PDFFont;
-  bold: PDFFont;
-  italic: PDFFont;
+/**
+ * Embeds a catalogue face into this document.
+ *
+ * fontkit does the work; the bytes are the bundled copy rather than a file
+ * read or a fetch, because a node action has no `public/` and an outbound
+ * request is not something a learner's certificate should depend on.
+ *
+ * The faces are embedded whole rather than subsetted, which is worth a few
+ * kilobytes on the file and saves two real problems:
+ *
+ *   - pdf-lib's subset embedder writes no ToUnicode CMap, so the text in a
+ *     subsetted certificate cannot be copied, searched or read aloud: it
+ *     extracts as glyph indices. The whole-font embedder does write one.
+ *   - fontkit's subsetter mis-measures a font it reconstructed from woff2 and
+ *     writes past the end of its buffer, which fails the save — after the
+ *     promise has already been handed back, so the failure surfaces as a
+ *     timeout rather than as an error.
+ *
+ * A face this build does not ship falls back to Helvetica rather than failing:
+ * printing in the wrong face is a defect, but refusing to print is an outage.
+ */
+async function embedCertificateFont(
+  doc: PDFDocument,
+  id: CertificateFontId,
+): Promise<PDFFont> {
+  const bytes = certificateFontBytes(certificateFont(id).id);
+  if (!bytes) return await doc.embedFont(StandardFonts.Helvetica);
+  return await doc.embedFont(bytes, { subset: true });
 }
 
 /**
@@ -76,30 +108,6 @@ function drawCentered(
   const x = anchor.x * width - font.widthOfTextAtSize(text, size) / 2;
   const y = height - anchor.y * height - size;
   page.drawText(text, { x, y, size, font, color });
-}
-
-/** Draws centred, wrapped text. The first line sits on the anchor. */
-function drawCenteredWrapped(
-  page: PDFPage,
-  text: string,
-  anchor: FieldAnchor,
-  font: PDFFont,
-  color: ReturnType<typeof rgb>,
-) {
-  const size = anchor.size ?? 22;
-  const lineHeight = size * LINE_HEIGHT_RATIO;
-  // SAFE_WIDTH_RATIO of the page is the area a template's own border allows.
-  const maxChars = wrapCharBudget(page.getWidth(), size);
-
-  wrapText(text, maxChars).forEach((line, i) => {
-    drawCentered(
-      page,
-      line,
-      { ...anchor, y: anchor.y + i * (lineHeight / page.getHeight()) },
-      font,
-      color,
-    );
-  });
 }
 
 /**
@@ -214,11 +222,24 @@ async function createBackgroundPage(
  */
 export async function renderCertificatePdf(
   input: CertificatePdfInput,
-  options: BackgroundOptions & { layout?: CertificateLayout } = {},
+  options: BackgroundOptions & {
+    layout?: CertificateLayout;
+    /**
+     * Editable wording — heading, date prefix, verify prefix. Kept apart from
+     * `layout` because it is copy rather than placement, and both are read off
+     * the one installed template row.
+     */
+    texts?: CertificateTexts;
+  } = {},
 ): Promise<Uint8Array> {
   const revoked = typeof input.revokedAt === "number";
 
   const doc = await PDFDocument.create();
+  // The faces are woff2, which only pdf-lib can embed if a font engine is
+  // registered first. Registering the engine is what lets it read the font's
+  // own metrics instead of guessing them, which is also how a name in a
+  // script the face does not cover is drawn rather than refused.
+  doc.registerFontkit(fontkit);
   const { page, usedTemplate } = await createBackgroundPage(
     doc,
     options,
@@ -229,11 +250,22 @@ export async function renderCertificatePdf(
   // heading is suppressed unless the admin positioned one explicitly.
   const defaults = usedTemplate ? TEMPLATE_DEFAULTS : DEFAULT_LAYOUT;
   const layout: CertificateLayout = { ...defaults, ...options.layout };
+  const texts: Required<CertificateTexts> = {
+    ...CERTIFICATE_TEXT_DEFAULTS,
+    ...options.texts,
+  };
 
-  const fonts: Fonts = {
-    regular: await doc.embedFont(StandardFonts.Helvetica),
-    bold: await doc.embedFont(StandardFonts.HelveticaBold),
-    italic: await doc.embedFont(StandardFonts.TimesRomanItalic),
+  /**
+   * Embedded once per face however many fields are set in it — three fields in
+   * Inter Bold must not put three copies of the face in the file.
+   */
+  const fontCache = new Map<CertificateFontId, PDFFont>();
+  const fontFor = async (id: CertificateFontId): Promise<PDFFont> => {
+    const cached = fontCache.get(id);
+    if (cached) return cached;
+    const embedded = await embedCertificateFont(doc, id);
+    fontCache.set(id, embedded);
+    return embedded;
   };
 
   /**
@@ -241,19 +273,49 @@ export async function renderCertificatePdf(
    * that is how an admin keeps a field off a template that already prints it,
    * and how the heading stays off template-backed certificates.
    */
-  const anchor = (key: keyof CertificateLayout): FieldAnchor | null => {
+  const anchor = (key: CertificateFieldKey): FieldAnchor | null => {
     const value = layout[key];
     return value === null ? null : (value ?? defaults[key]);
   };
 
-  const draw = (
-    key: keyof CertificateLayout,
+  /**
+   * Draws one field: its face, its colour and its lines all resolved from the
+   * anchor, falling back to the field's own defaults for anything the admin
+   * left alone.
+   *
+   * Every field now goes through `certificateFieldLines`, which is what applies
+   * letter case, the truncation limit and wrapping — recipient used to truncate
+   * through it while the course title wrapped around it directly, so a template
+   * that changed either rule would have split the two apart.
+   */
+  const draw = async (
+    key: CertificateFieldKey,
     text: string,
-    font: PDFFont,
-    color: ReturnType<typeof rgb>,
-  ) => {
+    override: { font?: CertificateFontId; color?: string } = {},
+  ): Promise<void> => {
     const at = anchor(key);
-    if (at) drawCentered(page, text, at, font, color);
+    if (!at) return;
+
+    const field = certificateField(key);
+    const face = certificateFont(override.font ?? at.font ?? field.font);
+    const size = at.size ?? 14;
+    const lines = certificateFieldLines(key, text, page.getWidth(), size, {
+      font: face.id,
+      case: at.case,
+    });
+    const lineHeight = size * (at.lineHeight ?? LINE_HEIGHT_RATIO);
+    const color = toRgb(resolveColor(override.color ?? at.color, field.color));
+    const font = await fontFor(face.id);
+
+    lines.forEach((line, i) =>
+      drawCentered(
+        page,
+        line,
+        { ...at, size, y: at.y + (i * lineHeight) / page.getHeight() },
+        font,
+        color,
+      ),
+    );
   };
 
   const issuedOn = new Date(input.issuedAt).toLocaleDateString("en-GB", {
@@ -263,42 +325,30 @@ export async function renderCertificatePdf(
     timeZone: "UTC",
   });
 
-  draw(
+  await draw(
     "heading",
-    revoked ? "CERTIFICATE OF COMPLETION (REVOKED)" : "CERTIFICATE OF COMPLETION",
-    fonts.bold,
-    INK,
+    `${texts.heading}${revoked ? " (REVOKED)" : ""}`,
   );
 
   // Truncated through the shared field rules rather than an inline constant,
   // so the canvas and the PDF clip a long name at the same character.
-  const recipientAt = anchor("recipient");
-  if (recipientAt) {
-    const [line] = certificateFieldLines(
-      "recipient",
-      input.holderName,
-      page.getWidth(),
-      recipientAt.size ?? 40,
-    );
-    drawCentered(page, line, recipientAt, fonts.italic, INK);
-  }
+  await draw("recipient", input.holderName);
 
-  const courseAt = anchor("course");
-  if (courseAt) {
-    drawCenteredWrapped(page, input.courseTitle, courseAt, fonts.bold, INK);
-  }
+  await draw("course", input.courseTitle);
 
-  draw("issuedOn", `Completed on ${issuedOn}`, fonts.regular, MUTED);
+  await draw("issuedOn", `${texts.issuedOnPrefix} ${issuedOn}`.trim());
 
-  draw("issuer", input.issuerName, fonts.bold, INK);
+  await draw("issuer", input.issuerName);
 
-  draw(
+  await draw(
     "serial",
     revoked
       ? `Revoked${input.revocationReason ? `: ${input.revocationReason}` : ""}`
-      : `Verify at ${input.verifyUrl}`,
-    revoked ? fonts.bold : fonts.regular,
-    revoked ? DANGER : MUTED,
+      : `${texts.serialPrefix} ${input.verifyUrl}`.trim(),
+    // The revoked state keeps red as its signal, but not a forced bold: half
+    // the catalogue has no bold partner, and a face that changes under an
+    // admin's feet is worse than one that stays put in a colour that says so.
+    revoked ? { color: DANGER } : {},
   );
 
   return await doc.save();

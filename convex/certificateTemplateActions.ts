@@ -20,7 +20,7 @@ import {
   readImageSize,
   sniffBackgroundKind,
 } from "../lib/certificate-background";
-import { layoutValidator } from "./certificateTemplates";
+import { layoutValidator, textsValidator } from "./certificateTemplates";
 
 /** Artwork rather than a photo library, so generous — but not unbounded. */
 const MAX_TEMPLATE_BYTES = 20 * 1024 * 1024;
@@ -267,7 +267,10 @@ export const prepareTemplateUpload = action({
  * installed — with none, it previews the built-in artwork.
  */
 export const previewTemplate = action({
-  args: { layout: v.optional(layoutValidator) },
+  args: {
+    layout: v.optional(layoutValidator),
+    texts: v.optional(textsValidator),
+  },
   handler: async (ctx, args) => {
     await requireAdminAction(ctx);
 
@@ -304,6 +307,10 @@ export const previewTemplate = action({
           ? { width: template.pageWidth, height: template.pageHeight }
           : undefined,
         layout: args.layout ?? undefined,
+        // Unsaved wording first, then what the template row actually says —
+        // a preview that quietly dropped an edited heading would read as
+        // "my change did nothing".
+        texts: args.texts ?? template?.texts ?? undefined,
       },
     );
 

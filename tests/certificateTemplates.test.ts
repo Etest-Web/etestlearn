@@ -261,3 +261,99 @@ describe("certificate template management", () => {
     ).rejects.toThrow(/name/i);
   });
 });
+
+describe("certificate template typography", () => {
+  const saveLayout = async (
+    t: TestWorld,
+    layout: Record<string, unknown>,
+    texts?: Record<string, string>,
+  ) =>
+    await as(t, "clerk_admin").mutation(
+      api.certificateTemplates.updateTemplateLayout,
+      { layout, texts },
+    );
+
+  test("saves a field's face, colour, case and line height", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await saveLayout(
+      t,
+      {
+        issuer: {
+          x: 0.5,
+          y: 0.85,
+          size: 16,
+          font: "cormorant",
+          color: "#102030",
+          case: "upper",
+          lineHeight: 1.4,
+        },
+      },
+      { heading: "CERTIFICATE OF EXCELLENCE" },
+    );
+
+    const row = (await templateRows(t))[0];
+    expect(row.layout?.issuer?.font).toBe("cormorant");
+    expect(row.layout?.issuer?.color).toBe("#102030");
+    expect(row.layout?.issuer?.case).toBe("upper");
+    expect(row.layout?.issuer?.lineHeight).toBe(1.4);
+    expect(row.texts?.heading).toBe("CERTIFICATE OF EXCELLENCE");
+  });
+
+  test("refuses a face it does not know", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await expect(
+      saveLayout(t, { issuer: { x: 0.5, y: 0.85, font: "comic-sans" } }),
+    ).rejects.toThrow(/not a certificate font/);
+  });
+
+  test("refuses a colour it does not know", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await expect(
+      saveLayout(t, { issuer: { x: 0.5, y: 0.85, color: "chartreuse" } }),
+    ).rejects.toThrow(/not a colour/);
+  });
+
+  test("refuses a line height outside the range the editor offers", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await expect(
+      saveLayout(t, { issuer: { x: 0.5, y: 0.85, lineHeight: 9 } }),
+    ).rejects.toThrow(/line height/);
+  });
+
+  test("refuses wording too long to print", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await expect(
+      saveLayout(t, {}, { heading: "x".repeat(500) }),
+    ).rejects.toThrow(/characters or fewer/);
+  });
+
+  test("leaves the wording alone when the caller sends none", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedWorld(t);
+    await installTemplate(t, "Brand");
+
+    await saveLayout(t, {}, { heading: "CERTIFICATE OF EXCELLENCE" });
+    // A caller that only wants to move a field should not have to know what
+    // wording is currently saved.
+    await saveLayout(t, { issuer: { x: 0.4, y: 0.8 } });
+
+    const row = (await templateRows(t))[0];
+    expect(row.texts?.heading).toBe("CERTIFICATE OF EXCELLENCE");
+    expect(row.layout?.issuer?.x).toBe(0.4);
+  });
+});

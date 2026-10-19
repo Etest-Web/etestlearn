@@ -24,24 +24,72 @@ import {
   CardTitle,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Switch,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@/components/ui";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  CERTIFICATE_COLOR_PRESETS,
   CERTIFICATE_FIELDS,
+  CERTIFICATE_FONT_LIST,
+  CERTIFICATE_TEXT_DEFAULTS,
   DEFAULT_LAYOUT,
+  LINE_HEIGHT_MAX,
+  LINE_HEIGHT_MIN,
+  LINE_HEIGHT_RATIO,
   MAX_FIELD_SIZE,
+  MAX_TEXT_WORDING,
   MIN_FIELD_SIZE,
   TEMPLATE_DEFAULTS,
   certificateField,
+  certificateFont,
   effectiveAnchor,
   formatAnchor,
+  isValidColor,
   parseAnchor,
+  resolveColor,
+  rgbToCss,
   type CertificateFieldKey,
   type CertificateLayout,
+  type CertificateTexts,
   type FieldAnchor,
+  type TextCase,
 } from "@/lib/certificate-layout";
 import { CertificateCanvas } from "@/components/certificate-canvas";
+
+/**
+ * The letter cases a field can be set in, with the label that shows the effect
+ * rather than naming it — "UPPER" in the picker is a sample, not a caption.
+ */
+const TEXT_CASE_OPTIONS: ReadonlyArray<{ value: TextCase; label: string }> = [
+  { value: "none", label: "As typed" },
+  { value: "upper", label: "UPPER" },
+  { value: "lower", label: "lower" },
+  { value: "title", label: "Title Case" },
+];
+
+/**
+ * Narrows whatever the toggle group reports to a case the renderer knows.
+ *
+ * The group speaks in strings and the renderer speaks in a union, so the
+ * conversion has to happen once, here, rather than as a cast at the call site.
+ */
+function normalizeTextCase(value: string | undefined): TextCase {
+  switch (value) {
+    case "upper":
+    case "lower":
+    case "title":
+      return value;
+    default:
+      return "none";
+  }
+}
 
 /**
  * The single certificate design, on the admin Certificates page.
@@ -68,11 +116,22 @@ export function CertificateTemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [draft, setDraft] = useState<Required<CertificateLayout> | null>(null);
+  /**
+   * The working wording — heading, date prefix, verify prefix.
+   *
+   * Kept as its own piece of state rather than folded into `draft` because the
+   * two are different jobs with different "reset" meanings: placement is reset
+   * per field against what is saved, wording is one block, and a discard of
+   * one should not quietly eat the other.
+   */
+  const [textsDraft, setTextsDraft] = useState<Required<CertificateTexts> | null>(
+    null,
+  );
   const [selected, setSelected] = useState<CertificateFieldKey | null>(null);
   const [showGuides, setShowGuides] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showCoordinates, setShowCoordinates] = useState(false);
-  const [coordEpoch, setCoordEpoch] = useState(0);
+  const [entryEpoch, setEntryEpoch] = useState(0);
   /**
    * Whether the installed artwork is a PDF or an image.
    *
@@ -119,8 +178,19 @@ export function CertificateTemplateEditor() {
     return resolved;
   }, [template, defaults]);
 
+  /**
+   * Saved wording, with anything the template never recorded filled in from the
+   * same defaults the renderer falls back to — so the box shows the sentence a
+   * certificate would actually print, not an empty field pretending otherwise.
+   */
+  const savedTexts = useMemo<Required<CertificateTexts>>(
+    () => ({ ...CERTIFICATE_TEXT_DEFAULTS, ...template?.texts }),
+    [template],
+  );
+
   const working = draft ?? saved;
-  const dirty = draft !== null;
+  const workingTexts = textsDraft ?? savedTexts;
+  const dirty = draft !== null || textsDraft !== null;
 
   if (template === undefined) {
     return <Skeleton className="h-64 w-full" />;
@@ -135,6 +205,7 @@ export function CertificateTemplateEditor() {
     try {
       await remove({});
       setDraft(null);
+      setTextsDraft(null);
       setSelected(null);
       lastPositions.current = {};
       setPreviewUrl(null);
@@ -142,6 +213,11 @@ export function CertificateTemplateEditor() {
     } catch (err) {
       toast.error(getErrorMessage(err, "Something went wrong"));
     }
+  }
+
+  /** Rewordings one piece of copy in the working copy, like `moveField` does for a position. */
+  function setText(key: keyof CertificateTexts, value: string) {
+    setTextsDraft((prev) => ({ ...(prev ?? savedTexts), [key]: value }));
   }
 
   /** Moves one field in the working copy, without touching what is saved. */
@@ -203,8 +279,12 @@ export function CertificateTemplateEditor() {
       });
 
       // Positions were tuned for the previous artwork; keeping them would print
-      // the new design's fields in the old one's places.
+      // the new design's fields in the old one's places. The unsaved wording
+      // goes with them — it was being judged against a page that is no longer
+      // there — but the saved wording stays, because copy does not depend on
+      // the border.
       setDraft(null);
+      setTextsDraft(null);
       setSelected(null);
       lastPositions.current = {};
       setPreviewUrl(null);
@@ -225,7 +305,7 @@ export function CertificateTemplateEditor() {
   async function handlePreview() {
     setPreviewing(true);
     try {
-      const result = await preview({ layout: working });
+      const result = await preview({ layout: working, texts: workingTexts });
       setPreviewUrl(result.url);
     } catch (err) {
       toast.error(getErrorMessage(err, "Preview failed"));
@@ -238,12 +318,13 @@ export function CertificateTemplateEditor() {
     if (!template) return;
     setSaving(true);
     try {
-      // The whole placement, not a patch: an admin has been looking at the
-      // finished page, so what they save is what they saw — fields left off
-      // included, rather than quietly reverting to a default.
-      await updateLayout({ layout: working });
+      // The whole placement and the whole wording, not a patch: an admin has
+      // been looking at the finished page, so what they save is what they saw —
+      // fields left off included, rather than quietly reverting to a default.
+      await updateLayout({ layout: working, texts: workingTexts });
       setDraft(null);
-      toast.success("Placement saved");
+      setTextsDraft(null);
+      toast.success("Placement and wording saved");
     } catch (err) {
       toast.error(getErrorMessage(err, "Could not save the placement"));
     } finally {
@@ -465,6 +546,176 @@ export function CertificateTemplateEditor() {
                                   }
                                 />
                               </div>
+
+                              {/*
+                                Typography — how this one field is set, kept
+                                apart from X/Y/Size because it is a choice
+                                about the type rather than about where the
+                                line sits: nudging a heading must not restyle
+                                it, and restyling it must not move it.
+                              */}
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`cert-font-${field.key}`}
+                                    className="eyebrow"
+                                  >
+                                    Font
+                                  </Label>
+                                  <Select
+                                    value={certificateFont(anchor.font ?? field.font).id}
+                                    onValueChange={(next) => {
+                                      // Null would mean the selection was
+                                      // cleared; a field always has a face.
+                                      if (!next) return;
+                                      moveField(field.key, { ...anchor, font: next });
+                                    }}
+                                  >
+                                    <SelectTrigger
+                                      id={`cert-font-${field.key}`}
+                                      className="h-8 w-full"
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {CERTIFICATE_FONT_LIST.map((face) => (
+                                        <SelectItem key={face.id} value={face.id}>
+                                          <span
+                                            style={{
+                                              fontFamily: face.css,
+                                              fontWeight: face.weight,
+                                              fontStyle: face.style,
+                                            }}
+                                          >
+                                            {face.label}
+                                          </span>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="eyebrow">Case</Label>
+                                  <ToggleGroup
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full justify-between"
+                                    value={[anchor.case ?? "none"]}
+                                    onValueChange={(values) => {
+                                      // An empty list means the pressed item
+                                      // was released. That is not a request for
+                                      // "as typed" — it is a click on the
+                                      // button that is already on.
+                                      const next = values.at(-1);
+                                      if (!next) return;
+                                      moveField(field.key, {
+                                        ...anchor,
+                                        case: normalizeTextCase(next),
+                                      });
+                                    }}
+                                  >
+                                    {TEXT_CASE_OPTIONS.map((option) => (
+                                      <ToggleGroupItem
+                                        key={option.value}
+                                        value={option.value}
+                                        className="flex-1 text-xs"
+                                      >
+                                        {option.label}
+                                      </ToggleGroupItem>
+                                    ))}
+                                  </ToggleGroup>
+                                </div>
+
+                                <NumberField
+                                  id={`cert-leading-${field.key}`}
+                                  label="Line height"
+                                  suffix="×"
+                                  step={0.05}
+                                  min={LINE_HEIGHT_MIN}
+                                  max={LINE_HEIGHT_MAX}
+                                  value={anchor.lineHeight ?? LINE_HEIGHT_RATIO}
+                                  onChange={(next) =>
+                                    moveField(field.key, {
+                                      ...anchor,
+                                      // Clamped to the range the server will
+                                      // accept, so a typed value cannot fail
+                                      // the whole save over one field.
+                                      lineHeight: Math.min(
+                                        LINE_HEIGHT_MAX,
+                                        Math.max(LINE_HEIGHT_MIN, next),
+                                      ),
+                                    })
+                                  }
+                                />
+
+                                <div className="space-y-1">
+                                  <Label
+                                    htmlFor={`cert-colour-${field.key}`}
+                                    className="eyebrow"
+                                  >
+                                    Colour
+                                  </Label>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      {CERTIFICATE_COLOR_PRESETS.map((preset) => {
+                                        const active =
+                                          (anchor.color ?? field.color) === preset.id;
+                                        return (
+                                          <button
+                                            key={preset.id}
+                                            type="button"
+                                            title={preset.label}
+                                            aria-label={`${preset.label} text`}
+                                            aria-pressed={active}
+                                            onClick={() =>
+                                              moveField(field.key, {
+                                                ...anchor,
+                                                color: preset.id,
+                                              })
+                                            }
+                                            className={`h-6 w-6 rounded border ${
+                                              active
+                                                ? "border-primary ring-1 ring-ring"
+                                                : "border-rule"
+                                            }`}
+                                            style={{
+                                              backgroundColor: rgbToCss(
+                                                resolveColor(preset.id),
+                                              ),
+                                            }}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                    <Input
+                                      id={`cert-colour-${field.key}`}
+                                      // Keyed on the value and the epoch, so a
+                                      // rejected entry is cleared rather than
+                                      // left sitting there looking accepted.
+                                      key={`${field.key}-colour-${entryEpoch}-${anchor.color ?? field.color}`}
+                                      defaultValue={anchor.color ?? field.color}
+                                      onBlur={(e) => {
+                                        const value =
+                                          e.target.value.trim() || field.color;
+                                        if (!isValidColor(value)) {
+                                          setEntryEpoch((n) => n + 1);
+                                          toast.error(
+                                            `“${e.target.value}” is not a colour — use a preset name or #rrggbb`,
+                                          );
+                                          return;
+                                        }
+                                        moveField(field.key, {
+                                          ...anchor,
+                                          color: value,
+                                        });
+                                      }}
+                                      className="tabular h-8 min-w-0 flex-1 font-mono text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   size="sm"
@@ -507,6 +758,47 @@ export function CertificateTemplateEditor() {
                 Drag it on the page, or type an exact position above.
               </p>
             )}
+
+            {/*
+              Wording — the lines on the certificate that are not learner data.
+              Everything else (name, course, date) prints from the certificate
+              itself and cannot be reworded here, because a certificate saying
+              something other than what the learner earned is not a
+              certificate.
+            */}
+            <div className="space-y-3 border-t border-rule pt-4">
+              <Label className="eyebrow">Wording</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="cert-text-heading">Heading</Label>
+                <Input
+                  id="cert-text-heading"
+                  maxLength={MAX_TEXT_WORDING}
+                  value={workingTexts.heading}
+                  onChange={(e) => setText("heading", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cert-text-issued">Before the date</Label>
+                <Input
+                  id="cert-text-issued"
+                  maxLength={MAX_TEXT_WORDING}
+                  value={workingTexts.issuedOnPrefix}
+                  onChange={(e) => setText("issuedOnPrefix", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cert-text-serial">Before the link</Label>
+                <Input
+                  id="cert-text-serial"
+                  maxLength={MAX_TEXT_WORDING}
+                  value={workingTexts.serialPrefix}
+                  onChange={(e) => setText("serialPrefix", e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The heading prints only while the Heading field is switched on.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -526,13 +818,16 @@ export function CertificateTemplateEditor() {
                 size="sm"
                 variant="outline"
                 disabled={!dirty}
-                onClick={() => setDraft(null)}
+                onClick={() => {
+                  setDraft(null);
+                  setTextsDraft(null);
+                }}
               >
                 Discard changes
               </Button>
               <Button size="sm" disabled={saving || !dirty} onClick={handleSaveLayout}>
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Save placement
+                Save changes
               </Button>
             </>
           )}
@@ -580,14 +875,14 @@ export function CertificateTemplateEditor() {
                   // Keyed on the live value so the box catches up after a drag
                   // or a reset, and on an epoch so a rejected entry is cleared
                   // rather than left sitting there looking accepted.
-                  key={`${field.key}-${coordEpoch}-${formatAnchor(working[field.key])}`}
+                  key={`${field.key}-${entryEpoch}-${formatAnchor(working[field.key])}`}
                   defaultValue={formatAnchor(working[field.key])}
                   onBlur={(e) => {
                     try {
                       const anchor = parseAnchor(e.target.value);
                       if (anchor !== undefined) moveField(field.key, anchor);
                     } catch (err) {
-                      setCoordEpoch((n) => n + 1);
+                      setEntryEpoch((n) => n + 1);
                       toast.error(getErrorMessage(err, "That is not a position"));
                     }
                   }}

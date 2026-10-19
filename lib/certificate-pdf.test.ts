@@ -1,39 +1,48 @@
 import { describe, expect, it } from "vitest";
-import { PDFArray, PDFDocument, PDFRawStream, StandardFonts, rgb } from "pdf-lib";
-import zlib from "node:zlib";
+import { PDFDict, PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
 import { DEFAULT_LAYOUT } from "./certificate-layout";
 import { renderCertificatePdf, type CertificatePdfInput } from "./certificate-pdf";
 import { TINY_JPEG, buildPng } from "@/tests/helpers/png";
 
 /**
- * Text drawn on a page, decoded from the content stream.
+ * The runs of text on a page, as a reader reads them.
  *
- * pdf-lib writes text as hex strings in WinAnsi encoding, so the assertion has
- * to decode them — reading the stream as plain text finds nothing.
+ * Two encodings meet in a certificate. A standard font (Helvetica) writes
+ * WinAnsi bytes into the content stream, so the hex string *is* the text. A
+ * custom face writes two-byte glyph ids and carries a ToUnicode map saying
+ * which character each id stands for — read the hex bytes directly and a
+ * certificate set in Inter comes out as a row of numbers.
+ *
+ * So the text is read the way a reader reads it, through pdf.js, which applies
+ * the font's own map. That also makes this the assertion that matters: what a
+ * learner gets when they select the verification link to copy it.
+ *
+ * Each run carries the text matrix it was drawn at, so a test can ask *where*
+ * a line landed and not only what it said.
  */
-function pageText(doc: PDFDocument, pageIndex: number): string {
-  const contents = doc.getPage(pageIndex).node.Contents();
-  if (!(contents instanceof PDFArray)) return "";
+interface TextRun {
+  str: string;
+  /** The text matrix: [a, b, c, d, x, y]. */
+  transform: number[];
+}
 
-  let out = "";
-  for (let i = 0; i < contents.size(); i += 1) {
-    const stream = doc.context.lookup(contents.lookup(i));
-    if (!(stream instanceof PDFRawStream)) continue;
+async function textRuns(
+  bytes: Uint8Array,
+  pageIndex: number,
+): Promise<TextRun[]> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+  const page = await doc.getPage(pageIndex + 1);
+  const content = await page.getTextContent();
 
-    // pdf-lib flate-compresses content streams on save.
-    const raw = Buffer.from(stream.getContents() as Uint8Array);
-    let source: string;
-    try {
-      source = zlib.inflateSync(raw).toString("latin1");
-    } catch {
-      source = raw.toString("latin1");
-    }
-    for (const match of source.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
-      out += Buffer.from(match[1], "hex").toString("latin1");
-      out += "\n";
-    }
-  }
-  return out;
+  return content.items
+    .filter((item) => "str" in item)
+    .map((item) => ({ str: item.str, transform: item.transform }));
+}
+
+async function pageText(bytes: Uint8Array, pageIndex: number): Promise<string> {
+  const runs = await textRuns(bytes, pageIndex);
+  return runs.map((run) => run.str).join("\n");
 }
 
 const base: CertificatePdfInput = {
@@ -96,11 +105,15 @@ describe("renderCertificatePdf without a template", () => {
   it("truncates a long learner name where the editor does", async () => {
     // The canvas shows the same clip, so the two only stay in step while the
     // shared maxLength is the one doing the cutting.
-    const bytes = await renderCertificatePdf({
-      ...base,
-      holderName: "A".repeat(80),
-    });
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const bytes = await renderCertificatePdf(
+      { ...base, holderName: "A".repeat(80) },
+      // Set small enough that the whole clipped name fits the page. Text that
+      // hangs off the edge is not on the page, and pdf.js only reports what is
+      // on the page — at the default 40pt the name is wider than the sheet, so
+      // this would be measuring the crop rather than the clip.
+      { layout: { recipient: { x: 0.5, y: 0.5, size: 18 } } },
+    );
+    const drawn = await pageText(bytes, 0);
 
     expect(drawn).toContain("A".repeat(46));
     expect(drawn).not.toContain("A".repeat(47));
@@ -154,7 +167,7 @@ describe("renderCertificatePdf with a template", () => {
     const bytes = await renderCertificatePdf(base, { templateBytes: template });
     const doc = await PDFDocument.load(bytes);
 
-    const drawn = pageText(doc, 0);
+    const drawn = await pageText(bytes, 0);
 
     // Artwork from the template survives and the learner's data sits on top of
     // it — the only assertion that proves real overlay rather than a blank page
@@ -186,7 +199,7 @@ describe("renderCertificatePdf with a template", () => {
   it("does not draw its own heading over a template", async () => {
     const template = await buildTemplate();
     const bytes = await renderCertificatePdf(base, { templateBytes: template });
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const drawn = await pageText(bytes, 0);
 
     // A designed background normally prints its own title; doubling it up is
     // what produces the overlapping-text look.
@@ -202,7 +215,7 @@ describe("renderCertificatePdf with a template", () => {
       templateBytes: template,
       layout: { heading: { x: 0.5, y: 0.1, size: 22 } },
     });
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const drawn = await pageText(bytes, 0);
 
     expect(drawn).toContain("CERTIFICATE OF COMPLETION");
   });
@@ -213,7 +226,7 @@ describe("renderCertificatePdf with a template", () => {
       templateBytes: template,
       layout: { issuer: null },
     });
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const drawn = await pageText(bytes, 0);
 
     expect(drawn).not.toContain("Adeyemi");
     expect(drawn).toContain("Okonkwo");
@@ -221,7 +234,7 @@ describe("renderCertificatePdf with a template", () => {
 
   it("still draws its own heading with no template", async () => {
     const bytes = await renderCertificatePdf(base);
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const drawn = await pageText(bytes, 0);
     expect(drawn).toContain("CERTIFICATE OF COMPLETION");
   });
 });
@@ -248,7 +261,7 @@ describe("renderCertificatePdf with an image background", () => {
       templateBytes: buildPng(40, 30),
       templatePageSize: { width: 841.89, height: 595.28 },
     });
-    const drawn = pageText(await PDFDocument.load(bytes), 0);
+    const drawn = await pageText(bytes, 0);
 
     expect(drawn).toContain("Okonkwo");
     expect(drawn).toContain(base.serial);
@@ -276,7 +289,7 @@ describe("renderCertificatePdf with an image background", () => {
     const doc = await PDFDocument.load(bytes);
 
     expect(doc.getPage(0).getSize().width).toBeCloseTo(900, 1);
-    expect(pageText(doc, 0)).toContain("Okonkwo");
+    expect(await pageText(bytes, 0)).toContain("Okonkwo");
   });
 
   it("falls back when the file only claims to be an image", async () => {
@@ -302,7 +315,7 @@ describe("renderCertificatePdf with an image background", () => {
       templatePageSize: page,
     });
     expect(
-      pageText(await PDFDocument.load(suppressed), 0),
+      await pageText(suppressed, 0),
     ).not.toContain("CERTIFICATE OF COMPLETION");
 
     // An image usually has a title of its own printed into it, which is the
@@ -312,8 +325,134 @@ describe("renderCertificatePdf with an image background", () => {
       templatePageSize: page,
       layout: { heading: { x: 0.5, y: 0.1, size: 22 } },
     });
-    expect(pageText(await PDFDocument.load(restored), 0)).toContain(
+    expect(await pageText(restored, 0)).toContain(
       "CERTIFICATE OF COMPLETION",
     );
+  });
+});
+
+describe("per-field typography", () => {
+  /**
+   * The fonts a PDF actually carries, by name.
+   *
+   * Read back through pdf-lib rather than by scanning the bytes: pdf-lib
+   * writes its objects into compressed object streams, so the names are in
+   * there but not in plain sight.
+   */
+  const embeddedFonts = async (bytes: Uint8Array): Promise<string[]> => {
+    const doc = await PDFDocument.load(bytes);
+    const names: string[] = [];
+
+    for (const page of doc.getPages()) {
+      const fonts = page.node.Resources()?.lookup(PDFName.of("Font"));
+      if (!(fonts instanceof PDFDict)) continue;
+      for (const [, ref] of fonts.entries()) {
+        const font = doc.context.lookup(ref);
+        if (!(font instanceof PDFDict)) continue;
+        const base = font.lookup(PDFName.of("BaseFont"));
+        if (base instanceof PDFName) names.push(base.decodeText());
+      }
+    }
+
+    return names;
+  };
+
+  it("sets a field in the face the admin chose", async () => {
+    const serif = await renderCertificatePdf(base, {
+      layout: { issuer: { x: 0.5, y: 0.85, size: 14, font: "cormorant" } },
+    });
+    const mono = await renderCertificatePdf(base, {
+      layout: { issuer: { x: 0.5, y: 0.85, size: 14, font: "jetbrains" } },
+    });
+
+    // The face is not just a label on the field: it is the font the PDF
+    // carries, and the learner's name still reads back as text.
+    expect((await embeddedFonts(serif)).join(" ")).toMatch(/Cormorant/i);
+    expect((await embeddedFonts(mono)).join(" ")).toMatch(/JetBrains/i);
+    expect(await pageText(serif, 0)).toContain("Dr. Bambo Adeyemi");
+  });
+
+  it("applies the letter case before it draws", async () => {
+    const bytes = await renderCertificatePdf(base, {
+      layout: { issuer: { x: 0.5, y: 0.85, size: 14, case: "upper" } },
+    });
+    const drawn = await pageText(bytes, 0);
+
+    expect(drawn).toContain("DR. BAMBO ADEYEMI");
+    expect(drawn).not.toContain("Dr. Bambo Adeyemi");
+  });
+
+  it("stacks a wrapped field at the line height it is given", async () => {
+    const title =
+      "Advanced Data Structures and Algorithm Analysis for Competitive Programming";
+    const runs = async (lineHeight: number) => {
+      const bytes = await renderCertificatePdf(
+        { ...base, courseTitle: title },
+        { layout: { course: { x: 0.5, y: 0.58, size: 22, lineHeight } } },
+      );
+      const drawn = await textRuns(bytes, 0);
+      return drawn.filter(
+        (run) => run.str.includes("Advanced") || run.str.includes("Programming"),
+      );
+    };
+
+    const tight = await runs(1);
+    const loose = await runs(2);
+
+    expect(tight).toHaveLength(2);
+    expect(loose).toHaveLength(2);
+
+    // The gap between the two lines is the line height, in points.
+    const gap = (runs: TextRun[]) =>
+      Math.abs(runs[0].transform[5] - runs[1].transform[5]);
+    expect(gap(tight)).toBeCloseTo(22, 0);
+    expect(gap(loose)).toBeCloseTo(44, 0);
+  });
+});
+
+describe("certificate wording", () => {
+  it("prints the heading the admin saved", async () => {
+    const bytes = await renderCertificatePdf(base, {
+      texts: { heading: "CERTIFICATE OF EXCELLENCE" },
+    });
+    const drawn = await pageText(bytes, 0);
+
+    expect(drawn).toContain("CERTIFICATE OF EXCELLENCE");
+    expect(drawn).not.toContain("CERTIFICATE OF COMPLETION");
+  });
+
+  it("prints the prefixes it is given", async () => {
+    const bytes = await renderCertificatePdf(base, {
+      texts: { issuedOnPrefix: "Finished on", serialPrefix: "Check it at" },
+    });
+    const drawn = await pageText(bytes, 0);
+
+    expect(drawn).toContain("Finished on 9 March 2026");
+    expect(drawn).toContain("Check it at https://glypha.learn/verify/");
+  });
+
+  it("keeps the default wording when the template says nothing", async () => {
+    const bytes = await renderCertificatePdf(base);
+    const drawn = await pageText(bytes, 0);
+
+    expect(drawn).toContain("CERTIFICATE OF COMPLETION");
+    expect(drawn).toContain("Completed on 9 March 2026");
+  });
+});
+
+describe("names the faces cannot spell", () => {
+  it("draws the certificate anyway rather than refusing to print", async () => {
+    // The old standard font threw on this, and a throw inside the render is a
+    // learner who never receives a certificate. The face has no glyph for the
+    // name, so the name prints as a blank — but the certificate around it is
+    // still a certificate.
+    const bytes = await renderCertificatePdf({
+      ...base,
+      holderName: "李明",
+    });
+    const drawn = await pageText(bytes, 0);
+
+    expect(drawn).toContain("CERTIFICATE OF COMPLETION");
+    expect(drawn).toContain("Dr. Bambo Adeyemi");
   });
 });

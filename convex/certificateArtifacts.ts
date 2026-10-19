@@ -11,6 +11,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { renderCertificatePdf } from "../lib/certificate-pdf";
 import { siteUrl } from "../lib/mail";
+import type { CertificateLayout, CertificateTexts } from "../lib/certificate-layout";
 
 export const issueCertificateArtifacts = internalAction({
   args: {
@@ -33,7 +34,8 @@ export const issueCertificateArtifacts = internalAction({
       // issuance and render — and plain artwork is the honest answer there.
       let templateBytes: Uint8Array | undefined;
       let templatePageSize: { width: number; height: number } | undefined;
-      let layout = undefined;
+      let layout: CertificateLayout | undefined;
+      let texts: CertificateTexts | undefined;
 
       if (args.templateId) {
         const template = await ctx.runQuery(
@@ -42,6 +44,9 @@ export const issueCertificateArtifacts = internalAction({
         );
         if (template && template._id === args.templateId) {
           layout = template.layout ?? undefined;
+          // Wording travels with the artwork: the heading and the date prefix
+          // are the admin's copy, saved on the same row as the placement.
+          texts = template.texts ?? undefined;
           templatePageSize = {
             width: template.pageWidth,
             height: template.pageHeight,
@@ -60,7 +65,7 @@ export const issueCertificateArtifacts = internalAction({
           issuedAt: args.issuedAt,
           verifyUrl,
         },
-        { templateBytes, templatePageSize, layout },
+        { templateBytes, templatePageSize, layout, texts },
       );
       const storageId = await ctx.storage.store(
         new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }),

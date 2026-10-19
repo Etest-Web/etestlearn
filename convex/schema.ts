@@ -1,6 +1,44 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+/**
+ * One certificate field's placement: where it sits as a fraction of the page,
+ * plus how its text is set.
+ *
+ * Declared once and referenced by all six fields. The shape used to be written
+ * out six times over, which is how a property ends up on five fields and not
+ * the sixth — and how a font override would have been saved for a name but
+ * silently dropped for the course title.
+ */
+const certificateAnchor = v.object({
+  x: v.number(),
+  y: v.number(),
+  size: v.optional(v.number()),
+  /** Face id from the `CERTIFICATE_FONTS` catalogue; omitted = field default. */
+  font: v.optional(v.string()),
+  /** A colour preset name or `#rrggbb`; omitted = field default. */
+  color: v.optional(v.string()),
+  case: v.optional(
+    v.union(
+      v.literal("none"),
+      v.literal("upper"),
+      v.literal("lower"),
+      v.literal("title"),
+    ),
+  ),
+  /** Line height as a multiple of the font size. */
+  lineHeight: v.optional(v.number()),
+});
+
+const certificatePlacement = v.optional(v.union(v.null(), certificateAnchor));
+
+/** Wording that is not learner data: the heading and the two prefixes. */
+const certificateTexts = v.object({
+  heading: v.optional(v.string()),
+  issuedOnPrefix: v.optional(v.string()),
+  serialPrefix: v.optional(v.string()),
+});
+
 export default defineSchema({
   users: defineTable({
     clerkId: v.string(),
@@ -472,19 +510,23 @@ export default defineSchema({
     // single-template rule may still carry `false`, which is why readers go
     // through getInstalledTemplate() instead of assuming the newest row wins.
     active: v.optional(v.boolean()),
-    // Per-field text placement as fractions of page width/height. A field
-    // omitted uses the built-in default; set to null to keep it off the
-    // certificate entirely (for a template that already prints its own title).
+    // Per-field text placement as fractions of page width/height, plus the way
+    // each field's text is set. A field omitted uses the built-in default; set
+    // to null to keep it off the certificate entirely (for a template that
+    // already prints its own title).
     layout: v.optional(
       v.object({
-        heading: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
-        recipient: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
-        course: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
-        issuedOn: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
-        issuer: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
-        serial: v.optional(v.union(v.null(), v.object({ x: v.number(), y: v.number(), size: v.optional(v.number()) }))),
+        heading: certificatePlacement,
+        recipient: certificatePlacement,
+        course: certificatePlacement,
+        issuedOn: certificatePlacement,
+        issuer: certificatePlacement,
+        serial: certificatePlacement,
       }),
     ),
+    // Editable wording kept out of `layout`: it is copy, not a position, and
+    // every reader that wants the heading already asks for the whole row.
+    texts: v.optional(certificateTexts),
     createdAt: v.number(),
     createdBy: v.optional(v.id("users")),
   }).index("by_active", ["active"]),

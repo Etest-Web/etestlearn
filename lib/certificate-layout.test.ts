@@ -1,22 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   CANVAS_BASELINE_NUDGE,
+  CERTIFICATE_COLORS,
   CERTIFICATE_FIELDS,
+  CERTIFICATE_FONT_LIST,
   CERTIFICATE_INK,
   CERTIFICATE_MUTED,
   DEFAULT_LAYOUT,
   TEMPLATE_DEFAULTS,
+  applyCase,
   certificateField,
   certificateFieldLines,
+  certificateFont,
   effectiveAnchor,
   formatAnchor,
+  isValidColor,
   parseAnchor,
+  resolveColor,
   rgbToCss,
   wrapCharBudget,
   wrapText,
   type CertificateFieldKey,
   type CertificateLayout,
 } from "./certificate-layout";
+import { certificateFontBytes } from "./certificate-fonts-data";
 
 describe("effectiveAnchor", () => {
   it("falls back to the defaults for a field the layout omits", () => {
@@ -224,5 +233,124 @@ describe("CANVAS_BASELINE_NUDGE", () => {
     // the constant for the derivation.
     expect(CANVAS_BASELINE_NUDGE).toBeGreaterThan(0);
     expect(CANVAS_BASELINE_NUDGE).toBeLessThan(0.2);
+  });
+});
+
+describe("the font catalogue", () => {
+  it("ships a file for every face, and the renderer has the bytes", () => {
+    for (const face of CERTIFICATE_FONT_LIST) {
+      // The editor loads the file over HTTP; a face with no file would draw in
+      // whatever the browser happened to have.
+      expect(existsSync(join(process.cwd(), "public", "fonts", face.file))).toBe(
+        true,
+      );
+      // The renderer cannot fetch — its copy is in the bundle.
+      const bytes = certificateFontBytes(face.id);
+      expect(bytes).not.toBeNull();
+      expect(bytes!.length).toBeGreaterThan(1000);
+    }
+  });
+
+  it("gives the renderer a TrueType program, not a woff2", () => {
+    // pdf-lib embeds the bytes it is handed as the PDF's font program, and a
+    // woff2 is a brotli wrapper that no reader can draw.
+    const bytes = certificateFontBytes("inter")!;
+    expect([...bytes.slice(0, 4)]).toEqual([0x00, 0x01, 0x00, 0x00]);
+  });
+
+  it("falls back to the default face for an id it does not know", () => {
+    // A row written by a build with a face this one dropped must still print.
+    expect(certificateFont("no-such-face").id).toBe("inter");
+    expect(certificateFont(undefined).id).toBe("inter");
+  });
+
+  it("measures each face for itself, so wrapping differs by typeface", () => {
+    // Monospace is exactly 0.6em — which is how the measurement was checked —
+    // and a narrow serif is well under the one-size estimate it replaced.
+    expect(certificateFont("jetbrains").advance).toBe(0.6);
+    expect(certificateFont("cormorant").advance).toBeLessThan(0.45);
+    expect(certificateFont("inter").advance).toBeGreaterThan(0.45);
+  });
+});
+
+describe("applyCase", () => {
+  it("leaves the text alone when no case is set", () => {
+    expect(applyCase("Adaeze Okonkwo", undefined)).toBe("Adaeze Okonkwo");
+    expect(applyCase("Adaeze Okonkwo", "none")).toBe("Adaeze Okonkwo");
+  });
+
+  it("upper-cases and lower-cases", () => {
+    expect(applyCase("Adaeze", "upper")).toBe("ADAEZE");
+    expect(applyCase("Adaeze", "lower")).toBe("adaeze");
+  });
+
+  it("title-cases each word", () => {
+    expect(applyCase("completed on 9 march 2026", "title")).toBe(
+      "Completed On 9 March 2026",
+    );
+  });
+
+  it("title-cases a word that starts with a bracket", () => {
+    // The bracket is not the word, so it must not be the thing that gets
+    // capitalised instead.
+    expect(applyCase("(certificate", "title")).toBe("(Certificate");
+  });
+});
+
+describe("certificateFieldLines with typography", () => {
+  it("applies the case before it truncates", () => {
+    // Both the canvas and the PDF clip through this function, so a name set to
+    // UPPER has to lose its tail at the same character as the same name as
+    // typed — otherwise the preview shows more of the name than the print.
+    const typed = certificateFieldLines("recipient", "a".repeat(60), 841.89, 40);
+    const upper = certificateFieldLines("recipient", "a".repeat(60), 841.89, 40, {
+      case: "upper",
+    });
+
+    expect(typed[0]).toHaveLength(46);
+    expect(upper[0]).toHaveLength(46);
+    expect(upper[0]).toBe("A".repeat(46));
+  });
+
+  it("wraps to the width of the face it is set in", () => {
+    const title = "Advanced Data Structures and Algorithm Analysis for Competitive";
+    const narrow = certificateFieldLines("course", title, 841.89, 22, {
+      font: "cormorant",
+    });
+    const wide = certificateFieldLines("course", title, 841.89, 22, {
+      font: "jetbrains",
+    });
+
+    // A narrower face fits more on a line; a monospace one fits least.
+    expect(narrow).toHaveLength(1);
+    expect(wide.length).toBeGreaterThan(narrow.length);
+  });
+});
+
+describe("resolveColor", () => {
+  it("reads a preset", () => {
+    expect(resolveColor("ink")).toEqual(CERTIFICATE_INK);
+    expect(resolveColor("muted")).toEqual(CERTIFICATE_MUTED);
+    expect(resolveColor("white")).toEqual(CERTIFICATE_COLORS.white);
+  });
+
+  it("reads a hex colour, long or short", () => {
+    expect(resolveColor("#ff0000")).toEqual({ r: 1, g: 0, b: 0 });
+    expect(resolveColor("#f00")).toEqual({ r: 1, g: 0, b: 0 });
+    expect(resolveColor("#102030").r).toBeCloseTo(16 / 255, 5);
+  });
+
+  it("falls back rather than throwing on a colour it does not know", () => {
+    // A certificate that prints in the wrong ink is a defect; one that refuses
+    // to print is an outage.
+    expect(resolveColor("chartreuse", "muted")).toEqual(CERTIFICATE_MUTED);
+    expect(resolveColor(undefined, "gold")).toEqual(CERTIFICATE_COLORS.gold);
+  });
+
+  it("knows which colours it accepts", () => {
+    expect(isValidColor("ink")).toBe(true);
+    expect(isValidColor("#abcdef")).toBe(true);
+    expect(isValidColor("#12zz34")).toBe(false);
+    expect(isValidColor("chartreuse")).toBe(false);
   });
 });

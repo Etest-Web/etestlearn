@@ -6,15 +6,14 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { sniffBackgroundKind } from "@/lib/certificate-background";
 import {
   CANVAS_BASELINE_NUDGE,
-  CERTIFICATE_COLORS,
   CERTIFICATE_FIELDS,
-  CERTIFICATE_FONT_CSS,
-  CERTIFICATE_FONT_STYLE,
-  CERTIFICATE_FONT_WEIGHT,
+  CERTIFICATE_FONT_FACES_CSS,
   LINE_HEIGHT_RATIO,
   MAX_FIELD_SIZE,
   MIN_FIELD_SIZE,
   certificateFieldLines,
+  certificateFont,
+  resolveColor,
   rgbToCss,
   type CertificateFieldKey,
   type CertificateLayout,
@@ -453,6 +452,17 @@ export function CertificateCanvas({
 
   return (
     <div className="space-y-2">
+      {/*
+        The six faces, declared once. React 19 hoists this to <head> and
+        dedupes on `href`, so fifty canvases still mean one set of rules —
+        and the files come from /public/fonts, which the CSP already allows
+        in `font-src 'self'`.
+      */}
+      <style
+        href="certificate-fonts"
+        precedence="certificate"
+        dangerouslySetInnerHTML={{ __html: CERTIFICATE_FONT_FACES_CSS }}
+      />
       <div
         ref={containerRef}
         className="relative w-full touch-none overflow-hidden rounded-md border border-rule bg-white select-none"
@@ -491,11 +501,16 @@ export function CertificateCanvas({
           if (!anchor) return null;
 
           const size = anchor.size ?? 14;
+          const face = certificateFont(anchor.font ?? field.font);
+          // Same shared casing, truncation and wrapping the PDF runs, so a
+          // field set to UPPER CASE breaks its lines in the same place here
+          // as it prints there.
           const lines = certificateFieldLines(
             field.key,
             field.sample,
             pageWidth,
             size,
+            { font: face.id, case: anchor.case },
           );
           const isSelected = selected === field.key;
 
@@ -530,12 +545,12 @@ export function CertificateCanvas({
                 // them is exactly what the admin is lining it up to.
                 opacity: dragging && dragging !== field.key ? 0.45 : 1,
                 transition: "opacity 120ms ease",
-                color: rgbToCss(CERTIFICATE_COLORS[field.color]),
-                fontFamily: CERTIFICATE_FONT_CSS[field.font],
-                fontWeight: CERTIFICATE_FONT_WEIGHT[field.font],
-                fontStyle: CERTIFICATE_FONT_STYLE[field.font] as "normal" | "italic",
+                color: rgbToCss(resolveColor(anchor.color, field.color)),
+                fontFamily: face.css,
+                fontWeight: face.weight,
+                fontStyle: face.style,
                 fontSize: size * scale,
-                lineHeight: LINE_HEIGHT_RATIO,
+                lineHeight: anchor.lineHeight ?? LINE_HEIGHT_RATIO,
                 whiteSpace: "pre",
                 // Every line is centred on the anchor in the PDF, so wrapped
                 // lines have to be centred in the box too — left-aligned, the

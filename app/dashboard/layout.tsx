@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 <Input
                                     name="q"
                                     type="search"
-                                    placeholder="Search your course...."
+                                    placeholder="Search courses, instructors, people..."
                                     className="h-12 rounded-sm border-rule pl-11 text-[15px]"
                                 />
                             </form>
@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 variant="ghost"
                                 size="icon"
                                 className="md:hidden"
-                                aria-label="Search your courses"
+                                aria-label="Search courses, instructors and people"
                                 render={<Link href="/dashboard/search" />}
                             >
                                 <Search className="h-5 w-5" />

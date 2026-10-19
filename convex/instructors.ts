@@ -89,8 +89,15 @@ async function loadPublicInstructor(
   return user;
 }
 
-/** Narrows a user document to the public subset, trimming empty strings away. */
-function toPublicInstructor(user: Doc<"users">): PublicInstructor {
+/**
+ * Narrows a user document to the public subset, trimming empty strings away.
+ *
+ * Exported because the search page draws the same person from the same
+ * fields: a card that named somebody "Glypha Instructor" while their profile
+ * page said "Ada Lovelace" would be two truths about one row, and the search
+ * result is the one a learner meets first.
+ */
+export function toPublicInstructor(user: Doc<"users">): PublicInstructor {
   return {
     _id: user._id,
     // A name is the one field the page cannot do without; Clerk always

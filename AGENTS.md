@@ -318,6 +318,36 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       somebody asked for. **Replying is not gated on having finished**, only on having a session:
       a thread only the completed may enter is a testimonial wall, and the people most likely to
       reply to a teacher's answer are still working through the course.
+13. **Search is one query with three kinds of answer, and two people directories that must agree.**
+    `convex/search.ts` answers for a **course**, an **instructor** and a **person** in a single
+    round trip; the page is `app/dashboard/search/page.tsx`, the shared vocabulary is
+    `lib/search.ts`, and the wire handle is `lib/search-api.ts` (a `makeFunctionReference`, because
+    `convex/_generated/api.d.ts` predates the module — same workaround as `lib/friends-api.ts`).
+    Four things are load-bearing:
+    - **One query, three sections — not three queries, one list.** Three subscriptions would mean
+      three loading states and a result set that is half old and half new. The sections are separate
+      because a course and a person are not comparable: one has a price and a syllabus, the other
+      has an avatar and a request button. Each is ranked against its own kind.
+    - **Courses are full-text; people are a bounded scan.** Courses use the `search` index on
+      `courses` (`searchText` + `published` as a filter field). `users` has no search index and a
+      substring match could not use one, so the people half reads the **`by_role` index** — three
+      role ranges, newest first, capped at `USER_SEARCH_SCAN_CAP` (`convex/helpers/users.ts`). The
+      honest cost: a match beyond the window is invisible, not merely unranked. **At scale, replace
+      the scan with a `searchIndex` on a normalised `searchText` field on `users`** — a schema
+      change plus a backfill, which is why it is not done in the same breath as the feature.
+    - **The two people directories share one window.** The search page and the friends Discover tab
+      are two doors onto one directory, so they must read the same people — `readSearchableUsers` in
+      `convex/helpers/users.ts` is the single definition. Two windows would mean the same name
+      returning different people depending on which box you typed it in.
+    - **A relationship is one state with a direction, and the direction changes the button.**
+      `mergeRelationship` in `lib/friends.ts` collapses the two possible rows for a pair, and it
+      uses the same priority as `planSendRequest` — the two must agree, or the search page offers a
+      button the friends page then refuses. A **declined** request keeps its direction: one you
+      sent may be re-asked, one they sent may not (the platform does not re-offer somebody you
+      turned down). `convex/helpers/relationships.ts` has two readers on purpose — six range reads
+      for *everyone* you are related to (Discover must exclude them all, in every status), and two
+      point reads each off `by_requester_addressee` for *specific* people (the search page asks
+      about eight, and must not read a large friend graph to do it).
 
 ---
 

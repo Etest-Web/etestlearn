@@ -391,8 +391,9 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
 14. **Search is one query with three kinds of answer, and two people directories that must agree.**
     `convex/search.ts` answers for a **course**, an **instructor** and a **person** in a single
     round trip; the page is `app/dashboard/search/page.tsx`, the shared vocabulary is
-    `lib/search.ts`, and the wire handle is `lib/search-api.ts` (a `makeFunctionReference`, because
-    `convex/_generated/api.d.ts` predates the module — same workaround as `lib/friends-api.ts`).
+    `lib/search.ts`, and the wire handle is `lib/search-api.ts` (a `makeFunctionReference`, the
+    same seam `lib/friends-api.ts` uses, so a client component never imports a Convex *server*
+    module and bundles the function definitions).
     Four things are load-bearing:
     - **One query, three sections — not three queries, one list.** Three subscriptions would mean
       three loading states and a result set that is half old and half new. The sections are separate

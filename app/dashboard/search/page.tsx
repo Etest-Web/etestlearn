@@ -150,49 +150,109 @@ function SearchView() {
 
   return (
     <PageShell>
-      <PageHeader
-        // Kept in plain quotes rather than a template with typographic quotes:
-        // the header's display face already carries the voice, and a template
-        // literal here was the source of a parse error that no editor flagged.
-        title={query ? `Search results for "${query}"` : "Search"}
-        description={resultSummary(query, results, browseCourses?.length)}
-      />
+      {/* ── The spotlight ──────────────────────────────────────────────────
+          The whole page hangs off this one control, so it is the page's
+          hero: centred, larger than anything around it, and lit.
 
-      <form onSubmit={submit} role="search" className="relative w-full max-w-xl">
-        <SearchIcon
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-          size={18}
+          The light is three layers rather than one. A wide wash behind the
+          whole block, a soft halo under the field, and a tighter core inside
+          it. One layer reads as a coloured box; three read as light falling
+          on the field.
+
+          The two close layers brighten on focus by changing **opacity only**.
+          Animating their colour would repaint a blurred region on every
+          frame of the transition, which is the one thing on this page that
+          could cost a frame; an opacity change is a compositor operation and
+          costs nothing. The blur is static for the same reason — it is
+          painted once, when the page settles, and never repainted.
+
+          `isolate` matters: the layers sit at `-z-10`, and without a stacking
+          context of their own they would fall behind the page background
+          rather than behind the field. */}
+      <section className="relative isolate flex flex-col items-center">
+        <div
           aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_70%_at_50%_55%,var(--brand)_0%,transparent_72%)] opacity-[0.09]"
         />
-        <Input
-          type="search"
-          name="q"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Search courses, instructors and people…"
-          aria-label="Search courses, instructors and people"
-          className="h-12 rounded-sm border-rule pl-11 pr-24 text-[15px]"
+
+        <PageHeader
+          className="hero-enter-1 w-full max-w-2xl sm:justify-center text-center"
+          // Kept in plain quotes rather than a template with typographic quotes:
+          // the header's display face already carries the voice, and a template
+          // literal here was the source of a parse error that no editor flagged.
+          title={query ? `Search results for "${query}"` : "Search"}
+          description={resultSummary(query, results, browseCourses?.length)}
         />
-        {draft ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={clear}
-            aria-label="Clear search"
-            className="absolute right-20 top-1/2 -translate-y-1/2"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        ) : null}
-        <Button
-          type="submit"
-          size="sm"
-          className="absolute right-2 top-1/2 -translate-y-1/2"
+
+        <form
+          onSubmit={submit}
+          role="search"
+          className="hero-enter-2 group relative mt-2 w-full max-w-2xl"
         >
-          Search
-        </Button>
-      </form>
+          {/* The halo. Two radii rather than one: a wide soft spread and a
+              tighter core, so the light has depth instead of reading as a
+              single blurred rectangle behind a field. Opacity is the only
+              thing that changes when the field takes focus.
+
+              Both sit on the field's own box, so the blur spreads the light
+              evenly on every side. A layer that hung below the field would
+              read as a stain under it, not as light around it.
+
+              Dimmer on a phone, where the field runs edge to edge and only
+              the top and bottom of the aura are on screen — at full strength
+              the underside reads as a shadow rather than as light. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-brand/25 opacity-50 blur-2xl transition-opacity duration-500 group-focus-within:opacity-100 sm:opacity-70"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 rounded-lg bg-brand/45 opacity-30 blur-md transition-opacity duration-500 group-focus-within:opacity-100 sm:opacity-40"
+          />
+
+          <SearchIcon
+            className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors duration-300 group-focus-within:text-brand"
+            size={20}
+            aria-hidden
+          />
+          <Input
+            type="search"
+            name="q"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Search courses, instructors and people…"
+            aria-label="Search courses, instructors and people"
+            // Opaque in both themes: the halo behind the field is meant to be
+            // seen around its edges, not through the middle of it.
+            className="h-14 rounded-sm border-rule bg-background pl-14 pr-24 text-base group-focus-within:border-brand/60 focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/20 sm:pr-32 dark:bg-background"
+          />
+          {draft ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={clear}
+              aria-label="Clear search"
+              className="absolute right-14 top-1/2 -translate-y-1/2 sm:right-20"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <Button
+            type="submit"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+          >
+            {/* Icon-only on a phone, where the field is already narrow. A
+                `type="search"` input puts a Search key on the soft keyboard
+                that submits the form, so the button is a convenience there,
+                not the only way through — and the label is still read out. */}
+            <SearchIcon className="sm:hidden" size={16} aria-hidden />
+            <span className="hidden sm:inline">Search</span>
+            <span className="sr-only sm:hidden">Search</span>
+          </Button>
+        </form>
+      </section>
 
       <p aria-live="polite" className="sr-only">
         {announcement}

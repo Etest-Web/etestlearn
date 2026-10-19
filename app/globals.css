@@ -362,10 +362,12 @@
 }
 
 /* ── Hero entrance ─────────────────────────────────────────────────────────
-   A staggered rise, and the only keyframe set added for the marketing page.
+   A staggered rise, and the only keyframe set in the app.
    The order is the whole point: headline, then supporting line, then the
    actions, then the certificate, so the eye lands on the promise before the
-   artifact instead of arriving at both at once.
+   artifact instead of arriving at both at once. The dashboard search uses the
+   same two steps for the same reason — the heading settles before the field it
+   introduces.
 
    Gated on `no-preference` rather than `reduce` so a reduced-motion visitor
    gets the finished layout with no fade at all, rather than a 0.01ms one. */

@@ -44,28 +44,35 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <DashboardSidebar />
 
                 <SidebarInset className="min-h-dvh bg-background">
-                    <header className="flex h-20 items-center justify-between gap-3 px-4 bg-transparent sm:px-6 lg:px-8">
+                    {/*
+                      Three columns, and the two flanks are *equal* (`flex-1`)
+                      rather than content-sized — that equality is what puts the
+                      middle column, and the search inside it, on the header's
+                      true centre no matter how much heavier the right flank
+                      (mail / bell / avatar) is than the left (the sidebar
+                      trigger, nothing at all above lg).
+
+                      The middle is `flex-[2]` because a search field plus the
+                      student CTA needs half the header, not a third. All three
+                      are `min-w-0`, so a column whose content outruns its share
+                      spills sideways into the empty middle instead of widening
+                      the document — which is what keeps a long name or a
+                      320px viewport from producing a horizontal scrollbar.
+
+                      Two consequences of that share-maths, deliberately not
+                      "fixed" elsewhere:
+                      · The header name waits until `xl`. Below it, the name's
+                        ~100px would take the right flank past its quarter of
+                        the header and it would collide with the search.
+                      · The student CTA waits until `md`, where the search form
+                        itself appears — below that the middle column has to
+                        stay empty or the CTA and the right flank overlap.
+                    */}
+                    <header className="flex h-20 items-center gap-3 px-4 bg-transparent sm:px-6 lg:px-8">
                         <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                             <SidebarTrigger className="lg:hidden" />
-                            <form
-                                action="/dashboard/search"
-                                method="get"
-                                data-tour="search"
-                                className="relative max-w-md w-full hidden md:block"
-                            >
-                                <Search
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                                    size={18}
-                                />
-                                <Input
-                                    name="q"
-                                    type="search"
-                                    placeholder="Search courses, instructors, people..."
-                                    className="h-12 rounded-sm border-rule pl-11 text-[15px]"
-                                />
-                            </form>
-                            {/* Below md the search form above is hidden, so the
-                                trigger has to live in the icon cluster instead —
+                            {/* Below md the search form in the middle column is
+                                hidden, so the affordance lives here instead —
                                 and the search page carries its own field,
                                 because linking to a page with no input is a
                                 dead end. */}
@@ -80,9 +87,42 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             </Button>
                         </div>
 
+                        <div className="flex min-w-0 flex-[2] items-center justify-center gap-2">
+                            <form
+                                action="/dashboard/search"
+                                method="get"
+                                data-tour="search"
+                                className="relative hidden w-full max-w-md min-w-0 md:block"
+                            >
+                                <Search
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                                    size={18}
+                                />
+                                <Input
+                                    name="q"
+                                    type="search"
+                                    placeholder="Search courses, instructors, people..."
+                                    className="h-12 rounded-sm border-rule pl-11 text-[15px]"
+                                />
+                            </form>
+                            {/* Students only: instructors and admins already
+                                have the console, and `/become-instructor`
+                                answers the pending / approved / rejected case
+                                itself. */}
+                            {dbUser?.role === "student" ? (
+                                <Button
+                                    variant="outline"
+                                    className="hidden md:inline-flex"
+                                    render={<Link href="/become-instructor" />}
+                                >
+                                    Become an instructor
+                                </Button>
+                            ) : null}
+                        </div>
+
                         <div
                             data-tour="header-actions"
-                            className="flex shrink-0 items-center gap-3 sm:gap-4 lg:gap-6"
+                            className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:gap-4 lg:gap-6"
                         >
                             <div className="flex items-center gap-2 sm:gap-3">
                                 {/* These were two inert <button>s with no
@@ -143,9 +183,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                     ) : null}
                                 </Button>
                             </div>
-                            <div className="flex items-center gap-3 border-l border-rule pl-3 sm:pl-6">
+                            <div className="flex min-w-0 items-center gap-3 border-l border-rule pl-3 sm:pl-6">
                                 <UserButton appearance={{ elements: { avatarBox: "w-10 h-10" } }} />
-                                <span className="hidden font-semibold text-foreground sm:block">
+                                {/* Capped and late: see the note above the
+                                    header — this text is the whole reason the
+                                    right flank is the wide one. */}
+                                <span className="hidden max-w-24 truncate font-semibold text-foreground xl:block">
                                     {user?.fullName || "Student"}
                                 </span>
                             </div>

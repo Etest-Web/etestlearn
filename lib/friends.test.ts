@@ -17,6 +17,7 @@ import {
   searchMatchRank,
   sendRequestBlockedMessage,
   shiftDayKey,
+  sortFriendsForDisplay,
   summarizeActivity,
   utcDayKey,
 } from "./friends";
@@ -248,6 +249,59 @@ describe("orderByBefriended", () => {
     ];
     orderByBefriended(items);
     expect(items.map((i) => i.name)).toEqual(["old", "new"]);
+  });
+});
+
+describe("sortFriendsForDisplay", () => {
+  test("latest matches orderByBefriended — the order the server sends", () => {
+    const items = [
+      { name: "mid", since: 2000, tiebreak: "c" },
+      { name: "new", since: 3000, tiebreak: "b" },
+      { name: "old", since: 1000, tiebreak: "a" },
+    ];
+    expect(sortFriendsForDisplay(items, "latest").map((i) => i.name)).toEqual([
+      "new",
+      "mid",
+      "old",
+    ]);
+  });
+
+  test("alphabetical is case-insensitive", () => {
+    const items = [
+      { name: "zuri", since: 1, tiebreak: "a" },
+      { name: "Ada", since: 2, tiebreak: "b" },
+      { name: "bola", since: 3, tiebreak: "c" },
+    ];
+    expect(
+      sortFriendsForDisplay(items, "alphabetical").map((i) => i.name),
+    ).toEqual(["Ada", "bola", "zuri"]);
+  });
+
+  test("names equal apart from case fall back to tiebreak", () => {
+    // "ada" and "Ada" compare equal under sensitivity:"base", so without the
+    // tiebreak the two rows would reshuffle between reads. The boundary goes
+    // the same way `orderByBefriended` draws it (larger row id first).
+    const items = [
+      { name: "Ada", since: 1, tiebreak: "b" },
+      { name: "ada", since: 2, tiebreak: "a" },
+    ];
+    expect(
+      sortFriendsForDisplay(items, "alphabetical").map((i) => i.tiebreak),
+    ).toEqual(["b", "a"]);
+    expect(
+      sortFriendsForDisplay([...items].reverse(), "alphabetical").map(
+        (i) => i.tiebreak,
+      ),
+    ).toEqual(["b", "a"]);
+  });
+
+  test("does not mutate its input", () => {
+    const items = [
+      { name: "zuri", since: 1, tiebreak: "a" },
+      { name: "Ada", since: 2, tiebreak: "b" },
+    ];
+    sortFriendsForDisplay(items, "alphabetical");
+    expect(items.map((i) => i.name)).toEqual(["zuri", "Ada"]);
   });
 });
 

@@ -10,6 +10,8 @@ import {
   Check,
   Clock,
   Flame,
+  LayoutGrid,
+  List,
   Loader2,
   Mail,
   Search as SearchIcon,
@@ -46,6 +48,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { friendsApi } from "@/lib/friends-api";
 import {
   MIN_SEARCH_LENGTH,
@@ -53,6 +56,8 @@ import {
   isSearchableTerm,
   normalizeSearchTerm,
   roleLabel,
+  sortFriendsForDisplay,
+  type FriendSortOrder,
 } from "@/lib/friends";
 import { formatRelativeTime } from "@/lib/utils";
 import type {
@@ -70,6 +75,12 @@ import type {
  * and the browser's back button walks between tabs — the same `useSearchParams`
  * + Suspense pattern `app/dashboard/search` uses.
  *
+ * The Friends tab renders **one list two ways**: compact rows whose full
+ * details reveal on hovering (and focusing) the person's name, and the gallery
+ * of full cards. Sort and view are session-local choices, not URL state — so a
+ * shared link always lands the newcomer on the default list, newest friends
+ * first.
+ *
  * Every relationship state is rendered as **word + icon + tint**, never tint
  * alone, so "Friends" and "Request sent" survive greyscale and colour-blindness.
  *
@@ -81,6 +92,10 @@ import type {
 
 const TABS = ["friends", "requests", "discover"] as const;
 type Tab = (typeof TABS)[number];
+
+/** The two renderings of the friends list itself — no runtime discrimination
+    happens on them, so they are a plain type rather than a validated set. */
+type FriendListView = "list" | "gallery";
 
 function isTab(value: string | null): value is Tab {
   return value !== null && (TABS as readonly string[]).includes(value);
@@ -295,6 +310,18 @@ function FriendGridSkeleton({ count = 4 }: { count?: number }) {
   );
 }
 
+/** Matches the compact list row (p-4 above a default avatar) so the data
+    landing does not jump the page. */
+function FriendListSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true">
+      {Array.from({ length: count }, (_, i) => (
+        <Skeleton key={i} className="h-[72px] w-full rounded-sm" />
+      ))}
+    </div>
+  );
+}
+
 function RowSkeleton({ count = 3, height = "h-20" }: { count?: number; height?: string }) {
   return (
     <div className="flex flex-col gap-3" aria-busy="true">
@@ -354,6 +381,196 @@ function Since({ at, prefix }: { at: number; prefix: string }) {
 
 // ─── Friends tab ──────────────────────────────────────────────────────────
 
+/**
+ * One of the two option controls (sort, view): words + a tint for the selected
+ * state, never colour alone — the rule this page applies to every pill. A pair
+ * of `aria-pressed` buttons rather than a dropdown keeps both choices visible,
+ * which is why "sort" and "view" need no menu.
+ */
+function ChoiceGroup<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: ReadonlyArray<{
+    value: T;
+    label: string;
+    icon?: LucideIcon;
+  }>;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="border-rule inline-flex items-center rounded-md border bg-card p-0.5"
+    >
+      {options.map((option) => {
+        const Icon = option.icon;
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(option.value)}
+            className={`focus-ring touch-target inline-flex items-center gap-1.5 rounded-sm px-3 py-2 text-sm font-bold transition-colors ${
+              selected
+                ? "bg-brand/10 text-brand-ink"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {Icon && <Icon size={16} aria-hidden className="shrink-0" />}
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * One row of the list view.
+ *
+ * The name is the hover **and keyboard-focus** target for the details the
+ * gallery card paints inline — same facts (`convex/friends.listFriends`
+ * resolves all of it server-side), one place. Touch users without hover have
+ * the gallery view, where nothing is hidden behind a tooltip.
+ */
+function FriendListRow({
+  friend,
+  busy,
+  onRemove,
+}: {
+  friend: FriendSummary;
+  busy: string | null;
+  onRemove: () => void;
+}) {
+  const { activity } = friend;
+
+  return (
+    <div className="border-rule flex flex-col gap-3 border bg-card p-4 transition-colors hover:border-rule-strong sm:flex-row sm:items-center">
+      <PersonAvatar
+        name={friend.name}
+        imageUrl={friend.imageUrl}
+        size="default"
+      />
+      <div className="min-w-0 flex-1">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                className="focus-ring text-foreground break-words rounded-sm text-left text-[15px] font-bold transition-colors hover:text-brand"
+              >
+                {friend.name}
+              </button>
+            }
+          />
+          <TooltipContent
+            side="bottom"
+            align="start"
+            className="flex-col w-64 items-stretch gap-1.5 px-4 py-3 text-xs"
+          >
+            <span className="text-sm font-bold">{friend.name}</span>
+            <span className="inline-flex items-center gap-1 font-semibold">
+              <Check size={12} aria-hidden />
+              {`Friends · ${roleLabel(friend.role)}`}
+            </span>
+            <span>
+              {`Friends since ${formatRelativeTime(friend.since)}`}
+            </span>
+            <span>
+              {`${activity.certificatesEarned} certificate${
+                activity.certificatesEarned === 1 ? "" : "s"
+              } · ${activity.coursesInProgress} in progress · ${
+                activity.currentStreak
+              }-day streak`}
+            </span>
+            <span className="text-background/70">
+              {activity.lastActiveAt === null
+                ? "No activity yet"
+                : `Last active ${formatRelativeTime(activity.lastActiveAt)}`}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+        <div className="mt-1">
+          <Since at={friend.since} prefix="Friends since" />
+        </div>
+      </div>
+      <RemoveFriendButton
+        friend={friend}
+        busy={busy}
+        onRemove={onRemove}
+        className="flex-1 sm:flex-none"
+      />
+    </div>
+  );
+}
+
+/**
+ * The remove flow, shared by the list row and the gallery card so the
+ * confirmation copy can never drift between the two views. `busy` keys the
+ * button disabled while **any** friend action is in flight — the same
+ * one-in-flight rule `FriendsView.run` applies to every control on the page.
+ */
+function RemoveFriendButton({
+  friend,
+  busy,
+  onRemove,
+  className,
+}: {
+  friend: FriendSummary;
+  busy: string | null;
+  onRemove: () => void;
+  /** Positioning differs by host: the card tucks it into a footer, the row stretches it in a column. */
+  className: string;
+}) {
+  const pending = busy === `remove:${friend.friendshipId}`;
+
+  return (
+    <AlertDialog>
+      {/* Base UI composes with `render`, not `asChild`. */}
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy !== null}
+            aria-label={`Remove ${friend.name} from your friends`}
+            className={className}
+          >
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <UserRoundMinus className="h-4 w-4" aria-hidden />
+            )}
+            Remove
+          </Button>
+        }
+      />
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove {friend.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            They will leave your friend list and stop sharing their progress
+            with you. You can send another request later.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep friend</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={onRemove} disabled={pending}>
+            Remove friend
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function FriendsTab({
   friends,
   activity,
@@ -367,8 +584,15 @@ function FriendsTab({
   onRemove: (friend: FriendSummary) => void;
   onGoToDiscover: () => void;
 }) {
+  // Session-local, not URL state: the shared link (the tabs carry those) always
+  // opens on the default — the list the learner just built, newest friends
+  // first. "latest" is a no-op sort of what `listFriends` already sends, so
+  // the first paint and the first reorder do the exact same work.
+  const [sort, setSort] = useState<FriendSortOrder>("latest");
+  const [view, setView] = useState<FriendListView>("list");
+
   if (friends === undefined) {
-    return <FriendGridSkeleton />;
+    return view === "gallery" ? <FriendGridSkeleton /> : <FriendListSkeleton />;
   }
 
   if (friends.length === 0) {
@@ -382,19 +606,67 @@ function FriendsTab({
     );
   }
 
+  // `friendshipId` is the tiebreak `sortFriendsForDisplay` needs, and `name`
+  // rides along at the top level because that is the field it compares — the
+  // same widening `convex/friends.ts` does to feed `orderByBefriended`.
+  const sorted = sortFriendsForDisplay(
+    friends.map((friend) => ({
+      friend,
+      name: friend.name,
+      since: friend.since,
+      tiebreak: friend.friendshipId,
+    })),
+    sort,
+  ).map((entry) => entry.friend);
+
   return (
-    <div className="flex flex-col gap-8">
-      <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {friends.map((friend) => (
-          <li key={friend.friendshipId}>
-            <FriendCard
-              friend={friend}
-              busy={busy}
-              onRemove={() => onRemove(friend)}
-            />
-          </li>
-        ))}
-      </ul>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ChoiceGroup
+          label="Sort friends by"
+          value={sort}
+          onChange={setSort}
+          options={[
+            { value: "latest", label: "Latest added" },
+            { value: "alphabetical", label: "A–Z" },
+          ]}
+        />
+        <ChoiceGroup
+          label="View"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "list", label: "List", icon: List },
+            { value: "gallery", label: "Gallery", icon: LayoutGrid },
+          ]}
+        />
+      </div>
+
+      {view === "list" ? (
+        <ul className="flex flex-col gap-3">
+          {sorted.map((friend) => (
+            <li key={friend.friendshipId}>
+              <FriendListRow
+                friend={friend}
+                busy={busy}
+                onRemove={() => onRemove(friend)}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {sorted.map((friend) => (
+            <li key={friend.friendshipId}>
+              <FriendCard
+                friend={friend}
+                busy={busy}
+                onRemove={() => onRemove(friend)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       <ActivityFeed items={activity} />
     </div>
   );
@@ -409,7 +681,6 @@ function FriendCard({
   busy: string | null;
   onRemove: () => void;
 }) {
-  const pending = busy === `remove:${friend.friendshipId}`;
   const { activity } = friend;
 
   return (
@@ -459,42 +730,12 @@ function FriendCard({
             ? "No activity yet"
             : `Last active ${formatRelativeTime(activity.lastActiveAt)}`}
         </span>
-        <AlertDialog>
-          {/* Base UI composes with `render`, not `asChild`. */}
-          <AlertDialogTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy !== null}
-                aria-label={`Remove ${friend.name} from your friends`}
-                className="shrink-0"
-              >
-                {pending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <UserRoundMinus className="h-4 w-4" aria-hidden />
-                )}
-                Remove
-              </Button>
-            }
-          />
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remove {friend.name}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                They will leave your friend list and stop sharing their progress
-                with you. You can send another request later.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Keep friend</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={onRemove} disabled={pending}>
-                Remove friend
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <RemoveFriendButton
+          friend={friend}
+          busy={busy}
+          onRemove={onRemove}
+          className="shrink-0"
+        />
       </div>
     </article>
   );

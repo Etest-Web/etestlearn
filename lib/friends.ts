@@ -250,6 +250,44 @@ export function orderByBefriended<T extends BefriendedAt>(items: T[]): T[] {
   return [...items].sort((a, b) => b.since - a.since || (a.tiebreak < b.tiebreak ? 1 : a.tiebreak > b.tiebreak ? -1 : 0));
 }
 
+// ── View ordering ────────────────────────────────────────────────────────
+
+/**
+ * The two sort orders the Friends page offers. `"latest"` **is** the ordering
+ * rule the server sends — {@link orderByBefriended} — so the list arrives in
+ * that order and the client only re-derives it when the learner picks
+ * `"alphabetical"`. Sorting is a view choice, not a server fact.
+ */
+export const FRIEND_SORT_ORDERS = ["latest", "alphabetical"] as const;
+export type FriendSortOrder = (typeof FRIEND_SORT_ORDERS)[number];
+
+/**
+ * Sorts a friends list for display, without mutating it.
+ *
+ * `"alphabetical"` compares with `sensitivity: "base"` so "ada" and "Ada" land
+ * together — a learner's capitalisation never decides whose row comes first —
+ * and names that are equal apart from case fall back to the same stable
+ * {@link BefriendedAt.tiebreak} the latest ordering uses, so two buttons that
+ * agree never reshuffle between reads.
+ *
+ * The caller carries `tiebreak` itself (the friendship row id) because the
+ * stored rows do not have that field name — the same widening `listFriends`
+ * already does.
+ */
+export function sortFriendsForDisplay<T extends BefriendedAt & { name: string }>(
+  items: readonly T[],
+  order: FriendSortOrder,
+): T[] {
+  if (order === "latest") {
+    return orderByBefriended([...items]);
+  }
+  return [...items].sort(
+    (a, b) =>
+      a.name.localeCompare(b.name, "en", { sensitivity: "base" }) ||
+      (a.tiebreak < b.tiebreak ? 1 : a.tiebreak > b.tiebreak ? -1 : 0),
+  );
+}
+
 // ── Activity arithmetic ──────────────────────────────────────────────────
 
 /** UTC day bucket, matching how `statistics.calculateCurrentStreak` groups. */

@@ -20,7 +20,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
-import { CourseSchema } from "@/components/seo/course-schema";
 import { CourseReviews } from "@/components/course-reviews";
 import { CourseClassDiscussion } from "@/components/course-class-discussion";
 import { CourseProjects } from "@/components/course-projects";
@@ -265,17 +264,15 @@ export default function CoursePage() {
 
   return (
     <>
-      <CourseSchema
-        course={{
-          title: course.title,
-          description: course.description,
-          slug: course.slug,
-          category: course.category,
-          level: course.level,
-          thumbnailUrl: course.thumbnailUrl,
-          priceKobo: course.price,
-        }}
-      />
+      {/*
+        The course's structured data is emitted by the layout, not here.
+
+        This page is a client component: it reads the course through
+        `useQuery`, which does not resolve during the server render, so a
+        schema built from its data would be missing from the HTML a crawler
+        fetches. The layout is the server component that already has the
+        course document, so the schema is built there.
+      */}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:py-10 space-y-8 pb-24 lg:pb-16">
         {/* Breadcrumb & Back */}

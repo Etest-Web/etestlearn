@@ -7,7 +7,26 @@ import { StarFeature } from "@/components/marketing/star-feature";
 import { InstructorBand } from "@/components/marketing/instructor-band";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { ClosingCta } from "@/components/marketing/closing-cta";
-import { HomepageSchema } from "@/components/seo/homepage-schema";
+import { FAQS } from "@/components/marketing/faq-data";
+import JsonLd from "@/components/seo/jsonld";
+import { buildFaqSchema, buildWebPageSchema } from "@/components/seo/schemas";
+import type { Metadata } from "next";
+
+/**
+ * The homepage is the one page whose canonical URL is the site root, and it
+ * was the only public page without one.
+ *
+ * It is declared here rather than in the root layout on purpose: a canonical
+ * in the root layout is inherited by every route that does not set its own,
+ * which would tell the search engine that `/become-instructor` and
+ * `/verify/<id>` are duplicates of the homepage. Next.js merges metadata
+ * per-field, so a child that sets `alternates` replaces the parent's
+ * wholesale — but a child that sets nothing inherits it, and that is the
+ * wrong answer for every page except this one.
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 /**
  * Eight sections, eight different layout families.
@@ -25,7 +44,20 @@ import { HomepageSchema } from "@/components/seo/homepage-schema";
 export default function Home() {
   return (
     <>
-      <HomepageSchema />
+      {/*
+        The homepage's own structured data, in the initial HTML.
+
+        `WebPage` is what describes this page as part of the site; `FAQPage` is
+        what lets the questions below show up as expandable results in search.
+        Both are rendered here rather than from inside the client components
+        that display the content, because a crawler that does not run
+        JavaScript would otherwise see the copy but not the markup describing
+        it.
+      */}
+      <JsonLd
+        schema={[buildWebPageSchema(), buildFaqSchema(FAQS)]}
+        id="homepage-schema"
+      />
       <main>
         <HeroPoster />
         <CategoryMarquee />

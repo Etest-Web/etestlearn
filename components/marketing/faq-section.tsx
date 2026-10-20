@@ -4,46 +4,7 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Reveal } from "./reveal";
-import ScriptOrg from "@/components/seo/script-org";
-import type { SchemaOrg } from "@/components/seo/types";
-
-const FAQS = [
-  {
-    q: "Are the certificates actually verifiable?",
-    a: "Yes. Each certificate is issued with a unique ID and a public verification page of its own. An employer, a client or a school can confirm it in seconds without contacting us.",
-  },
-  {
-    q: "How much do courses cost?",
-    a: "It depends on the course. Many are free, and paid ones are priced in naira and settled through Paystack. The price is always on the listing before you enroll, and there are no added fees at checkout.",
-  },
-  {
-    q: "What exactly is the preference star?",
-    a: "It appears next to your name across the GlyphaWeb platform once you complete a course. It marks you as someone whose skills have been verified, and it stays there.",
-  },
-  {
-    q: "Who can become an instructor?",
-    a: "Anyone with real expertise. You apply with your portfolio and bio, and a person reads it before publishing access is granted. That review is how the catalog stays curated.",
-  },
-  {
-    q: "Do I need an account to browse?",
-    a: "No. The whole catalog is open. You only need to sign in to enroll, track your progress, take quizzes and earn certificates.",
-  },
-];
-
-function buildFaqSchema(faqs: Array<{ q: string; a: string }>): SchemaOrg {
-  return {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faqs.map((faq) => ({
-      "@type": "Question",
-      name: faq.q,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: faq.a,
-      },
-    })),
-  };
-}
+import { FAQS } from "./faq-data";
 
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
@@ -89,26 +50,22 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export function FaqSection() {
-  const schema = buildFaqSchema(FAQS);
   return (
-    <>
-      <ScriptOrg organization={schema} />
-      <section className="mx-auto max-w-3xl px-4 pb-20 md:pb-28">
-        <Reveal>
-          <p className="rule-heading eyebrow pb-4">Before you enroll</p>
-          <h2 className="display-heading text-3xl text-balance sm:text-4xl md:text-5xl">
-            What people ask first.
-          </h2>
-        </Reveal>
+    <section className="mx-auto max-w-3xl px-4 pb-20 md:pb-28">
+      <Reveal>
+        <p className="rule-heading eyebrow pb-4">Before you enroll</p>
+        <h2 className="display-heading text-3xl text-balance sm:text-4xl md:text-5xl">
+          What people ask first.
+        </h2>
+      </Reveal>
 
-        <Reveal delay={90}>
-          <div className="mt-10 border-t border-rule">
-            {FAQS.map((faq) => (
-              <FaqItem key={faq.q} q={faq.q} a={faq.a} />
-            ))}
-          </div>
-        </Reveal>
-      </section>
-    </>
+      <Reveal delay={90}>
+        <div className="mt-10 border-t border-rule">
+          {FAQS.map((faq) => (
+            <FaqItem key={faq.q} q={faq.q} a={faq.a} />
+          ))}
+        </div>
+      </Reveal>
+    </section>
   );
 }

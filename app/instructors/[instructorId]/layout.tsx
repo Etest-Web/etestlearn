@@ -5,6 +5,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { siteConfig } from "@/lib/site";
 import { isConvexId } from "@/lib/instructors";
+import JsonLd from "@/components/seo/jsonld";
+import { buildInstructorProfileSchema } from "@/components/seo/schemas";
 
 /**
  * Metadata for a public instructor profile.
@@ -74,10 +76,41 @@ export async function generateMetadata({
   };
 }
 
-export default function InstructorProfileLayout({
+export default async function InstructorProfileLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ instructorId: string }>;
 }) {
-  return children;
+  const { instructorId } = await params;
+
+  // The profile's structured data, in the initial HTML. A published profile is
+  // in the sitemap and is meant to be found by name, so the person behind it
+  // has to be described to a crawler that does not run JavaScript.
+  //
+  // The lookup is best-effort here rather than fatal: `generateMetadata` has
+  // already 404'd an id that resolves to nobody, so by the time this runs the
+  // profile exists or the route is already gone.
+  const instructor = await loadInstructor(instructorId);
+
+  return (
+    <>
+      {instructor && (
+        <JsonLd
+          schema={buildInstructorProfileSchema({
+            instructorId,
+            name: instructor.name,
+            bio: instructor.bio,
+            imageUrl: instructor.imageUrl,
+            website: instructor.website,
+            ratingSum: instructor.instructorRatingSum,
+            ratingCount: instructor.instructorRatingCount,
+          })}
+          id="instructor-schema"
+        />
+      )}
+      {children}
+    </>
+  );
 }

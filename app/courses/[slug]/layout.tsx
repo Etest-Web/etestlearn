@@ -4,9 +4,54 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { siteConfig } from "@/lib/site";
-import { buildCourseSchema, buildBreadcrumbSchema } from "@/components/seo/course-schema-helpers";
+import JsonLd from "@/components/seo/jsonld";
+import {
+  buildBreadcrumbSchema,
+  buildCourseSchema,
+  type CourseMeta,
+} from "@/components/seo/schemas";
 
 const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+/**
+ * The course document, as the schema and the metadata both need it.
+ *
+ * `notFound()` rather than a null return: a slug that matches no course is a
+ * 404, and saying so here means the status code is right before a crawler
+ * looks at the body. A page that renders "not found" with a 200 is a soft 404
+ * — the exact thing that tells a search engine the URL is a duplicate of
+ * another one it already has.
+ */
+async function loadCourse(slug: string): Promise<Doc<"courses">> {
+  let course: Doc<"courses"> | null = null;
+  try {
+    const result = await client.query(api.courses.getCourseBySlug, { slug });
+    course = result?.course ?? null;
+  } catch {
+    // Metadata is best-effort; the page itself handles a missing course.
+  }
+
+  if (!course) notFound();
+  return course;
+}
+
+/** The shape the schema builders take, from the document the query returned. */
+function toCourseMeta(course: Doc<"courses">): CourseMeta {
+  return {
+    title: course.title,
+    description: course.description,
+    slug: course.slug,
+    thumbnailUrl: course.thumbnailUrl,
+    category: course.category,
+    level: course.level,
+    priceKobo: course.price,
+    publishedDate: course.createdAt
+      ? new Date(course.createdAt).toISOString()
+      : undefined,
+    ratingSum: course.ratingSum,
+    ratingCount: course.ratingCount,
+  };
+}
 
 export async function generateMetadata({
   params,
@@ -19,18 +64,7 @@ export async function generateMetadata({
   // level, price and its creation date, which the previous hand-written
   // annotation excluded — so they were being passed as `undefined` and dropped
   // from the structured data entirely.
-  let course: Doc<"courses"> | null = null;
-  try {
-    const result = await client.query(api.courses.getCourseBySlug, { slug });
-    course = result?.course ?? null;
-  } catch {
-    // Metadata is best-effort; the page itself handles missing courses.
-  }
-
-  if (!course) {
-    // Server-side 404: no content, no metadata, proper HTTP 404
-    notFound();
-  }
+  const course = await loadCourse(slug);
 
   const description = course.description.slice(0, 160);
   return {
@@ -59,33 +93,45 @@ export async function generateMetadata({
       description,
       site: "@glypha_learn",
     },
-    other: {
-      // Server-side JSON-LD via `other` (Next.js injects these into <head>).
-      // Everything below comes from the one query already made for the
-      // metadata above — the course document carries category, level, price and
-      // its creation date, which the schema previously received as undefined
-      // and therefore omitted from the structured data entirely.
-      "script:ld+json-course": JSON.stringify(buildCourseSchema({
-        title: course.title,
-        description: course.description,
-        slug: slug,
-        thumbnailUrl: course.thumbnailUrl,
-        category: course.category,
-        level: course.level,
-        priceKobo: course.price,
-        publishedDate: course.createdAt
-          ? new Date(course.createdAt).toISOString()
-          : undefined,
-      }), null, 2),
-      "script:ld+json-breadcrumb": JSON.stringify(buildBreadcrumbSchema(slug), null, 2),
-    },
   };
 }
 
-export default function CourseDetailLayout({
+export default async function CourseDetailLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ slug: string }>;
 }) {
-  return children;
+  const { slug } = await params;
+  const course = await loadCourse(slug);
+  const courseMeta = toCourseMeta(course);
+
+  return (
+    <>
+      {/*
+        The course's structured data, in the initial HTML.
+
+        This used to be emitted through `metadata.other` under a
+        `script:ld+json-course` key. Next.js has no special case for that
+        name — it rendered as `<meta name="script:ld+json-course">`, which no
+        crawler reads as structured data, so the markup was inert. It is a real
+        `<script type="application/ld+json">` now, in the server-rendered
+        response.
+
+        The layout is where it lives because the layout is the server
+        component that already has the course; the page itself is a client
+        component that reads through `useQuery` and would have no data to
+        describe during the server render.
+      */}
+      <JsonLd
+        schema={[
+          buildCourseSchema(courseMeta),
+          buildBreadcrumbSchema(courseMeta),
+        ]}
+        id="course-schema"
+      />
+      {children}
+    </>
+  );
 }

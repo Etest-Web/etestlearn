@@ -13,8 +13,11 @@ import { Navbar } from "@/components/navbar";
 import { EnsureCurrentUser } from "@/components/ensure-current-user";
 import { Toaster } from "sonner";
 import { siteConfig } from "@/lib/site";
-import ScriptOrg from "@/components/seo/script-org";
-import { organization } from "@/components/seo/organization-schema";
+import JsonLd from "@/components/seo/jsonld";
+import {
+  buildOrganizationSchema,
+  buildWebSiteSchema,
+} from "@/components/seo/schemas";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const outfit = Outfit({
@@ -51,6 +54,14 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  // The application name and the author are two more places a search engine
+  // can read the site's name from. `application-name` in particular is one of
+  // the few machine-readable statements of "what is this site called" that
+  // does not depend on a page title.
+  applicationName: siteConfig.name,
+  authors: [{ name: siteConfig.name, url: siteConfig.url }],
+  creator: siteConfig.name,
+  publisher: siteConfig.name,
   openGraph: {
     type: "website",
     siteName: siteConfig.name,
@@ -108,6 +119,22 @@ export default async function RootLayout({
       >
         <head>
           <meta name="google-site-verification" content="wFwCJGycYcPHfP8xZ3zVFS9bCobqpYTcgpJH4tS2Q_s" />
+          {/*
+            The site's own identity, as structured data, in the initial HTML.
+
+            `WebSite` is the document Google reads to decide what to call the
+            site in search results, and `Organization` is the entity behind it.
+            Both are here rather than on the homepage alone because the site
+            name has to be discoverable from any page that represents the site,
+            and because the WebPage/Course schemas reference them by `@id`.
+
+            Server-rendered on purpose: a schema injected after hydration is
+            invisible to a crawler that does not run JavaScript.
+          */}
+          <JsonLd
+            schema={[buildWebSiteSchema(), buildOrganizationSchema()]}
+            id="site-schema"
+          />
         </head>
         <body
           className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
@@ -133,7 +160,6 @@ export default async function RootLayout({
           </LocalizationProvider>
         </body>
       </html>
-      <ScriptOrg organization={organization} />
     </>
   );
 }

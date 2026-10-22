@@ -799,7 +799,7 @@ function Conversation({
     if (unreadCount === 0) return;
     if (markingRef.current === threadId) return;
     markingRef.current = threadId;
-    // A failed auto-mark is not worth a toast — the badge simply stays lit,
+    // A failed auto-mark is not worth a toast — the badge stays lit,
     // which is honest feedback and lets the reader retry by re-opening.
     void markThreadRead({ threadId }).catch(() => undefined);
   }, [threadId, unreadCount, markThreadRead]);
@@ -1122,7 +1122,7 @@ function NotificationsPane({
 
   async function handleOpen(item: NotificationView) {
     if (markingId) return;
-    // Already read: just follow the link, and say nothing — a toast claiming
+    // Already read: follow the link, and say nothing — a toast claiming
     // something was marked would be a lie.
     if (item.isRead) {
       if (item.href) onNavigate(item.href);

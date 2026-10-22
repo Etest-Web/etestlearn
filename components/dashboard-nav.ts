@@ -27,6 +27,7 @@ import {
     Inbox,
     LayoutDashboard,
     LayoutList,
+    Mail,
     Megaphone,
     MessagesSquare,
     Receipt,
@@ -72,7 +73,8 @@ export type NavBadge =
     | "pendingApplications"
     | "pendingUnpublish"
     | "pendingPayouts"
-    | "maintenanceOn";
+    | "maintenanceOn"
+    | "scheduled";
 
 export type NavItem = {
     href: string;
@@ -163,6 +165,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             { href: "/dashboard/admin/discussions", label: "Moderation", icon: MessagesSquare },
             { href: "/dashboard/admin/categories", label: "Categories", icon: Tags },
             { href: "/dashboard/admin/announcements", label: "Announcements", icon: Megaphone },
+            { href: "/dashboard/admin/email-launch", label: "Email launch", icon: Mail, badge: "scheduled" },
             // The platform-wide outage switch. It has to be a sidebar entry, not a
             // card buried on the overview: it is the one admin control somebody
             // needs at 2am, and reaching it should not depend on remembering

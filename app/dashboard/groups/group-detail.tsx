@@ -619,7 +619,7 @@ function Composer({ groupId }: { groupId: string }) {
   const [now, setNow] = useState(() => Date.now());
 
   // The server enforces a per-group cooldown; mirroring it here turns a
-  // guaranteed rejection into a button that is simply not ready yet.
+  // guaranteed rejection into a button that is not ready yet.
   useEffect(() => {
     if (cooldownUntil === 0) return;
     const timer = setInterval(() => setNow(Date.now()), 500);

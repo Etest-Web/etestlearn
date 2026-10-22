@@ -19,7 +19,7 @@
  *    a retried mutation may schedule the same drip step twice; the claim is
  *    what makes a duplicate impossible rather than merely unlikely.
  */
-import { internalAction } from "./_generated/server";
+import { internalAction, action } from "./_generated/server";
 import { v } from "convex/values";
 import { makeFunctionReference, type GenericActionCtx } from "convex/server";
 import type { DataModel, Id } from "./_generated/dataModel";
@@ -35,6 +35,18 @@ import { siteUrl } from "../lib/mail";
 import { EMAIL_TEMPLATES, renderEmail } from "../lib/emails/templates";
 import type { EmailTemplateId } from "../lib/emails/types";
 import { isSuppressible } from "../lib/emails/types";
+const getCallerRole = makeFunctionReference<
+  "query",
+  Record<string, never>,
+  string | null
+>("certificateTemplates:getCallerRole");
+
+async function requireAdminAction(ctx: GenericActionCtx<DataModel>) {
+  const role = await ctx.runQuery(getCallerRole, {});
+  if (role !== "admin") {
+    throw new Error("Not authorized — admin access required");
+  }
+}
 import {
   DRIP_CADENCE,
   shouldSendDrip,
@@ -687,3 +699,88 @@ export const sendNewCourseDigest = internalAction({
     return sent;
   },
 });
+
+/**
+ * Publish a platform-wide announcement to all registered users.
+ *
+ * Broadcast email respects marketing preferences (users who opted out of emails
+ * do not receive platform-wide broadcast messages).
+ *
+ * Only callable by admin. Delivery is idempotent: a single call or Convex retry
+ * never sends the same user twice, and mail failures never block the action.
+ */
+export const sendPlatformAnnouncement = action({
+  args: {
+    title: v.string(),
+    body: v.string(),
+    /** Published at matches scheduling constraints if the action fires later. */
+    publishedAt: v.number(),
+    onlyUsers: v.optional(v.array(v.id("users"))),
+  },
+  handler: async (ctx, args) => {
+    await requireAdminAction(ctx);
+    const now = Date.now();
+    const target = new Date(args.publishedAt).toLocaleDateString("en-NG", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+    await runPlatformAnnouncement(ctx, {
+      title: args.title,
+      body: args.body,
+      target,
+      onlyUsers: args.onlyUsers,
+    });
+
+    console.log(`[email] platform announcement sent for ${target}`);
+  },
+});
+
+async function runPlatformAnnouncement(
+  ctx: EmailActionCtx,
+  args: {
+    title: string;
+    body: string;
+    target: string;
+    onlyUsers?: Id<"users">[];
+  },
+) {
+  const publishedAt = Date.now();
+  const data = {
+    title: args.title,
+    body: args.body,
+    publishedAt: new Date(publishedAt).toLocaleDateString("en-NG", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
+    target: args.target,
+  };
+
+  const recipients = await ctx.runQuery(broadcastRecipients, { onlyUsers: args.onlyUsers },
+  );
+
+  if (!recipients || recipients.length === 0) {
+    console.log("[email] platform announcement: no eligible recipients");
+    return;
+  }
+
+  // Ensure we include the admin in the distribution. This guarantees that
+  // when we announce, we all read it from the inbox before anyone else.
+  const userIds = [...new Set(recipients.map((r) => r.userId))];
+
+  let sent = 0;
+  for (const recipient of recipients) {
+    const ok = await deliver(ctx, {
+      to: recipient.email,
+      templateId: "platformAnnouncement",
+      data,
+      dedupeKey: `platformAnnouncement:${recipient.userId}:${publishedAt}`, // unique per user per launch
+      userId: recipient.userId,
+    });
+    if (ok) sent += 1;
+  }
+
+  console.log(`[email] platform announcement: sent ${sent} of ${recipients.length}`);
+}

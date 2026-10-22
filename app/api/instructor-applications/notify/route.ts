@@ -111,12 +111,12 @@ export async function POST(request: Request) {
 
   // Durable limiter — the authoritative check. The in-memory map above resets
   // on every cold start, so the Convex-backed counter (a row in `rateLimits`,
-  // bumped inside a serializable mutation) is what actually holds the 5/hour
+  // bumped inside a serializable mutation) is what holds the 5/hour
   // quota across instances.
   //
   // Fail closed: if the limiter cannot be consulted (missing env, Convex
   // unreachable) we return 503 rather than falling back to the per-instance
-  // map — otherwise simply overloading the limiter would downgrade it back to
+  // map — otherwise overloading the limiter would downgrade it back to
   // the bypassable one. 503 means "endpoint temporarily unavailable", not
   // "unlimited".
   let durable: { allowed: boolean; retryAfterMs: number };
@@ -201,9 +201,9 @@ export async function POST(request: Request) {
     }
   }
 
-  // If a URL was supplied it must actually be http(s) — otherwise it is either
+  // If a URL was supplied it must be http(s) — otherwise it is either
   // a javascript:/data: payload aimed at whoever clicks it in the admin
-  // review queue, or simply malformed.
+  // review queue, or malformed.
   if (application.portfolioUrl) {
     try {
       const { protocol } = new URL(application.portfolioUrl);

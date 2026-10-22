@@ -73,7 +73,7 @@ export default function LessonQuizPage() {
       setResult(res);
     } catch (err) {
       // Without this the promise rejection escapes the click handler: the button
-      // re-enables and the attempt looks like it simply did nothing.
+      // re-enables and the attempt looks like it did nothing.
       toast.error(getErrorMessage(err, "Your answers could not be submitted"));
     } finally {
       setSubmitting(false);
@@ -144,7 +144,7 @@ export default function LessonQuizPage() {
           </div>
 
           {result && (
-            // Tinted by outcome, but the sentence below is what actually says
+            // Tinted by outcome, but the sentence below is what says
             // whether the attempt passed — never colour alone.
             <div
               className={`mt-4 rounded-sm border px-3 py-2 text-sm ${

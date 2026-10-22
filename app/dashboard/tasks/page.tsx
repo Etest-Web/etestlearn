@@ -128,7 +128,7 @@ function TasksContent() {
 
 /** The count of ungraded submissions, announced politely as it changes. */
 function AwaitingGradeBadge() {
-  // Only subscribed when the tab that shows it is actually reachable, so a
+  // Only subscribed when the tab that shows it is reachable, so a
   // student is not paying for a grading query they can never see.
   const summary = useQuery(getGradingSummary, {});
   if (summary === undefined || summary.awaitingGrade === 0) return null;

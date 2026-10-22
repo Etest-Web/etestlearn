@@ -585,7 +585,7 @@ function FriendsTab({
   onGoToDiscover: () => void;
 }) {
   // Session-local, not URL state: the shared link (the tabs carry those) always
-  // opens on the default — the list the learner just built, newest friends
+  // opens on the default — the list the learner built, newest friends
   // first. "latest" is a no-op sort of what `listFriends` already sends, so
   // the first paint and the first reorder do the exact same work.
   const [sort, setSort] = useState<FriendSortOrder>("latest");

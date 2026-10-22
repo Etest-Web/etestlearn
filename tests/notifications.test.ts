@@ -82,13 +82,11 @@ describe("significant action notifications", () => {
     const t = convexTest(testSchema, modules);
     const { userA, userB } = await seedUsers(t);
 
-    // User A sends friend request to User B
     const friendshipId = await as(t, "clerk_user_a").mutation(
       api.friends.sendRequest,
       { userId: userB },
     );
 
-    // User B receives friend_request notification
     const userBNotifications = await as(t, "clerk_user_b").query(
       api.inbox.listNotifications,
       {},
@@ -97,12 +95,10 @@ describe("significant action notifications", () => {
     expect(userBNotifications[0].type).toBe("friend_request");
     expect(userBNotifications[0].title).toContain("Friend request from User A");
 
-    // User B accepts friend request
     await as(t, "clerk_user_b").mutation(api.friends.acceptRequest, {
       friendshipId,
     });
 
-    // User A receives friend_accepted notification
     const userANotifications = await as(t, "clerk_user_a").query(
       api.inbox.listNotifications,
       {},
@@ -116,19 +112,16 @@ describe("significant action notifications", () => {
     const t = convexTest(testSchema, modules);
     const { userA, courseId, instructor } = await seedUsers(t);
 
-    // User A enrolls in course
     await as(t, "clerk_user_a").mutation(api.enrollments.enrollInCourse, {
       courseId,
     });
 
-    // Learner receives course_purchased notification
     const learnerNotifs = await as(t, "clerk_user_a").query(
       api.inbox.listNotifications,
       {},
     );
     expect(learnerNotifs.some((n) => n.type === "course_purchased")).toBe(true);
 
-    // Instructor receives notification of new student
     const instructorNotifs = await as(t, "clerk_instructor").query(
       api.inbox.listNotifications,
       {},
@@ -141,12 +134,10 @@ describe("significant action notifications", () => {
     const t = convexTest(testSchema, modules);
     const { userA, courseId, lessonId } = await seedUsers(t);
 
-    // Enroll
     await as(t, "clerk_user_a").mutation(api.enrollments.enrollInCourse, {
       courseId,
     });
 
-    // Complete the only lesson (100% course completion)
     await as(t, "clerk_user_a").mutation(api.enrollments.completeLesson, {
       courseId,
       lessonId,
@@ -163,7 +154,6 @@ describe("significant action notifications", () => {
     const t = convexTest(testSchema, modules);
     const { userA, courseId, lessonId } = await seedUsers(t);
 
-    // Add a second lesson so 1 completed = 50% progress
     await t.run(async (ctx: TestCtx) =>
       ctx.db.insert("lessons", {
         courseId,
@@ -174,7 +164,6 @@ describe("significant action notifications", () => {
       }),
     );
 
-    // Enroll
     await as(t, "clerk_user_a").mutation(api.enrollments.enrollInCourse, {
       courseId,
     });
@@ -185,7 +174,6 @@ describe("significant action notifications", () => {
       lessonId,
     });
 
-    // Backdate enrollment updatedAt by 10 days
     const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
     await t.run(async (ctx: TestCtx) => {
       const enrollment = await ctx.db
@@ -199,7 +187,6 @@ describe("significant action notifications", () => {
       }
     });
 
-    // Run inactivity check
     await as(t, "clerk_user_a").mutation(
       api.enrollments.checkInactivityReminders,
       {},
@@ -325,7 +312,6 @@ describe("significant action notifications", () => {
       courseId,
     });
 
-    // Instructor creates assignment
     const assignmentId = await as(t, "clerk_instructor").mutation(
       api.tasks.createAssignment,
       {
@@ -337,7 +323,6 @@ describe("significant action notifications", () => {
       },
     );
 
-    // Learner receives task_assigned
     const learnerNotifs = await as(t, "clerk_user_a").query(
       api.inbox.listNotifications,
       {},
@@ -346,7 +331,6 @@ describe("significant action notifications", () => {
     expect(taskNotif).toBeDefined();
     expect(taskNotif?.title).toContain("New assignment: Build a Portfolio");
 
-    // Student submits assignment
     const submissionId = await as(t, "clerk_user_a").mutation(
       api.tasks.submitAssignment,
       {
@@ -355,14 +339,12 @@ describe("significant action notifications", () => {
       },
     );
 
-    // Instructor grades submission
     await as(t, "clerk_instructor").mutation(api.tasks.gradeSubmission, {
       submissionId,
       score: 95,
       feedback: "Great job!",
     });
 
-    // Student receives task_graded
     const updatedLearnerNotifs = await as(t, "clerk_user_a").query(
       api.inbox.listNotifications,
       {},
@@ -384,7 +366,6 @@ describe("significant action notifications", () => {
       courseId,
     });
 
-    // User A creates private study group
     const groupId = await as(t, "clerk_user_a").mutation(
       api.groups.createGroup,
       {
@@ -395,7 +376,6 @@ describe("significant action notifications", () => {
       },
     );
 
-    // User B requests to join
     const joinResult = await as(t, "clerk_user_b").mutation(
       api.groups.joinGroup,
       {
@@ -405,7 +385,6 @@ describe("significant action notifications", () => {
     );
     expect(joinResult.outcome).toBe("request_created");
 
-    // Group creator (User A) receives join request notification
     const userANotifs = await as(t, "clerk_user_a").query(
       api.inbox.listNotifications,
       {},
@@ -414,14 +393,12 @@ describe("significant action notifications", () => {
     expect(joinReqNotif).toBeDefined();
     expect(joinReqNotif?.title).toContain("Join request: React Masters");
 
-    // User A approves join request
     if (joinResult.outcome === "request_created" && joinResult.requestId) {
       await as(t, "clerk_user_a").mutation(api.groups.reviewJoinRequest, {
         requestId: joinResult.requestId as any,
         decision: "approve",
       });
 
-      // User B receives approval notification
       const userBNotifs = await as(t, "clerk_user_b").query(
         api.inbox.listNotifications,
         {},

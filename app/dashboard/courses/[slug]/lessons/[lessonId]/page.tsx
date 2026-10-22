@@ -272,7 +272,7 @@ export default function LessonPage() {
               lessonId={lesson._id}
               isCompleted={isCompleted}
               onWatchedEnough={() => {
-                // 90% watched counts as done — no navigation, just the toast + progress.
+                // 90% watched counts as done — no navigation, the toast + progress.
                 completeLesson({ courseId: course._id, lessonId: lesson._id }).then(
                   () => toast.success("Lesson completed"),
                   (err) => toast.error(getErrorMessage(err, "Failed to update progress")),

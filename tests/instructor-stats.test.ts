@@ -581,7 +581,6 @@ describe("attention items", () => {
     const t = convexTest(testSchema, modules);
     const { freeCourseId, lessonIds } = await seedWorld(t);
 
-    // Enroll the same quiet learner in a second course.
     await t.run(async (ctx: TestCtx) => {
       const stalled = await ctx.db
         .query("users")

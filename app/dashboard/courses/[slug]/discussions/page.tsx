@@ -61,7 +61,7 @@ export default function CourseDiscussionsPage() {
   }
 
   // Both composers are fire-and-forget, so without these the rejection escapes
-  // the click handler and the post looks like it simply never happened.
+  // the click handler and the post looks like it never happened.
   async function handleCreateThread() {
     if (!newTitle.trim()) return;
     if (!courseData) return;

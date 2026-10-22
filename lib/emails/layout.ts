@@ -69,10 +69,10 @@ export function emailButton({ label, href }: Action): string {
   const safeHref = escapeHtml(href);
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">` +
-    `<tr><td align="center" bgcolor="${BRAND}" style="border-radius:12px;">` +
+    `<tr><td align="center" bgcolor="${BRAND}" style="border-radius:12px;background-color:${BRAND};">` +
     `<a href="${safeHref}" role="button" ` +
-    `style="display:inline-block;padding:13px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;` +
-    `font-size:15px;font-weight:600;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:12px;">` +
+    `style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;` +
+    `font-size:15px;font-weight:600;line-height:20px;color:#FFFFFF;text-decoration:none;border-radius:12px;background-color:${BRAND};">` +
     `${escapeHtml(label)}</a>` +
     `</td></tr></table>`
   );
@@ -260,15 +260,23 @@ export function emailLayout(options: EmailLayoutOptions): string {
     `</div>` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ` +
     `style="width:100%;background:${SURFACE};">` +
+    // Top brand accent bar
+    `<tr><td style="height:4px;background:${BRAND};"></td></tr>` +
     `<tr><td align="center" style="padding:28px 16px;">` +
 
     `<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" ` +
-    `style="width:100%;max-width:${WIDTH}px;background:#FFFFFF;border:1px solid ${BORDER};border-radius:18px;">` +
+    `style="width:100%;max-width:${WIDTH}px;background:#FFFFFF;border:1px solid ${BORDER};border-radius:18px;box-shadow:0 2px 8px rgba(31,27,29,0.06);">` +
 
-    // Wordmark. Text rather than a logo image so it survives images-off and
-    // arrives instantly on a slow connection.
-    `<tr><td style="padding:26px 32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">` +
-    `<span style="font-size:17px;font-weight:700;letter-spacing:-0.01em;color:${BRAND};">Glypha Learn</span>` +
+    // Logo + wordmark. The SVG is inline so it works without external requests.
+    `<tr><td style="padding:26px 32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">` +
+    `<div style="display:inline-block;vertical-align:middle;">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="vertical-align:middle;">` +
+    `<rect x="0" y="0" width="40" height="40" rx="8" fill="${BRAND}"/>` +
+    `<path d="M22 10c6.5 0 11 4.2 11 10.5S28.5 31 22 31s-11-4.2-11-10.5S15.5 10 22 10z" fill="#FFFFFF"/>` +
+    `<path d="M14 12v14h8" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+    `</svg>` +
+    `</div>` +
+    `<span style="font-size:18px;font-weight:600;letter-spacing:-0.005em;color:${BRAND};"> Glypha Learn</span>` +
     `</td></tr>` +
 
     (eyebrow

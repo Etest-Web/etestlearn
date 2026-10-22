@@ -178,7 +178,6 @@ describe("discussion rate limits", () => {
     const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
 
-    // Enroll a second student and give both their own threads.
     const second = await t.run(async (ctx: TestCtx) => {
       const student = (
         await ctx.db

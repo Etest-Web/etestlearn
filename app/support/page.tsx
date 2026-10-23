@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { LifeBuoy, Send, CheckCircle2, Search, HelpCircle, Paperclip } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -23,6 +25,7 @@ type AttachmentInfo = {
 };
 
 export default function SupportPublicPage() {
+  const { user, isLoaded } = useUser();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
@@ -38,6 +41,13 @@ export default function SupportPublicPage() {
   // Status lookup state
   const [lookupNumber, setLookupNumber] = useState("");
   const [lookupEmail, setLookupEmail] = useState("");
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      setName(user.fullName || user.firstName || "");
+      setEmail(user.primaryEmailAddress?.emailAddress || "");
+    }
+  }, [isLoaded, user]);
 
   const createTicketMutation = useMutation(api.support.createTicket);
   const generateUploadUrlMutation = useMutation(api.support.generateSupportUploadUrl);
@@ -196,6 +206,18 @@ export default function SupportPublicPage() {
                     Open Another Ticket
                   </Button>
                 </div>
+              ) : !isLoaded ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+              ) : !user ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <h2 className="text-xl font-bold text-foreground">Sign in to submit a ticket</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    You need to be signed in to open a support ticket.
+                  </p>
+                  <Button className="mt-4" onClick={() => (window.location.href = "/sign-in?redirect_url=/support")}>
+                    Sign in
+                  </Button>
+                </div>
               ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                   <h2 className="text-xl font-bold text-foreground">Open a Support Ticket</h2>
@@ -210,7 +232,8 @@ export default function SupportPublicPage() {
                         required
                         placeholder="e.g. Divine Amaka"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        readOnly
+                        className="bg-muted"
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -220,7 +243,8 @@ export default function SupportPublicPage() {
                         type="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        readOnly
+                        className="bg-muted"
                       />
                     </div>
                   </div>

@@ -267,16 +267,9 @@ export function emailLayout(options: EmailLayoutOptions): string {
     `<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" ` +
     `style="width:100%;max-width:${WIDTH}px;background:#FFFFFF;border:1px solid ${BORDER};border-radius:18px;box-shadow:0 2px 8px rgba(31,27,29,0.06);">` +
 
-    // Logo + wordmark. The SVG is inline so it works without external requests.
+    // Logo + wordmark. The hosted PNG loads across all email clients (Gmail, Outlook, Yahoo) without SVG stripping.
     `<tr><td style="padding:26px 32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">` +
-    `<div style="display:inline-block;vertical-align:middle;">` +
-    `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="vertical-align:middle;">` +
-    `<rect x="0" y="0" width="40" height="40" rx="8" fill="${BRAND}"/>` +
-    `<path d="M22 10c6.5 0 11 4.2 11 10.5S28.5 31 22 31s-11-4.2-11-10.5S15.5 10 22 10z" fill="#FFFFFF"/>` +
-    `<path d="M14 12v14h8" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-    `</svg>` +
-    `</div>` +
-    `<span style="font-size:18px;font-weight:600;letter-spacing:-0.005em;color:${BRAND};"> Glypha Learn</span>` +
+    `<img src="https://yt6hirzthe.ufs.sh/f/mzi1l3RrVdF9Mxxb3j9zEvaGJ5kQzj0bPpxmH41iRredVWYs" alt="Glypha Learn" width="140" style="display:block;max-width:140px;height:auto;border:0;outline:none;text-decoration:none;" />` +
     `</td></tr>` +
 
     (eyebrow

@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { LifeBuoy, Send, CheckCircle2, Search, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Navbar } from "@/components/navbar";
 
 type SupportCategory = "account" | "billing" | "courses" | "certificates" | "technical" | "other";
 type SupportPriority = "low" | "medium" | "high" | "urgent";
@@ -59,8 +58,6 @@ export default function SupportPublicPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-
       <main className="mx-auto max-w-5xl px-4 py-12 md:py-16">
         <div className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent/30 px-3 py-1 text-xs font-semibold text-brand">

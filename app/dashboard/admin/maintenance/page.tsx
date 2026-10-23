@@ -375,7 +375,7 @@ function MaintenanceBody() {
                 </Card>
             )}
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,6fr)_minmax(0,6fr)]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,6fr)_minmax(0,6fr)]">
                 {/* ── the switch ───────────────────────────────────────────── */}
                 <Card className="rounded-2xl p-5">
                     <CardHeader className="px-0 pt-0">

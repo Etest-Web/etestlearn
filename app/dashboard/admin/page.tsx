@@ -141,12 +141,12 @@ function OverviewBody() {
   if (overview === undefined) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(8)].map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-2xl" />
           ))}
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-56 rounded-2xl" />
           ))}
@@ -159,7 +159,7 @@ function OverviewBody() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Users" value={totals.users} sub={`${totals.instructors} instructors · ${totals.suspendedUsers} suspended`} />
         <StatCard label="Courses" value={totals.publishedCourses} sub={`${totals.courses} total · ${totals.featuredCourses} featured`} />
         <StatCard label="Enrollments" value={totals.enrollments} sub={`${totals.completedEnrollments} completed`} />
@@ -171,7 +171,7 @@ function OverviewBody() {
         <StatCard label="Certificates" value={totals.certificatesActive} sub={`${totals.certificatesIssued} issued · ${totals.certificatesIssued - totals.certificatesActive} revoked`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard title="New users" data={series.users} color="var(--brand)" />
         <ChartCard title="Enrollments" data={series.enrollments} color="var(--warning)" />
         <ChartCard title="Purchases" data={series.purchases} color="var(--success)" />
@@ -216,7 +216,7 @@ function OverviewBody() {
 
       <Card className="rounded-2xl p-5">
         <p className="text-sm font-semibold text-foreground">Jump to</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {QUICK_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}

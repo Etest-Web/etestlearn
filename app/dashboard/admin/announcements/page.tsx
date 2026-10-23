@@ -79,7 +79,7 @@ function AnnouncementsBody() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <Card className="rounded-2xl p-5">
         <CardTitle className="flex items-center gap-2 text-base">
           <Megaphone className="h-4 w-4 text-brand" /> New announcement

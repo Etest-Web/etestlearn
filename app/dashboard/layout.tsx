@@ -68,8 +68,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         itself appears — below that the middle column has to
                         stay empty or the CTA and the right flank overlap.
                     */}
-                    <header className="flex h-20 items-center gap-3 px-4 bg-transparent sm:px-6 lg:px-8">
-                        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                    <header className="flex h-16 items-center justify-between gap-2 px-3 sm:h-20 sm:gap-3 sm:px-6 lg:px-8 bg-transparent">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-4 shrink-0">
                             <SidebarTrigger className="lg:hidden" />
                             {/* Below md the search form in the middle column is
                                 hidden, so the affordance lives here instead —
@@ -87,7 +87,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             </Button>
                         </div>
 
-                        <div className="flex min-w-0 flex-[2] items-center justify-center gap-2">
+                        <div className="hidden md:flex min-w-0 md:flex-[2] items-center justify-center gap-2">
                             <form
                                 action="/dashboard/search"
                                 method="get"
@@ -122,16 +122,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
                         <div
                             data-tour="header-actions"
-                            className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:gap-4 lg:gap-6"
+                            className="flex min-w-0 items-center justify-end gap-2 sm:gap-4 lg:gap-6 shrink-0"
                         >
-                            <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-1.5 sm:gap-3">
                                 {/* These were two inert <button>s with no
                                     handler. They now deep-link into the matching
                                     inbox tab and carry live counts. */}
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="relative border border-rule"
+                                    className="relative border border-rule size-9"
                                     render={<Link href="/dashboard/inbox?tab=messages" />}
                                     aria-label={
                                         unread?.messages
@@ -157,7 +157,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="relative border border-rule"
+                                    className="relative border border-rule size-9"
                                     render={
                                         <Link href="/dashboard/inbox?tab=notifications" />
                                     }
@@ -183,8 +183,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                     ) : null}
                                 </Button>
                             </div>
-                            <div className="flex min-w-0 items-center gap-3 border-l border-rule pl-3 sm:pl-6">
-                                <UserButton appearance={{ elements: { avatarBox: "w-10 h-10" } }} />
+                            <div className="hidden sm:flex shrink-0 items-center gap-2 border-l border-rule pl-3 sm:gap-3 sm:pl-4 lg:pl-6">
+                                <UserButton appearance={{ elements: { avatarBox: "size-8" } }} />
                                 {/* Capped and late: see the note above the
                                     header — this text is the whole reason the
                                     right flank is the wide one. */}
@@ -195,7 +195,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         </div>
                     </header>
 
-                    <main className="p-4 pt-2 px-[clamp(1rem,3vw,2rem)] py-[clamp(1rem,3vw,2rem)] sm:p-6 sm:pt-2 lg:p-8 lg:pt-2">
+                    <main className="p-3 sm:p-6 lg:p-8 pt-2 sm:pt-2 lg:pt-2">
                         {children}
                     </main>
                 </SidebarInset>

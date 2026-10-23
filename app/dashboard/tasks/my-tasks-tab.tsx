@@ -494,7 +494,7 @@ function TaskComposer() {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Label htmlFor="task-course">Course (optional)</Label>
             <Select
@@ -676,7 +676,7 @@ function TaskEditDialog({
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor={`edit-due-${task.id}`}>Due date</Label>
               <Input

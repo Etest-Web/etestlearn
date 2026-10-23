@@ -167,7 +167,7 @@ function ReferrerPageContent() {
           </Card>
 
           {/* Stats grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
@@ -380,7 +380,7 @@ function ReferrerSkeleton() {
     <PageShell width="narrow" className="gap-6">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-40 w-full rounded-2xl" />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
           <Skeleton key={i} className="h-24" />
         ))}

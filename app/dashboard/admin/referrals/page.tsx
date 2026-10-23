@@ -27,7 +27,7 @@ function ReferralStatsPageContent() {
   return (
     <PageShell width="narrow" className="gap-6">
       <h1 className="text-2xl font-bold mb-4">Referral Program</h1>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -71,7 +71,7 @@ function ReferralStatsPageContent() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -127,12 +127,12 @@ function ReferralStatsSkeleton() {
   return (
     <PageShell width="narrow" className="gap-6">
       <Skeleton className="h-8 w-48" />
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[...Array(3)].map((_, i) => (
           <Skeleton key={i} className="h-24" />
         ))}
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[...Array(3)].map((_, i) => (
           <Skeleton key={i} className="h-24" />
         ))}

@@ -114,7 +114,7 @@ export function AssignmentsTab() {
               </span>
             </div>
 
-            <ul className="grid gap-4 lg:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {group.assignments.map((assignment) => (
                 <li key={assignment.id}>
                   <AssignmentCard assignment={assignment} />
@@ -404,7 +404,7 @@ function AssignmentsSkeleton() {
         ))}
       </div>
       <Skeleton className="h-5 w-40" />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CardSkeleton />
         <CardSkeleton />
       </div>

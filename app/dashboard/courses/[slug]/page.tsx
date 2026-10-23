@@ -99,7 +99,7 @@ export default function DashboardCoursePage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <section className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {course.category && <Badge variant="secondary">{course.category}</Badge>}

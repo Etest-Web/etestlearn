@@ -434,7 +434,7 @@ function InboxPage() {
         </div>
 
         <TabsContent value="messages" className="mt-0 outline-none">
-          <div className="grid gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] items-start">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] items-start">
             <ThreadListPane
               threads={threads}
               unreadTotal={unreadMessages}
@@ -1617,7 +1617,7 @@ function InboxSkeleton() {
         <Skeleton className="h-5 w-72" />
       </div>
       <Skeleton className="h-11 w-64" />
-      <div className="grid gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] items-start">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] items-start">
         <div className="overflow-hidden border border-rule bg-card">
           <div className="flex items-center justify-between border-b border-rule p-4">
             <Skeleton className="h-4 w-24 rounded-sm" />

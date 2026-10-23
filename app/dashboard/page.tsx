@@ -154,7 +154,7 @@ export default function DashboardPage() {
         {/* Banner */}
         {/* The hero plate is the one saturated surface on the page, so it needs no
             shadow at all — the gradient already separates it from the paper. */}
-        <div className="relative overflow-hidden rounded-sm bg-gradient-to-br from-brand to-brand-ink p-6 text-brand-foreground sm:p-8 md:p-12">
+        <div className="relative overflow-hidden rounded-sm bg-gradient-to-br from-brand to-brand-ink p-5 text-brand-foreground sm:p-8 md:p-12">
           <div className="relative z-10 max-w-lg">
             {/* The plate inverts PageHeader's own colour choices, so the eyebrow
                 and title are re-pointed at the foreground-on-brand pair. The
@@ -194,7 +194,7 @@ export default function DashboardPage() {
                 aria-label={`Open ${item.course.title}`}
                 className="flex-1 min-w-[160px] sm:min-w-[200px] flex flex-wrap items-center justify-between gap-2 rounded-sm border border-rule bg-card p-4 transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 min-w-0 flex-1">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                   <div className={`w-12 h-12 flex items-center justify-center rounded-sm ${progressColors[idx % 3]}`}>
                     <Play className={iconColors[idx % 3]} size={20} fill="currentColor" aria-hidden />
                   </div >
@@ -423,7 +423,7 @@ export default function DashboardPage() {
             </Badge>
           </div >
           
-          <h2 className="text-2xl font-bold text-foreground mb-1 text-center tracking-tight">Welcome back, <span className="text-brand">{user?.firstName || "Learner"}</span>! 🔥</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-1 text-center tracking-tight">Welcome back, <span className="text-brand">{user?.firstName || "Learner"}</span>! 🔥</h2>
           <p className="tabular text-xs text-muted-foreground text-center mb-8 px-4">
             {statistics.completedCourses} courses completed, {statistics.totalLessonsCompleted} lessons done
           </p>
@@ -468,7 +468,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <StatCard 
             icon={<BookOpen className="w-5 h-5 text-primary" />}
             label="Courses"
@@ -550,16 +550,16 @@ export default function DashboardPage() {
             <TrendingUp className="w-5 h-5 text-brand" />
             This Week
           </CardTitle>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-sm bg-surface-sunken p-2 sm:p-3 text-center">
               <div className="tabular text-xl font-bold text-foreground">{statistics.lessonsThisWeek}</div>
               <div className="eyebrow">Lessons</div>
             </div >
-            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+            <div className="rounded-sm bg-surface-sunken p-2 sm:p-3 text-center">
               <div className="tabular text-xl font-bold text-foreground">{statistics.quizzesThisWeek}</div>
               <div className="eyebrow">Quizzes</div>
             </div >
-            <div className="rounded-sm bg-surface-sunken p-3 text-center">
+            <div className="rounded-sm bg-surface-sunken p-2 sm:p-3 text-center">
               <div className="tabular text-xl font-bold text-foreground">{statistics.studyHoursThisWeek}h</div>
               <div className="eyebrow">Study</div>
             </div >

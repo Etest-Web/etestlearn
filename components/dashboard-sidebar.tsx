@@ -23,7 +23,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, UserButton } from "@clerk/nextjs";
 import {
     ChevronDown,
     GraduationCap,
@@ -471,7 +471,19 @@ export function DashboardSidebar() {
                 ) : null}
             </SidebarContent>
 
-            <SidebarFooter className="mt-auto space-y-1 p-4">
+            <SidebarFooter className="mt-auto space-y-2 p-4">
+                <div className="flex items-center gap-3 border-b border-sidebar-border px-3 pb-3 group-data-[collapsible=icon]:hidden sm:hidden">
+                    <UserButton appearance={{ elements: { avatarBox: "size-9" } }} />
+                    <div className="flex flex-col min-w-0">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                            {dbUser?.name || "Student"}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground capitalize">
+                            {dbUser?.role || "student"}
+                        </span>
+                    </div>
+                </div>
+
                 <div className="flex items-center gap-2 px-3">
                     <Tooltip>
                         <TooltipTrigger

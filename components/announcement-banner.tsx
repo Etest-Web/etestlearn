@@ -33,29 +33,29 @@ export function AnnouncementBanner({ className }: { className?: string }) {
     <div
       data-slot="announcement-banner"
       className={cn(
-        "relative flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm",
+        "relative flex items-start gap-2.5 sm:gap-3 rounded-xl sm:rounded-2xl border border-rule bg-card p-3 sm:p-4 shadow-sm",
         className,
       )}
     >
-      <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground wrap-break-word">
+      <Megaphone className="mt-0.5 size-4 shrink-0 text-brand" />
+      <div className="flex-1 min-w-0 pr-7 sm:pr-8">
+        <p className="text-sm font-semibold text-foreground break-words [overflow-wrap:anywhere]">
           {announcement.title}
         </p>
-        <p className="mt-0.5 text-sm text-muted-foreground wrap-break-word">
+        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-muted-foreground break-words [overflow-wrap:anywhere]">
           {announcement.body}
         </p>
       </div>
       <button
         type="button"
         aria-label="Dismiss announcement"
-        className="absolute right-2 top-2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="absolute right-1.5 top-1.5 sm:right-2 sm:top-2 inline-flex size-7 sm:size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         onClick={() => {
           localStorage.setItem("dismissed-announcement", announcement._id);
           setDismissedId(announcement._id);
         }}
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="size-3.5" />
       </button>
     </div>
   );

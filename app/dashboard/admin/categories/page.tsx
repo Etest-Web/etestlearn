@@ -57,7 +57,7 @@ function CategoriesBody() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <Card className="rounded-2xl p-5">
         <div className="space-y-2">
           <Label htmlFor="new-category">Add a category</Label>

@@ -37,6 +37,13 @@ function generateTicketNumber(): string {
   return `TICK-${year}-${timePart}${randomPart}`;
 }
 
+export const generateSupportUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
 /**
  * Public/authenticated ticket creation.
  * Can be called by signed-in users or anonymously (if valid email + name provided).
@@ -49,6 +56,12 @@ export const createTicket = mutation({
     category: categoryValidator,
     message: v.string(),
     priority: v.optional(priorityValidator),
+    attachments: v.optional(v.array(v.object({
+      storageId: v.id("_storage"),
+      fileName: v.string(),
+      mimeType: v.string(),
+      size: v.number(),
+    }))),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
@@ -96,6 +109,20 @@ export const createTicket = mutation({
       isInternalNote: false,
       createdAt: now,
     });
+
+    // Store attachments if provided
+    if (args.attachments && args.attachments.length > 0) {
+      for (const att of args.attachments) {
+        await ctx.db.insert("supportTicketAttachments", {
+          ticketId,
+          storageId: att.storageId,
+          fileName: att.fileName,
+          mimeType: att.mimeType,
+          size: att.size,
+          createdAt: now,
+        });
+      }
+    }
 
     // Notify admins in-app
     const admins = await ctx.db
@@ -171,9 +198,22 @@ export const getTicketDetails = query({
       ? messages
       : messages.filter((m) => !m.isInternalNote);
 
+    const rawAttachments = await ctx.db
+      .query("supportTicketAttachments")
+      .withIndex("by_ticket", (q) => q.eq("ticketId", args.ticketId))
+      .collect();
+
+    const attachments = await Promise.all(
+      rawAttachments.map(async (att) => ({
+        ...att,
+        url: await ctx.storage.getUrl(att.storageId),
+      }))
+    );
+
     return {
       ticket,
       messages: visibleMessages,
+      attachments,
     };
   },
 });
@@ -205,9 +245,22 @@ export const lookupPublicTicket = query({
       .filter((q) => q.eq(q.field("isInternalNote"), false))
       .collect();
 
+    const rawAttachments = await ctx.db
+      .query("supportTicketAttachments")
+      .withIndex("by_ticket", (q) => q.eq("ticketId", ticket._id))
+      .collect();
+
+    const attachments = await Promise.all(
+      rawAttachments.map(async (att) => ({
+        ...att,
+        url: await ctx.storage.getUrl(att.storageId),
+      }))
+    );
+
     return {
       ticket,
       messages,
+      attachments,
     };
   },
 });
@@ -347,10 +400,23 @@ export const adminGetTicket = query({
       assignedAdminName = assignedUser?.name ?? null;
     }
 
+    const rawAttachments = await ctx.db
+      .query("supportTicketAttachments")
+      .withIndex("by_ticket", (q) => q.eq("ticketId", args.ticketId))
+      .collect();
+
+    const attachments = await Promise.all(
+      rawAttachments.map(async (att) => ({
+        ...att,
+        url: await ctx.storage.getUrl(att.storageId),
+      }))
+    );
+
     return {
       ticket,
       messages,
       assignedAdminName,
+      attachments,
     };
   },
 });

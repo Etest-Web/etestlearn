@@ -7,11 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { LifeBuoy, Send, CheckCircle2, Search, HelpCircle } from "lucide-react";
+import { LifeBuoy, Send, CheckCircle2, Search, HelpCircle, Paperclip } from "lucide-react";
 import { toast } from "sonner";
+
+import { Id } from "@/convex/_generated/dataModel";
 
 type SupportCategory = "account" | "billing" | "courses" | "certificates" | "technical" | "other";
 type SupportPriority = "low" | "medium" | "high" | "urgent";
+
+type AttachmentInfo = {
+  storageId: Id<"_storage">;
+  fileName: string;
+  mimeType: string;
+  size: number;
+};
 
 export default function SupportPublicPage() {
   const [name, setName] = useState("");
@@ -22,12 +31,16 @@ export default function SupportPublicPage() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<{ ticketNumber: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<AttachmentInfo[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Status lookup state
   const [lookupNumber, setLookupNumber] = useState("");
   const [lookupEmail, setLookupEmail] = useState("");
 
   const createTicketMutation = useMutation(api.support.createTicket);
+  const generateUploadUrlMutation = useMutation(api.support.generateSupportUploadUrl);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +58,7 @@ export default function SupportPublicPage() {
         category,
         priority,
         message,
+        attachments: attachedFiles,
       });
       setCreatedTicket({ ticketNumber: res.ticketNumber });
       toast.success("Support ticket opened! We'll reply shortly.");
@@ -54,6 +68,63 @@ export default function SupportPublicPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleFilesUpload = async (files: FileList | File[]) => {
+    setIsUploading(true);
+    setUploadError(null);
+
+    const uploadFiles = Array.from(files).filter((f) => f.size > 0);
+    if (uploadFiles.length === 0) {
+      setIsUploading(false);
+      return;
+    }
+
+    const MAX_SIZE = 16 * 1024 * 1024; // 16 MB
+    const oversized = uploadFiles.find((f) => f.size > MAX_SIZE);
+    if (oversized) {
+      setUploadError(`"${oversized.name}" exceeds 16MB limit.`);
+      setIsUploading(false);
+      return;
+    }
+
+    const uploaded: AttachmentInfo[] = [];
+
+    try {
+      for (const file of uploadFiles) {
+        const uploadUrl = await generateUploadUrlMutation();
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+        uploaded.push({
+          storageId,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+        });
+      }
+
+      setAttachedFiles((prev) => [...prev, ...uploaded]);
+      toast.success(`${uploaded.length} file(s) attached.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed.";
+      setUploadError(msg);
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -119,6 +190,7 @@ export default function SupportPublicPage() {
                       setCreatedTicket(null);
                       setSubject("");
                       setMessage("");
+                      setAttachedFiles([]);
                     }}
                   >
                     Open Another Ticket
@@ -193,6 +265,68 @@ export default function SupportPublicPage() {
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                     />
+                  </div>
+
+                  {/* File Upload Section */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Attach Files (Optional)
+                    </label>
+                    {attachedFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {attachedFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 bg-muted/50 rounded px-3 py-1.5 text-xs"
+                          >
+                            <Paperclip className="h-3 w-3 text-muted-foreground" />
+                            <span className="truncate max-w-[150px]">{file.fileName}</span>
+                            <span className="text-muted-foreground">({Math.round(file.size / 1024)} KB)</span>
+                            <button
+                              type="button"
+                              onClick={() => removeFile(index)}
+                              className="ml-1 text-muted-foreground hover:text-foreground"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="border-2 border-dashed border-border rounded-lg p-4 text-center bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        id="support-file-upload"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleFilesUpload(e.target.files);
+                          }
+                        }}
+                        disabled={isUploading}
+                      />
+                      <label
+                        htmlFor="support-file-upload"
+                        className="flex flex-col items-center gap-2 cursor-pointer"
+                      >
+                        <Paperclip className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">
+                          {isUploading
+                            ? "Uploading..."
+                            : attachedFiles.length > 0
+                            ? "Add more files"
+                            : "Click to attach files"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Images, documents, or other files (max 10MB each)
+                        </span>
+                      </label>
+                    </div>
+                    {uploadError && (
+                      <p className="text-xs text-destructive mt-1">{uploadError}</p>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">

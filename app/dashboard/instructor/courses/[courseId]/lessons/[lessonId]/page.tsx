@@ -27,7 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useRef } from "react";
-import { ArrowLeft, Loader2, Save, Trash2, Video, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { VideoUpload } from "@/components/video-upload";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +61,12 @@ export default function LessonEditPage() {
   const createQuiz = useMutation(api.quizzes.createQuiz);
   const deleteQuizQuestion = useMutation(api.quizzes.deleteQuizQuestion);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const registerLessonAttachment = useMutation(api.lessonAttachments.registerLessonAttachment);
+  const deleteLessonAttachment = useMutation(api.lessonAttachments.deleteLessonAttachment);
+  const listLessonAttachments = useQuery(
+    api.lessonAttachments.listLessonAttachments,
+    lessonId ? { lessonId: lessonId as Id<"lessons"> } : "skip"
+  );
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -491,7 +497,95 @@ export default function LessonEditPage() {
               </div>
             )}
 
-          </CardContent>
+          {/* Lesson attachments — instructors upload files students can download. */}
+          <Card variant="sunken" size="sm" className="gap-3 space-y-2">
+            <h2 className="eyebrow">Attachments</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const input = e.target.elements.namedItem("attachment") as HTMLInputElement | null;
+                const file = input?.files?.[0];
+                if (!file) return;
+                if (file.size > 25 * 1024 * 1024) {
+                  return toast.error("File must be under 25 MB");
+                }
+                setIsUploadingVideo(true);
+                try {
+                  const postUrl = await generateUploadUrl({});
+                  const res = await fetch(postUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": file.type },
+                    body: file,
+                  });
+                  if (!res.ok) throw new Error("Upload failed");
+                  const { storageId } = (await res.json()) as { storageId: string };
+                  await registerLessonAttachment({
+                    lessonId: lessonId as Id<"lessons">,
+                    storageId: storageId as Id<"_storage">,
+                    fileName: file.name,
+                    mimeType: file.type,
+                    sizeBytes: file.size,
+                  });
+                } catch {
+                  toast.error("Attachment upload failed");
+                } finally {
+                  setIsUploadingVideo(false);
+                  if (input) input.value = "";
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <label className="flex items-center gap-2 rounded border border-rule bg-surface-raised px-2 py-1 text-sm cursor-pointer hover:bg-surface-raised/80">
+                <Upload className="h-3.5 w-3.5" />
+                Upload attachment
+                <input
+                  name="attachment"
+                  type="file"
+                  accept="*/*"
+                  className="sr-only"
+                  onChange={(e) => e.target.files?.length && e.target.form?.requestSubmit()}
+                />
+              </label>
+              {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
+            </form>
+
+            {(listLessonAttachments ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No attachments yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {(listLessonAttachments ?? []).map((att) => (
+                  <li key={att._id} className="flex items-center justify-between gap-2 rounded bg-surface-sunken px-2 py-1">
+                    <span className="flex items-center gap-2 text-sm truncate min-w-0">
+                      <File className="h-3.5 w-3.5 shrink-0" />
+                      {att.fileName}
+                      {att.sizeBytes != null && (
+                        <span className="ml-1 text-[10px] text-muted-foreground shrink-0">
+                          ({Math.round(att.sizeBytes / 1024)} KB)
+                        </span>
+                      )}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={async () => {
+                        if (!confirm(`Delete "${att.fileName}"?`)) return;
+                        try {
+                          await deleteLessonAttachment({ attachmentId: att._id });
+                          toast.success("Attachment removed");
+                        } catch {
+                          toast.error("Failed to remove attachment");
+                        }
+                      }}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </CardContent>
           <CardFooter className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

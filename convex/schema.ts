@@ -1395,6 +1395,16 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_assigned", ["assignedTo", "status"]),
 
+  supportTicketAttachments: defineTable({
+    ticketId: v.id("supportTickets"),
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_ticket", ["ticketId"]),
+
   supportTicketMessages: defineTable({
     ticketId: v.id("supportTickets"),
     senderType: v.union(v.literal("user"), v.literal("staff")),
@@ -1406,7 +1416,22 @@ export default defineSchema({
   })
     .index("by_ticket", ["ticketId", "createdAt"]),
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // Lesson download attachments — instructors add files students can download.
+  // Each attachment is linked to a lesson and ordered explicitly so instructors
+  // control display order. Files live in Convex storage; students receive only
+  // signed URLs generated at read time, never the raw storage id.
+  lessonAttachments: defineTable({
+    lessonId: v.id("lessons"),
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    mimeType: v.optional(v.string()),
+    sizeBytes: v.number(),
+    order: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_lesson", ["lessonId", "order"]),
+
+  // ════════════════════════════════════════════════════════════════════════
   // END admin console block
 });
 

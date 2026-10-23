@@ -24,6 +24,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  Download,
   FileText,
   HelpCircle,
   Loader2,
@@ -134,6 +135,8 @@ export default function LessonPage() {
   const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
   const enrollments = useQuery(api.enrollments.getUserEnrollments);
   const completeLesson = useMutation(api.enrollments.completeLesson);
+  const generateLessonAttachmentUrl = useMutation(api.lessonAttachments.generateLessonAttachmentUrl);
+  const attachments = useQuery(api.lessonAttachments.listLessonAttachments, lessonId ? { lessonId } : "skip");
   const [isMarking, setIsMarking] = useState(false);
 
   if (data === undefined || enrollments === undefined) {
@@ -319,6 +322,52 @@ export default function LessonPage() {
               <span className="hidden sm:block" />
             )}
           </nav>
+
+          {/* Downloadable lesson attachments. Gated to enrolled learners (query already
+              filters out unauthorised callers), rendered inside the enrolled block. */}
+          {(enrollment && attachments !== undefined) && (
+            <Card variant="sunken" size="sm" className="gap-3 space-y-2">
+              <h2 className="eyebrow">Downloads</h2>
+              {attachments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No downloads for this lesson yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {attachments.map((att) => (
+                    <li
+                      key={att._id}
+                      className="flex items-center justify-between gap-2 rounded bg-surface-sunken px-2 py-1"
+                    >
+                      <span className="flex items-center gap-2 text-sm truncate min-w-0">
+                        <Download className="h-3.5 w-3.5 shrink-0" />
+                        {att.fileName}
+                        {att.sizeBytes != null && (
+                          <span className="ml-1 text-[10px] text-muted-foreground shrink-0">
+                            ({Math.round(att.sizeBytes / 1024)} KB)
+                          </span>
+                        )}
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const url = await generateLessonAttachmentUrl({
+                              attachmentId: att._id,
+                            });
+                            if (!url) return toast.error("Could not prepare download");
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          } catch {
+                            toast.error("Could not prepare download");
+                          }
+                        }}
+                      >
+                        Download
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
 
           {/* A sunken well, which is what the Card `sunken` variant is for — the
               outline is secondary to the lesson itself. */}

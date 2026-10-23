@@ -50,6 +50,7 @@ import type * as instructorBank from "../instructorBank.js";
 import type * as instructorReviews from "../instructorReviews.js";
 import type * as instructorStats from "../instructorStats.js";
 import type * as instructors from "../instructors.js";
+import type * as lessonAttachments from "../lessonAttachments.js";
 import type * as maintenance from "../maintenance.js";
 import type * as payments from "../payments.js";
 import type * as payouts from "../payouts.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   instructorReviews: typeof instructorReviews;
   instructorStats: typeof instructorStats;
   instructors: typeof instructors;
+  lessonAttachments: typeof lessonAttachments;
   maintenance: typeof maintenance;
   payments: typeof payments;
   payouts: typeof payouts;

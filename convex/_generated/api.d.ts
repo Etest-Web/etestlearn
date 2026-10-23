@@ -61,6 +61,8 @@ import type * as reviews from "../reviews.js";
 import type * as search from "../search.js";
 import type * as skills from "../skills.js";
 import type * as statistics from "../statistics.js";
+import type * as support from "../support.js";
+import type * as supportActions from "../supportActions.js";
 import type * as tasks from "../tasks.js";
 import type * as tutorial from "../tutorial.js";
 import type * as users from "../users.js";
@@ -127,6 +129,8 @@ declare const fullApi: ApiFromModules<{
   search: typeof search;
   skills: typeof skills;
   statistics: typeof statistics;
+  support: typeof support;
+  supportActions: typeof supportActions;
   tasks: typeof tasks;
   tutorial: typeof tutorial;
   users: typeof users;

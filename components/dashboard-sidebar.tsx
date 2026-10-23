@@ -341,6 +341,10 @@ export function DashboardSidebar() {
         api.payouts.countPendingPayouts,
         isAdmin ? {} : "skip",
     );
+    const supportStats = useQuery(
+        api.support.adminGetSupportStats,
+        isAdmin ? {} : "skip",
+    );
     // Not gated on `isAdmin`: the gate in `proxy.ts` exempts *staff*, and this
     // badge is how an instructor finds out the site they are working on is not
     // publicly reachable. `getStatus` is public and reads one row, so there is no
@@ -357,6 +361,7 @@ export function DashboardSidebar() {
         pendingUnpublish: pendingUnpublish ?? 0,
         pendingPayouts: pendingPayouts ?? 0,
         maintenanceOn: maintenance?.enabled ? 1 : 0,
+        openTickets: supportStats?.open ?? 0,
     };
 
     /**

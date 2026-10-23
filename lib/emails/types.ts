@@ -42,7 +42,11 @@ export type EmailTemplateId =
   | "instructorApplicationDecision"
   | "payoutAccountConfirmed"
   // updates — updates@
-  | "platformAnnouncement";
+  | "platformAnnouncement"
+  // support — noreply@ or support
+  | "supportTicketReceived"
+  | "supportTicketStaffReply"
+  | "supportTicketResolved";
 
 /** What a template produces. `replyTo` is optional because a receipt has nowhere to reply to. */
 export type RenderedEmail = {

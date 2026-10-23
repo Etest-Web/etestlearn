@@ -32,6 +32,7 @@ import {
   UserPlus,
   Users,
   XCircle,
+  LifeBuoy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -233,6 +234,21 @@ const NOTIFICATION_ICONS: Record<
     icon: XCircle,
     tint: "text-destructive bg-destructive/10",
     verb: "Payout declined",
+  },
+  support_ticket_created: {
+    icon: LifeBuoy,
+    tint: "text-brand-ink bg-brand/10",
+    verb: "Support ticket opened",
+  },
+  support_ticket_replied: {
+    icon: MessageSquare,
+    tint: "text-info bg-info/10",
+    verb: "Support ticket replied",
+  },
+  support_ticket_resolved: {
+    icon: BadgeCheck,
+    tint: "text-success bg-success/10",
+    verb: "Support ticket resolved",
   },
 };
 

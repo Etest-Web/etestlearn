@@ -1041,6 +1041,9 @@ export default defineSchema({
       v.literal("payout_requested"),
       v.literal("payout_paid"),
       v.literal("payout_declined"),
+      v.literal("support_ticket_created"),
+      v.literal("support_ticket_replied"),
+      v.literal("support_ticket_resolved"),
     ),
     title: v.string(),
     body: v.optional(v.string()),
@@ -1348,6 +1351,60 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_status", ["status"])
     .index("by_course", ["courseId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Support system block
+  // ═══════════════════════════════════════════════════════════════════════
+
+  supportTickets: defineTable({
+    ticketNumber: v.string(), // e.g. "TICK-2026-0001" or nanoid
+    userId: v.optional(v.id("users")),
+    email: v.string(),
+    name: v.string(),
+    subject: v.string(),
+    category: v.union(
+      v.literal("account"),
+      v.literal("billing"),
+      v.literal("courses"),
+      v.literal("certificates"),
+      v.literal("technical"),
+      v.literal("other")
+    ),
+    priority: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("urgent")
+    ),
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"),
+      v.literal("waiting_user"),
+      v.literal("resolved"),
+      v.literal("closed")
+    ),
+    assignedTo: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_ticket_number", ["ticketNumber"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["email"])
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_assigned", ["assignedTo", "status"]),
+
+  supportTicketMessages: defineTable({
+    ticketId: v.id("supportTickets"),
+    senderType: v.union(v.literal("user"), v.literal("staff")),
+    senderId: v.optional(v.id("users")),
+    senderName: v.string(),
+    body: v.string(),
+    isInternalNote: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_ticket", ["ticketId", "createdAt"]),
 
   // ═══════════════════════════════════════════════════════════════════════
   // END admin console block

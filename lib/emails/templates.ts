@@ -172,6 +172,28 @@ export type EmailData = {
     ctaLabel?: string;
     ctaUrl?: string;
   };
+  supportTicketReceived: {
+    name: string;
+    ticketNumber: string;
+    subject: string;
+    category: string;
+    messageExcerpt: string;
+    ticketUrl: string;
+  };
+  supportTicketStaffReply: {
+    name: string;
+    ticketNumber: string;
+    subject: string;
+    staffName: string;
+    replyExcerpt: string;
+    ticketUrl: string;
+  };
+  supportTicketResolved: {
+    name: string;
+    ticketNumber: string;
+    subject: string;
+    ticketUrl: string;
+  };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1320,6 +1342,99 @@ export const EMAIL_TEMPLATES: EmailRegistry<EmailData> = {
       });
     },
   },
+  supportTicketReceived: {
+    group: "account",
+    category: "transactional",
+    subject: (d) => `[Ticket #${clean(d.ticketNumber)}] Support request received: ${clean(d.subject)}`,
+    text: (d) =>
+      [
+        `Hi ${d.name},`,
+        "",
+        `We received your support request "${d.subject}" (Ticket #${d.ticketNumber}).`,
+        `Category: ${d.category}`,
+        "",
+        `"${d.messageExcerpt}"`,
+        "",
+        "Our team will review your message and respond shortly.",
+        `View your ticket: ${d.ticketUrl}`,
+        "",
+        "Glypha Learn Support",
+      ].join("\n"),
+    html: (d) =>
+      emailLayout({
+        preheader: `Ticket #${clean(d.ticketNumber)} received: ${clean(d.subject)}`,
+        eyebrow: "Support Ticket",
+        heading: "Request received",
+        body:
+          para(`Hi ${clean(d.name)}, we've received your support request and assigned it ticket #${emailStrong(clean(d.ticketNumber))}.`) +
+          emailPanel(
+            emailKeyValueRows([
+              ["Subject", clean(d.subject)],
+              ["Category", clean(d.category)],
+              ["Summary", clean(d.messageExcerpt)],
+            ]),
+          ) +
+          para("Our team is reviewing your message and will reply as soon as possible."),
+        action: { label: "View Ticket", href: d.ticketUrl },
+        footnote: "This is an automated confirmation of your support request.",
+      }),
+  },
+  supportTicketStaffReply: {
+    group: "account",
+    category: "transactional",
+    subject: (d) => `[Ticket #${clean(d.ticketNumber)}] Reply to: ${clean(d.subject)}`,
+    text: (d) =>
+      [
+        `Hi ${d.name},`,
+        "",
+        `${d.staffName} from Glypha Learn support has replied to your ticket #${d.ticketNumber}:`,
+        "",
+        `"${d.replyExcerpt}"`,
+        "",
+        `View and respond to this ticket: ${d.ticketUrl}`,
+        "",
+        "Glypha Learn Support",
+      ].join("\n"),
+    html: (d) =>
+      emailLayout({
+        preheader: `${clean(d.staffName)} replied to your support request #${clean(d.ticketNumber)}`,
+        eyebrow: "Support Update",
+        heading: "New response from support",
+        body:
+          para(`Hi ${clean(d.name)}, ${clean(d.staffName)} has replied to your support request (${emailStrong(`#${clean(d.ticketNumber)}`)}):`) +
+          emailPanel(para(clean(d.replyExcerpt))) +
+          para("You can view the full conversation or send a reply online:"),
+        action: { label: "View & Reply", href: d.ticketUrl },
+        footnote: "You are receiving this because you submitted a support ticket on Glypha Learn.",
+      }),
+  },
+  supportTicketResolved: {
+    group: "account",
+    category: "transactional",
+    subject: (d) => `[Ticket #${clean(d.ticketNumber)}] Ticket resolved: ${clean(d.subject)}`,
+    text: (d) =>
+      [
+        `Hi ${d.name},`,
+        "",
+        `Your support ticket #${d.ticketNumber} ("${d.subject}") has been marked as resolved.`,
+        "",
+        `If you still need assistance, you can reopen it or view the history here: ${d.ticketUrl}`,
+        "",
+        "Thank you for using Glypha Learn.",
+      ].join("\n"),
+    html: (d) =>
+      emailLayout({
+        preheader: `Ticket #${clean(d.ticketNumber)} resolved: ${clean(d.subject)}`,
+        eyebrow: "Support Ticket",
+        heading: "Ticket resolved",
+        body:
+          para(`Hi ${clean(d.name)}, your support request #${emailStrong(clean(d.ticketNumber))} has been marked as resolved.`) +
+          emailSuccessNote("If your issue is not completely solved, you can view the ticket details and send another reply to reopen it.") +
+          para("Thank you for your patience."),
+        action: { label: "View Ticket Details", href: d.ticketUrl },
+        footnote: "This notification was sent regarding your resolved support ticket.",
+      }),
+  },
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1426,6 +1541,28 @@ const REQUIRED_FIELDS = {
     "dashboardUrl",
   ],
   platformAnnouncement: ["title", "body", "publishedAt"],
+  supportTicketReceived: [
+    "name",
+    "ticketNumber",
+    "subject",
+    "category",
+    "messageExcerpt",
+    "ticketUrl",
+  ],
+  supportTicketStaffReply: [
+    "name",
+    "ticketNumber",
+    "subject",
+    "staffName",
+    "replyExcerpt",
+    "ticketUrl",
+  ],
+  supportTicketResolved: [
+    "name",
+    "ticketNumber",
+    "subject",
+    "ticketUrl",
+  ],
 } as const satisfies {
   [K in EmailTemplateId]: readonly (keyof EmailData[K] & string)[];
 };

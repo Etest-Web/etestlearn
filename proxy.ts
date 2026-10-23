@@ -125,6 +125,7 @@ const isPublicRoute = createRouteMatcher([
   '/instructors(.*)',
   '/verify(.*)',
   '/become-instructor',
+  '/support(.*)',
   // The maintenance page must load signed out, for the same reason the gate has
   // to allow it at all: it is shown to people who by definition have no session
   // (and to staff, who do). Without this entry `auth.protect()` redirects the

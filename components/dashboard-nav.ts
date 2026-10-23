@@ -38,6 +38,7 @@ import {
     UserRound,
     Wallet,
     Wrench,
+    LifeBuoy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -74,7 +75,8 @@ export type NavBadge =
     | "pendingUnpublish"
     | "pendingPayouts"
     | "maintenanceOn"
-    | "scheduled";
+    | "scheduled"
+    | "openTickets";
 
 export type NavItem = {
     href: string;
@@ -161,6 +163,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             // The payout queue: the place a requested payout actually gets sent,
             // and the record of what was sent before.
             { href: "/dashboard/admin/payouts", label: "Payouts", icon: Banknote, badge: "pendingPayouts" },
+            { href: "/dashboard/admin/support", label: "Support", icon: LifeBuoy, badge: "openTickets" },
             { href: "/dashboard/admin/certificates", label: "Certificates", icon: Award },
             { href: "/dashboard/admin/discussions", label: "Moderation", icon: MessagesSquare },
             { href: "/dashboard/admin/categories", label: "Categories", icon: Tags },

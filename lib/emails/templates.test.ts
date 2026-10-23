@@ -194,6 +194,31 @@ const DATA: { [K in EmailTemplateId]: EmailData[K] } = {
     ctaLabel: "Read the announcement",
     ctaUrl: "https://glypha.example.ng/updates/certificate-verification",
   },
+
+  supportTicketReceived: {
+    name: "Ada Obi",
+    ticketNumber: "TICK-2026-9012",
+    subject: "Cannot view certificate",
+    category: "certificates",
+    messageExcerpt: "I completed the lessons but cannot download certificate.",
+    ticketUrl: "https://glypha.example.ng/support?ticketNumber=TICK-2026-9012",
+  },
+
+  supportTicketStaffReply: {
+    name: "Ada Obi",
+    ticketNumber: "TICK-2026-9012",
+    subject: "Cannot view certificate",
+    staffName: "Tunde Support",
+    replyExcerpt: "We corrected the name spelling and reissued it.",
+    ticketUrl: "https://glypha.example.ng/support?ticketNumber=TICK-2026-9012",
+  },
+
+  supportTicketResolved: {
+    name: "Ada Obi",
+    ticketNumber: "TICK-2026-9012",
+    subject: "Cannot view certificate",
+    ticketUrl: "https://glypha.example.ng/support?ticketNumber=TICK-2026-9012",
+  },
 };
 
 /** Which group each email goes out as, and whether it can be turned off. */
@@ -215,6 +240,9 @@ const EXPECTED: Record<EmailTemplateId, { group: string; category: EmailCategory
   instructorApplicationDecision: { group: "instructors", category: "transactional" },
   payoutAccountConfirmed: { group: "instructors", category: "transactional" },
   platformAnnouncement: { group: "updates", category: "broadcast" },
+  supportTicketReceived: { group: "account", category: "transactional" },
+  supportTicketStaffReply: { group: "account", category: "transactional" },
+  supportTicketResolved: { group: "account", category: "transactional" },
 };
 
 /** The value each template must visibly carry into the rendered mail. */
@@ -241,6 +269,9 @@ const KEY_VALUE: Record<EmailTemplateId, string[]> = {
   instructorApplicationDecision: ["Amaka Obi"],
   payoutAccountConfirmed: ["Amaka Obi", "•••• 4417", "support@glypha.example.ng"],
   platformAnnouncement: ["Certificates can now be checked by anyone", "14 October 2026"],
+  supportTicketReceived: ["Ada Obi", "TICK-2026-9012", "Cannot view certificate"],
+  supportTicketStaffReply: ["Ada Obi", "TICK-2026-9012", "Tunde Support"],
+  supportTicketResolved: ["Ada Obi", "TICK-2026-9012", "Cannot view certificate"],
 };
 
 const IDS = Object.keys(EXPECTED) as EmailTemplateId[];

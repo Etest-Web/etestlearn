@@ -211,6 +211,9 @@ export const NOTIFICATION_TYPES = [
   "payout_requested",
   "payout_paid",
   "payout_declined",
+  "support_ticket_created",
+  "support_ticket_replied",
+  "support_ticket_resolved",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -240,6 +243,9 @@ export const notificationTypeValidator = v.union(
   v.literal("payout_requested"),
   v.literal("payout_paid"),
   v.literal("payout_declined"),
+  v.literal("support_ticket_created"),
+  v.literal("support_ticket_replied"),
+  v.literal("support_ticket_resolved"),
 );
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────

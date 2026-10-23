@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import { PageShell } from "@/components/dashboard-shell";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,15 +16,15 @@ import {
   LifeBuoy,
   MessageSquare,
   Search,
-  Filter,
-  CheckCircle2,
   Clock,
   AlertCircle,
-  UserCheck,
   Send,
   Lock,
 } from "lucide-react";
 import { toast } from "sonner";
+
+type TicketStatus = Doc<"supportTickets">["status"];
+type TicketPriority = Doc<"supportTickets">["priority"];
 
 export default function AdminSupportPage() {
   const [selectedTicketId, setSelectedTicketId] = useState<Id<"supportTickets"> | null>(null);
@@ -62,14 +62,15 @@ export default function AdminSupportPage() {
       });
       setReplyText("");
       toast.success(isInternalNote ? "Internal note added" : "Reply sent to user");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send reply");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to send reply";
+      toast.error(msg);
     } finally {
       setSubmittingReply(false);
     }
   };
 
-  const handleStatusChange = async (newStatus: any) => {
+  const handleStatusChange = async (newStatus: TicketStatus) => {
     if (!selectedTicketId) return;
     try {
       await updateMutation({
@@ -77,12 +78,13 @@ export default function AdminSupportPage() {
         status: newStatus,
       });
       toast.success(`Ticket marked as ${newStatus}`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update status");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update status";
+      toast.error(msg);
     }
   };
 
-  const handlePriorityChange = async (newPriority: any) => {
+  const handlePriorityChange = async (newPriority: TicketPriority) => {
     if (!selectedTicketId) return;
     try {
       await updateMutation({
@@ -90,8 +92,9 @@ export default function AdminSupportPage() {
         priority: newPriority,
       });
       toast.success(`Priority updated to ${newPriority}`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update priority");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update priority";
+      toast.error(msg);
     }
   };
 
@@ -189,7 +192,7 @@ export default function AdminSupportPage() {
                 <p className="mt-2 text-sm font-medium">No tickets found</p>
               </Card>
             ) : (
-              tickets.map((t) => {
+              tickets.map((t: Doc<"supportTickets">) => {
                 const isSelected = selectedTicketId === t._id;
                 return (
                   <Card
@@ -285,7 +288,7 @@ export default function AdminSupportPage() {
                   <div className="flex items-center gap-2">
                     <select
                       value={selectedTicket.ticket.status}
-                      onChange={(e) => handleStatusChange(e.target.value)}
+                      onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
                       className="h-8 rounded-md border border-input bg-background px-2 text-xs font-semibold"
                     >
                       <option value="open">Open</option>
@@ -297,7 +300,7 @@ export default function AdminSupportPage() {
 
                     <select
                       value={selectedTicket.ticket.priority}
-                      onChange={(e) => handlePriorityChange(e.target.value)}
+                      onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
                       className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                     >
                       <option value="low">Low</option>
@@ -316,7 +319,7 @@ export default function AdminSupportPage() {
                 </h4>
 
                 <div className="flex flex-col gap-4">
-                  {selectedTicket.messages.map((m) => {
+                  {selectedTicket.messages.map((m: Doc<"supportTicketMessages">) => {
                     const isStaff = m.senderType === "staff";
                     const isNote = m.isInternalNote;
 

@@ -6,20 +6,20 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LifeBuoy, Send, CheckCircle2, Search, ArrowRight, HelpCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { LifeBuoy, Send, CheckCircle2, Search, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { Navbar } from "@/components/navbar";
+
+type SupportCategory = "account" | "billing" | "courses" | "certificates" | "technical" | "other";
+type SupportPriority = "low" | "medium" | "high" | "urgent";
 
 export default function SupportPublicPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
-  const [category, setCategory] = useState<
-    "account" | "billing" | "courses" | "certificates" | "technical" | "other"
-  >("other");
-  const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [category, setCategory] = useState<SupportCategory>("other");
+  const [priority, setPriority] = useState<SupportPriority>("medium");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<{ ticketNumber: string } | null>(null);
@@ -27,7 +27,6 @@ export default function SupportPublicPage() {
   // Status lookup state
   const [lookupNumber, setLookupNumber] = useState("");
   const [lookupEmail, setLookupEmail] = useState("");
-  const [isLookingUp, setIsLookingUp] = useState(false);
 
   const createTicketMutation = useMutation(api.support.createTicket);
 
@@ -44,14 +43,15 @@ export default function SupportPublicPage() {
         name,
         email,
         subject,
-        category: category as any,
+        category,
         priority,
         message,
       });
       setCreatedTicket({ ticketNumber: res.ticketNumber });
       toast.success("Support ticket opened! We'll reply shortly.");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create support ticket.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to create support ticket.";
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -161,7 +161,7 @@ export default function SupportPublicPage() {
                       <label className="text-xs font-semibold text-foreground">Category *</label>
                       <select
                         value={category}
-                        onChange={(e) => setCategory(e.target.value as any)}
+                        onChange={(e) => setCategory(e.target.value as SupportCategory)}
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                       >
                         <option value="account">Account & Sign-in</option>
@@ -177,7 +177,7 @@ export default function SupportPublicPage() {
                       <label className="text-xs font-semibold text-foreground">Urgency</label>
                       <select
                         value={priority}
-                        onChange={(e) => setPriority(e.target.value as any)}
+                        onChange={(e) => setPriority(e.target.value as SupportPriority)}
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                       >
                         <option value="low">Low - General inquiry</option>

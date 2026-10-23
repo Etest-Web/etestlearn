@@ -1,10 +1,10 @@
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser, requireAdmin, requireUser } from "./helpers/auth";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
 import { internal } from "./_generated/api";
-import { Doc, Id } from "./_generated/dataModel";
+import { Doc } from "./_generated/dataModel";
 
 export const categoryValidator = v.union(
   v.literal("account"),

@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { logAudit, type AuditEntry } from "./helpers/audit";
 import { createNotification } from "./helpers/notifications";
 import { requireAdmin } from "./helpers/auth";
+import { isDisposableEmail, validateEmail } from "../lib/email";
 
 // Named rather than imported from `_generated/api`, which does not list the
 // email modules until codegen has run. Same wire name either way.
@@ -44,6 +45,15 @@ export const submitApplication = mutation({
       throw new Error("You are already an instructor or admin");
     }
 
+    const emailValidation = validateEmail(args.email);
+    if (!emailValidation.ok) {
+      throw new Error("Please provide a valid email address");
+    }
+    if (isDisposableEmail(emailValidation.email)) {
+      throw new Error("Please use a permanent email address");
+    }
+    const normalizedEmail = emailValidation.email;
+
     // Check for an existing pending application
     const existing = await ctx.db
       .query("instructorApplications")
@@ -59,7 +69,7 @@ export const submitApplication = mutation({
     const applicationId = await ctx.db.insert("instructorApplications", {
       userId: user._id,
       fullName: args.fullName,
-      email: args.email,
+      email: normalizedEmail,
       expertise: args.expertise,
       bio: args.bio,
       portfolioUrl: args.portfolioUrl,
@@ -80,7 +90,7 @@ export const submitApplication = mutation({
       sendInstructorApplicationReceivedRef,
       {
         applicationId,
-        email: args.email,
+        email: normalizedEmail,
         fullName: args.fullName,
         submittedAt: now,
       },

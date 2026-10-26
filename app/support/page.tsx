@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 import { Id } from "@/convex/_generated/dataModel";
+import { isDisposableEmail, suggestEmailDomain, validateEmail } from "@/lib/email";
 
 type SupportCategory = "account" | "billing" | "courses" | "certificates" | "technical" | "other";
 type SupportPriority = "low" | "medium" | "high" | "urgent";
@@ -49,6 +50,10 @@ export default function SupportPublicPage() {
     }
   }, [isLoaded, user]);
 
+  const supportEmailValidation = validateEmail(email);
+  const supportEmailSuggestion = suggestEmailDomain(email);
+  const supportEmailDisposable = supportEmailValidation.ok && isDisposableEmail(supportEmailValidation.email);
+
   const createTicketMutation = useMutation(api.support.createTicket);
   const generateUploadUrlMutation = useMutation(api.support.generateSupportUploadUrl);
 
@@ -58,12 +63,22 @@ export default function SupportPublicPage() {
       toast.error("Please fill in all required fields.");
       return;
     }
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.ok) {
+      toast.error(emailCheck.error);
+      return;
+    }
+    if (isDisposableEmail(emailCheck.email)) {
+      toast.error("Please use a permanent email address");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
+      const emailCheck = validateEmail(email);
       const res = await createTicketMutation({
         name,
-        email,
+        email: emailCheck.ok ? emailCheck.email : email,
         subject,
         category,
         priority,

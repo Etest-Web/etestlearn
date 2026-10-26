@@ -24,6 +24,7 @@ import { CheckCircle2, Clock, GraduationCap, Loader2, ShieldCheck, Video, Wallet
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { isDisposableEmail, suggestEmailDomain, validateEmail } from "@/lib/email";
 
 export default function BecomeInstructorPage() {
     const { user, isLoaded } = useUser();
@@ -55,18 +56,31 @@ export default function BecomeInstructorPage() {
     const effectiveFullName = formData.fullName || user?.fullName || "";
     const effectiveEmail = formData.email || user?.primaryEmailAddress?.emailAddress || "";
 
+    const emailSuggestion = suggestEmailDomain(effectiveEmail);
+    const emailValidation = validateEmail(effectiveEmail);
+    const isEmailDisposable = emailValidation.ok && isDisposableEmail(emailValidation.email);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const emailCheck = validateEmail(effectiveEmail);
+        if (!emailCheck.ok) {
+            toast.error(emailCheck.error);
+            return;
+        }
+        if (isDisposableEmail(emailCheck.email)) {
+            toast.error("Please use a permanent email address");
+            return;
+        }
         const payload = {
             fullName: effectiveFullName.trim(),
-            email: effectiveEmail.trim(),
+            email: emailCheck.email,
             expertise: formData.expertise.trim(),
             bio: formData.bio.trim(),
             portfolioUrl: formData.portfolioUrl.trim(),
             motivation: formData.motivation.trim(),
         };
 
-        if (!payload.fullName || !payload.email || !payload.expertise || !payload.bio || !payload.motivation) {
+        if (!payload.fullName || !payload.expertise || !payload.bio || !payload.motivation) {
             toast.error("Please fill in all required fields.");
             return;
         }
@@ -308,6 +322,19 @@ export default function BecomeInstructorPage() {
                                         onChange={handleChange}
                                         required
                                     />
+                                    {emailSuggestion && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Did you mean <span className="font-medium">{emailSuggestion}</span>?
+                                        </p>
+                                    )}
+                                    {isEmailDisposable && (
+                                        <p className="text-xs text-destructive">
+                                            Disposable emails are not allowed.
+                                        </p>
+                                    )}
+                                    {effectiveEmail && !emailValidation.ok && (
+                                        <p className="text-xs text-destructive">{emailValidation.error}</p>
+                                    )}
                                 </div>
                             </div>
 

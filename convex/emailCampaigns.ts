@@ -32,6 +32,7 @@ import { internalAction, action } from "./_generated/server";
 import { v } from "convex/values";
 import { makeFunctionReference, type GenericActionCtx } from "convex/server";
 import type { DataModel, Id } from "./_generated/dataModel";
+import { validateEmail } from "../lib/email";
 import type {
   BroadcastRecipient,
   CourseDigestItem,
@@ -98,17 +99,15 @@ async function deliver(
     return false;
   }
 
-  const recipient = args.to.trim().toLowerCase();
-
-  // Cheap sanity check. A malformed address fails at the provider, which costs
-  // a round trip and leaves a less useful error than this one.
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)) {
+  const emailValidation = validateEmail(args.to);
+  if (!emailValidation.ok) {
     console.warn(
       `[email] invalid recipient for "${args.templateId}":`,
       maskEmail(args.to),
     );
     return false;
   }
+  const recipient = emailValidation.email;
 
   const claim = await ctx.runMutation(claimDelivery, {
     dedupeKey: args.dedupeKey,

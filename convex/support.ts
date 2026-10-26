@@ -5,6 +5,7 @@ import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
+import { isDisposableEmail, validateEmail } from "../lib/email";
 
 export const categoryValidator = v.union(
   v.literal("account"),
@@ -85,11 +86,14 @@ export const generateSupportUploadUrl = mutation({
     if (user) {
       rateKey = `support:upload:${user._id}`;
     } else {
-      const email = args.email?.trim().toLowerCase() ?? "";
-      if (!email || !email.includes("@") || !email.includes(".") || email.length > 320) {
+      const emailValidation = validateEmail(args.email ?? "");
+      if (!emailValidation.ok) {
         throw new Error("Provide your email address (or sign in) to attach files");
       }
-      rateKey = `support:upload:${email}`;
+      if (isDisposableEmail(emailValidation.email)) {
+        throw new Error("Please use a permanent email address");
+      }
+      rateKey = `support:upload:${emailValidation.email}`;
     }
 
     await requireRateLimit(ctx, rateKey, 20, 60 * 60 * 1000);
@@ -155,16 +159,20 @@ export const createTicket = mutation({
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const trimmedName = args.name.trim();
-    const trimmedEmail = args.email.trim().toLowerCase();
+    const emailValidation = validateEmail(args.email);
+    if (!emailValidation.ok) {
+      throw new Error("Please provide a valid email address");
+    }
+    const trimmedEmail = emailValidation.email;
     const trimmedSubject = args.subject.trim();
     const trimmedMessage = args.message.trim();
 
-    if (!trimmedName || !trimmedEmail || !trimmedSubject || !trimmedMessage) {
+    if (!trimmedName || !trimmedSubject || !trimmedMessage) {
       throw new Error("All fields are required");
     }
 
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      throw new Error("Please provide a valid email address");
+    if (isDisposableEmail(trimmedEmail)) {
+      throw new Error("Please use a permanent email address");
     }
 
     // Declared attachment fields are attacker-controlled: cap and shape them

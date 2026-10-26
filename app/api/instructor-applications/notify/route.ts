@@ -7,6 +7,8 @@ import {
 } from "@/lib/emails/layout";
 import { consumeDurableRateLimit, DurableRateLimitUnavailableError } from "@/lib/durable-rate-limit";
 import { normalizeEmailAddress } from "@/lib/email-address";
+import { isDisposableEmail } from "@/lib/email";
+import { z } from "zod";
 
 type InstructorApplicationPayload = {
   fullName: string;
@@ -16,6 +18,29 @@ type InstructorApplicationPayload = {
   portfolioUrl?: string;
   motivation: string;
 };
+
+const instructorApplicationSchema = z.object({
+  fullName: z.string().trim().min(1, "Missing required fields.").max(200, "fullName exceeds the maximum length of 200 characters."),
+  email: z.string().trim().min(1, "Missing required fields.").max(320, "email exceeds the maximum length of 320 characters."),
+  expertise: z.string().trim().min(1, "Missing required fields.").max(300, "expertise exceeds the maximum length of 300 characters."),
+  bio: z.string().trim().min(1, "Missing required fields.").max(5000, "bio exceeds the maximum length of 5000 characters."),
+  motivation: z.string().trim().min(1, "Missing required fields.").max(5000, "motivation exceeds the maximum length of 5000 characters."),
+  portfolioUrl: z
+    .string()
+    .trim()
+    .max(2048, "portfolioUrl exceeds the maximum length of 2048 characters.")
+    .url("Portfolio must be a valid URL.")
+    .refine((url) => {
+      try {
+        const { protocol } = new URL(url);
+        return protocol === "http:" || protocol === "https:";
+      } catch {
+        return false;
+      }
+    }, "Portfolio must be an http(s) URL.")
+    .optional()
+    .or(z.literal("")),
+});
 
 /**
  * Fixed-window rate limiter: 5 per hour per client key.
@@ -166,34 +191,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = (body ?? {}) as Record<string, unknown>;
-  const application: InstructorApplicationPayload = {
-    fullName:
-      typeof data.fullName === "string" ? data.fullName.trim() : "",
-    email: typeof data.email === "string" ? data.email.trim() : "",
-    expertise:
-      typeof data.expertise === "string" ? data.expertise.trim() : "",
-    bio: typeof data.bio === "string" ? data.bio.trim() : "",
-    portfolioUrl:
-      typeof data.portfolioUrl === "string" && data.portfolioUrl.trim()
-        ? data.portfolioUrl.trim()
-        : undefined,
-    motivation:
-      typeof data.motivation === "string" ? data.motivation.trim() : "",
-  };
-
-  if (
-    !application.fullName ||
-    !application.email ||
-    !application.expertise ||
-    !application.bio ||
-    !application.motivation
-  ) {
-    return NextResponse.json(
-      { error: "Missing required fields." },
-      { status: 400 }
-    );
+  const parsed = instructorApplicationSchema.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const message = issue?.message || "Invalid request body.";
+    if (message.includes("exceeds the maximum length")) {
+      return NextResponse.json({ error: message }, { status: 413 });
+    }
+    if (message === "Missing required fields.") {
+      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    }
+    if (message === "Portfolio must be a valid URL." || message === "Portfolio must be an http(s) URL.") {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
+
+  const application: InstructorApplicationPayload = {
+    fullName: parsed.data.fullName,
+    email: parsed.data.email,
+    expertise: parsed.data.expertise,
+    bio: parsed.data.bio,
+    motivation: parsed.data.motivation,
+    portfolioUrl:
+      parsed.data.portfolioUrl && parsed.data.portfolioUrl.trim()
+        ? parsed.data.portfolioUrl.trim()
+        : undefined,
+  };
 
   // Format, not just presence: this address becomes the `replyTo` of the
   // admin notification, so it must be an address — no CR/LF, within the RFC
@@ -205,48 +229,13 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (isDisposableEmail(email)) {
+    return NextResponse.json(
+      { error: "Please use a permanent email address." },
+      { status: 400 }
+    );
+  }
   application.email = email;
-
-  // Cap each field so one submission cannot be used to ship an arbitrarily
-  // large message, and so the admin inbox cannot be flooded with megabytes.
-  const LIMITS: Array<[keyof InstructorApplicationPayload, number]> = [
-    ["fullName", 200],
-    ["email", 320],
-    ["expertise", 300],
-    ["bio", 5000],
-    ["motivation", 5000],
-    ["portfolioUrl", 2048],
-  ];
-
-  for (const [field, max] of LIMITS) {
-    const value = application[field];
-    if (typeof value === "string" && value.length > max) {
-      return NextResponse.json(
-        { error: `${field} exceeds the maximum length of ${max} characters.` },
-        { status: 413 }
-      );
-    }
-  }
-
-  // If a URL was supplied it must be http(s) — otherwise it is either
-  // a javascript:/data: payload aimed at whoever clicks it in the admin
-  // review queue, or malformed.
-  if (application.portfolioUrl) {
-    try {
-      const { protocol } = new URL(application.portfolioUrl);
-      if (protocol !== "http:" && protocol !== "https:") {
-        return NextResponse.json(
-          { error: "Portfolio must be an http(s) URL." },
-          { status: 400 }
-        );
-      }
-    } catch {
-      return NextResponse.json(
-        { error: "Portfolio must be a valid URL." },
-        { status: 400 }
-      );
-    }
-  }
 
   if (!isMailConfigured()) {
     return NextResponse.json(

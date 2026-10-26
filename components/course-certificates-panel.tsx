@@ -159,39 +159,8 @@ export function CertificatesPanel({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Label htmlFor="learner-id" className="text-xs">
-            Learner ID
-          </Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              id="learner-id"
-              value={learnerId}
-              onChange={(e) => setLearnerId(e.target.value.trim())}
-              placeholder="Convex user id"
-              className="font-mono text-xs"
-            />
-            <Button
-              size="sm"
-              disabled={!learnerId || busy === "award"}
-              onClick={() =>
-                run(
-                  "award",
-                  () =>
-                    award({
-                      userId: learnerId as Id<"users">,
-                      courseId,
-                    }),
-                  "Certificate issued",
-                ).finally(() => setLearnerId(""))
-              }
-            >
-              <Send className="size-3.5" />
-              {busy === "award" ? "Issuing…" : "Issue certificate"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            A learner ID is shown on their profile page. Issuance is
-            idempotent — issuing twice returns the same certificate.
+          <p className="text-sm text-muted-foreground">
+            Manual certificate issuance is only available to admins.
           </p>
         </CardContent>
       </Card>

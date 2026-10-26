@@ -476,6 +476,11 @@ export const issueCertificateForLearner = mutation({
     const actor = await requireUser(ctx);
     if (!isStaff(actor)) throw new Error("Not authorized");
 
+    // Instructors cannot issue certificates manually.
+    if (actor.role === "instructor") {
+      throw new Error("Instructors cannot issue certificates manually");
+    }
+
     const course = await ctx.db.get(args.courseId);
     if (!(await canManageCourse(ctx, actor, course))) {
       throw new Error("Not authorized to issue certificates for this course");

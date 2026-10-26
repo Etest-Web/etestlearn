@@ -161,14 +161,14 @@ export function CourseCouponsManager({ courseId }: { courseId: Id<"courses"> }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="coupon-value">
-                {kind === "percent" ? "Percent off" : "Amount off (₦)"}
+                {kind === "percent" ? "Percent off (max 30%)" : "Amount off (₦)"}
               </Label>
               {kind === "percent" ? (
                 <Input
                   id="coupon-value"
                   type="number"
                   min={1}
-                  max={100}
+                  max={30}
                   value={percent}
                   onChange={(e) => setPercent(e.target.value)}
                 />

@@ -93,3 +93,47 @@ export async function canManageCourse(
   if (!course) return false;
   return course.instructorId === user._id || user.role === "admin";
 }
+
+/**
+ * The public-preview rule: which lesson anyone may read without enrolling.
+ *
+ * One definition, used by the content gate in `courses.getCourseBySlug` and
+ * by the encrypted-video gate in `videoAssets` (`issuePlaybackToken` and
+ * `checkPlaybackAccess`). If those two ever disagree, a lesson whose video is
+ * refused still hands over its article text — which is exactly the kind of
+ * drift that re-opens a paywall nobody noticed.
+ *
+ * Note the historical oddity this preserves rather than silently changes:
+ * lessons are *created* 0-based (`order = lessons.length` in the course
+ * editor), while this rule — and the `isLessonUnlocked` helper on the public
+ * course page — both read `order === 1`. So on a freshly authored course the
+ * previewed lesson is the second one, not the first. Fixing that is a product
+ * decision (and better served by an explicit `lesson.isPreview` flag, per the
+ * note in the schema) — changing it here would quietly move which content is
+ * world-readable.
+ */
+export function isPreviewLesson(lesson: Doc<"lessons">): boolean {
+  return lesson.order === 1;
+}
+
+/**
+ * Is this user enrolled in this course? Read-only, one index point-read.
+ *
+ * Lives here rather than being copied per module: `videoAssets.ts` carried a
+ * private twin of this for the playback gate, and content gating in
+ * `courses.ts` needs the same question answered. Two definitions of
+ * "enrolled" is how the paywall and the video gate drift apart.
+ */
+export async function hasEnrollment(
+  ctx: ReadCtx,
+  userId: Id<"users">,
+  courseId: Id<"courses">,
+): Promise<boolean> {
+  const enrollment = await ctx.db
+    .query("enrollments")
+    .withIndex("by_user_course", (q) =>
+      q.eq("userId", userId).eq("courseId", courseId),
+    )
+    .unique();
+  return !!enrollment;
+}

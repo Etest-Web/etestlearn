@@ -132,9 +132,11 @@ async function addCoupon(
     amountOffKobo: number;
     maxRedemptions: number;
     expiresAt: number;
+    asAdmin?: boolean;
   }> = {},
 ): Promise<Id<"coupons">> {
-  return as(t, "clerk_instructor").mutation(api.coupons.create, {
+  const actor = args.asAdmin ? "clerk_admin" : "clerk_instructor";
+  return as(t, actor).mutation(api.coupons.create, {
     courseId,
     code: args.code ?? "SAVE20",
     kind: args.kind ?? "percent",
@@ -339,7 +341,9 @@ describe("coupon validation", () => {
       /between 4 and 32/,
     );
     await expect(addCoupon(t, courseId, { percentOff: 0 })).rejects.toThrow(/1 to 100/);
-    await expect(addCoupon(t, courseId, { percentOff: 150 })).rejects.toThrow(/1 to 100/);
+    await expect(
+      addCoupon(t, courseId, { percentOff: 150, asAdmin: true }),
+    ).rejects.toThrow(/1 to 100/);
     await expect(
       addCoupon(t, courseId, { expiresAt: Date.now() - 1000 }),
     ).rejects.toThrow(/must be in the future/);
@@ -572,7 +576,7 @@ describe("checkout with a coupon", () => {
   test("a 100%-off code pays the instructor nothing", async () => {
     const t = convexTest(testSchema, modules);
     const { courseId } = await seedWorld(t);
-    await addCoupon(t, courseId, { code: "FREE100", percentOff: 100 });
+    await addCoupon(t, courseId, { code: "FREE100", percentOff: 100, asAdmin: true });
 
     const { reference } = await checkout(t, "clerk_buyer", courseId, "FREE100");
     await t.mutation(internal.payments.markPurchasePaid, { reference });
@@ -614,6 +618,7 @@ describe("checkout with a coupon", () => {
       code: "ONLYONE",
       percentOff: 50,
       maxRedemptions: 1,
+      asAdmin: true,
     });
 
     const first = await checkout(t, "clerk_buyer", courseId, "ONLYONE");

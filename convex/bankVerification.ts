@@ -29,11 +29,16 @@ import { supportEmail } from "../lib/support";
  *      Paystack, and so a failed lookup still costs quota.
  *   2. This action calls Paystack's resolve endpoint with the secret key,
  *      which stays server-side.
- *   3. `persistVerifiedAccount` (internal mutation) writes the encrypted
- *      account, the audit row and the notification in one transaction.
+ *   3. The result is staged on the caller's row by
+ *      `storePendingVerification` — encrypted, expiring in 15 minutes.
+ *   4. `confirmBankAccount` (a public mutation taking **no** account
+ *      arguments) consumes that record and calls `persistVerifiedAccount`,
+ *      which writes the encrypted account, the audit row and the notification
+ *      in one transaction.
  *
  * The client therefore cannot store an unverified account: it can only ask
- * "verify this pair", and every database effect is server-authored.
+ * "verify this pair" and then "commit what you verified", and every database
+ * effect is server-authored (M-1).
  */
 
 const PAYSTACK_BASE = "https://api.paystack.co";
@@ -54,7 +59,8 @@ function secretKey(): string {
 }
 
 /**
- * Verify-only step: resolves the account name via Paystack but does NOT save.
+ * Verify-only step: resolves the account name via Paystack and stages it for
+ * `confirmBankAccount` to commit — it does **not** save anything itself.
  * Burns rate-limit quota so a typo loop isn't free.
  */
 export const verifyBankAccount = action({
@@ -99,6 +105,15 @@ export const verifyBankAccount = action({
       );
     }
 
+    // Stage what Paystack actually returned. This is what the confirm mutation
+    // will later commit — the client's copy of these values is display-only
+    // (M-1).
+    await ctx.runMutation(internal.instructorBank.storePendingVerification, {
+      accountNumber,
+      bankCode,
+      accountName,
+    });
+
     return { accountName };
   },
 });
@@ -110,14 +125,20 @@ export const verifyBankAccount = action({
  */
 export const sendBankConfirmationEmail = internalAction({
   args: {
-    accountNumber: v.string(),
-    bankCode: v.string(),
     accountName: v.string(),
     accountNumberMasked: v.string(),
+    /**
+     * Deliberately explicit rather than read from `ctx.auth`: a function
+     * scheduled with `scheduler.runAfter` runs without the caller's auth
+     * context, so the old `identity.email` read returned nothing and the
+     * confirmation was silently skipped. These come from the user row the
+     * mutation already loaded, so they are server-authored either way.
+     */
+    recipientEmail: v.optional(v.string()),
+    recipientName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) return;
+    if (!args.recipientEmail) return;
 
     if (!isMailConfigured()) {
       console.warn("No mail provider configured — skipping bank confirmation email");
@@ -125,7 +146,7 @@ export const sendBankConfirmationEmail = internalAction({
     }
 
     const email = renderEmail("payoutAccountConfirmed", {
-      name: identity.givenName ?? identity.nickname ?? "",
+      name: args.recipientName ?? "",
       accountName: args.accountName,
       accountNumberMasked: args.accountNumberMasked,
       supportEmail: supportEmail(),
@@ -135,7 +156,7 @@ export const sendBankConfirmationEmail = internalAction({
     try {
       await sendMail({
         group: "instructors",
-        to: identity.email,
+        to: args.recipientEmail,
         subject: email.subject,
         text: email.text,
         html: email.html,

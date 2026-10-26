@@ -84,7 +84,17 @@ const nextConfig: NextConfig = {
    * and is not diagnosable from the app's own logs.
    */
   outputFileTracingIncludes: {
-    "/**": ["./assets/fonts/*.ttf"],
+    "/**": [
+      "./assets/fonts/*.ttf",
+      // The CSP hash policy (lib/prerendered-csp.ts) reads these at request
+      // time. Neither is imported statically, so output-file tracing cannot
+      // see them — and if they are absent from the function bundle the proxy
+      // silently falls back to the degraded policy ('unsafe-inline') on every
+      // public route. Naming them here is what keeps the strict policy from
+      // being a local-only property.
+      "./.next/prerender-manifest.json",
+      "./.next/server/app/**/*.html",
+    ],
   },
   async headers() {
     return [

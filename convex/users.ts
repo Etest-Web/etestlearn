@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { logAudit } from "./helpers/audit";
+import { requireAdmin } from "./helpers/auth";
 import { checkUserInactivityReminders } from "./enrollments";
 
 // Named rather than taken from `internal`, which does not list the email
@@ -255,17 +256,11 @@ export const getCurrentUser = query({
 export const listAllUsers = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!admin || admin.role !== "admin") {
-      throw new Error("Not authorized");
-    }
+    // requireAdmin, not an inline identity lookup: suspension must revoke
+    // admin power too, and getCurrentUser is the single place that reads a
+    // suspended account as signed out. An inline copy would be the one path
+    // that let a suspended admin keep listing users and changing roles.
+    const admin = await requireAdmin(ctx);
 
     return await ctx.db.query("users").collect();
   },
@@ -281,17 +276,7 @@ export const setUserRole = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!admin || admin.role !== "admin") {
-      throw new Error("Not authorized");
-    }
+    const admin = await requireAdmin(ctx);
 
     // Safety: an admin cannot demote themselves (avoids lockout).
     if (args.userId === admin._id && args.role !== "admin") {

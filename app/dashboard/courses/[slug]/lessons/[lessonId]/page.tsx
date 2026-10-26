@@ -134,12 +134,13 @@ export default function LessonPage() {
 
   const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
   const enrollments = useQuery(api.enrollments.getUserEnrollments);
+  const dbUser = useQuery(api.users.getCurrentUser);
   const completeLesson = useMutation(api.enrollments.completeLesson);
   const generateLessonAttachmentUrl = useMutation(api.lessonAttachments.generateLessonAttachmentUrl);
   const attachments = useQuery(api.lessonAttachments.listLessonAttachments, lessonId ? { lessonId } : "skip");
   const [isMarking, setIsMarking] = useState(false);
 
-  if (data === undefined || enrollments === undefined) {
+  if (data === undefined || enrollments === undefined || dbUser === undefined) {
     return (
       <div className="mx-auto max-w-4xl py-8">
         <p className="text-sm text-muted-foreground">Loading lesson...</p>
@@ -178,6 +179,35 @@ export default function LessonPage() {
   const isCompleted = completed.has(lesson._id);
   const prev = index > 0 ? lessons[index - 1] : null;
   const next = index < lessons.length - 1 ? lessons[index + 1] : null;
+
+  // The server strips lesson content from anyone who is neither enrolled, nor
+  // staff for this course, nor looking at the public preview lesson — so
+  // "content missing" here can mean two different things: an instructor's
+  // lesson nobody has written yet, or a paywall. Rendering both as "No article
+  // yet" would tell a learner who simply has not enrolled that the material
+  // does not exist. Staff are treated as entitled (the common case is the
+  // owner previewing their own lesson), everything else resolves through the
+  // enrollment the same way getCourseBySlug did.
+  const isStaffUser = dbUser?.role === "instructor" || dbUser?.role === "admin";
+  const isEntitled = Boolean(enrollment) || lesson.order === 1 || isStaffUser;
+  const isPaywalled =
+    !isEntitled && !lesson.content && lesson.contentType !== "quiz";
+
+  if (isPaywalled) {
+    return (
+      <div className="mx-auto max-w-4xl py-8 space-y-2">
+        <p className="text-sm text-muted-foreground">
+          This lesson is part of a course you haven&apos;t enrolled in yet.
+        </p>
+        <Link
+          href={`/dashboard/courses/${course.slug}`}
+          className="text-sm text-primary underline"
+        >
+          Go to course overview
+        </Link>
+      </div>
+    );
+  }
 
   const activeLesson = lesson;
   type LessonDoc = NonNullable<typeof lesson>;

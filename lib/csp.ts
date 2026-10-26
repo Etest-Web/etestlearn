@@ -13,14 +13,17 @@
  *   1. **Response header** — what the browser enforces.
  *   2. **Request headers** — what the server-side renderers read back so they
  *      can stamp `nonce="…"` onto the tags they emit:
- *        · Next.js: `app-render` reads `content-security-policy` off the
+ *        · Next.js: `app-render` parses `content-security-policy` off the
  *          request (`getScriptNonceFromHeader`) and applies the nonce to every
  *          script/style tag it generates, including the inline RSC payload
  *          (`self.__next_f.push(...)`) that hydration depends on.
- *        · Clerk: `DynamicClerkScripts` reads `x-nonce` (falling back to the
- *          CSP header) and puts it on the clerk-js `<script>` and its preload —
- *          but only on the paths where Clerk actually mounts that component
- *          (see the "Why NOT strict-dynamic" note below for what we do today).
+ *        · Clerk does NOT read a nonce: `ClerkScripts` is rendered without
+ *          one, which is why `https://clerk.glypha.com.ng` has to stay in the
+ *          `script-src` host allow-list (see the "Why NOT strict-dynamic"
+ *          note below). There is no `X-Nonce` header — nothing reads it.
+ *        · Component-rendered scripts (next-themes' theme script) get neither,
+ *          so those are admitted by SHA-256 hash instead; see
+ *          `buildStaticContentSecurityPolicy` and `readLayoutScriptHashes`.
  *
  * Both hops matter: a nonce that is enforced but never applied to a tag is just
  * a policy that blocks your own page. This module exports the builder so the
@@ -61,13 +64,32 @@ const SCRIPT_HOSTS = [
  * The policy itself.
  *
  * `script-src` is the directive this whole file exists for:
- *   · `'nonce-…'`   — the per-request token; every inline tag Next renders
- *                     (RSC payload, hydration bootstrap, next-themes' theme
- *                     script) carries it, so those run again.
- *   · `'unsafe-eval'` — GSAP (components/TextLoop) evaluates strings.
- *   · `'unsafe-inline'` is deliberately ABSENT — a nonce in the same directive
- *                     disables it anyway, and an XSS payload that reaches the
- *                     DOM would otherwise just run.
+ *   · `'nonce-…'`   — the per-request token; every inline tag *Next* renders
+ *                     (RSC payload, hydration bootstrap) carries it, so those
+ *                     run again. Component-rendered scripts do not — hence:
+ *   · `sha256-…`    — build-time hashes for the layout's own inline scripts,
+ *                     which React renders *without* the nonce; they are added
+ *                     by the caller (`proxy.ts` reads them from the prerendered
+ *                     landing page — see `readLayoutScriptHashes`).
+ *   · `'unsafe-eval'` and `'unsafe-inline'` are deliberately ABSENT — a nonce
+ *                     in the same directive disables 'unsafe-inline' anyway,
+ *                     and an XSS payload that reaches the DOM would otherwise
+ *                     just run.
+ *
+ * Why no `'unsafe-eval'` either
+ * =============================
+ * It used to be here "because GSAP evaluates strings". It does not, and GSAP
+ * is not even imported anywhere in this repo — the note outlived the code.
+ * What matters is what actually ships to the browser, and that was measured
+ * rather than assumed before the source was dropped:
+ *   · all 90 built client chunks in `.next/static/chunks/` — 0 hits for
+ *     `eval(`, `new Function`, `(0,eval)`, `window.eval`;
+ *   · clerk-js@6.40.1 (`clerk.browser.js`, 324 KB) — 0 hits;
+ *   · Cloudflare's `challenges.cloudflare.com/turnstile/v0/api.js` — 0 hits.
+ * `'unsafe-eval'` is the source of the classic JSON-prototype-pollution →
+ * RCE chain, so its absence is worth more than the insurance policy it used
+ * to provide. If a future dependency genuinely needs it, this comment is the
+ * place to record *which* and *why* — not a silent re-add.
  *
  * Why NOT `'strict-dynamic'`
  * ==========================
@@ -93,14 +115,38 @@ const SCRIPT_HOSTS = [
  * sits. Keep it effective; do not add `'strict-dynamic'` without first
  * checking the rendered HTML for un-nonced `<script>` tags.
  */
-export function buildContentSecurityPolicy(nonce: string): string {
+export function buildContentSecurityPolicy(nonce: string, extraScriptHashes: string[] = []): string {
   if (!nonce) {
     throw new Error("buildContentSecurityPolicy requires a nonce");
   }
 
+  return buildPolicy(
+    [
+      "script-src",
+      "'self'",
+      `'nonce-${nonce}'`,
+      // Layout-level inline scripts (next-themes' theme script and friends),
+      // which React renders without the nonce. See `readLayoutScriptHashes`.
+      ...extraScriptHashes,
+      "blob:",
+      ...SCRIPT_HOSTS,
+    ].join(" "),
+  );
+}
+
+/**
+ * Every directive the policies have in common.
+ *
+ * `script-src` is the only thing that differs between them (nonce vs hashes
+ * vs the degraded fallback), so it is the only argument. This used to be two
+ * near-identical forty-line literals — and they had already drifted apart once
+ * (only one of them was updated when `'unsafe-eval'` was reconsidered), which
+ * is exactly the failure this shape prevents.
+ */
+function buildPolicy(scriptSrc: string): string {
   return [
     "default-src 'self'",
-    ["script-src", "'self'", `'nonce-${nonce}'`, "'unsafe-eval'", "blob:", ...SCRIPT_HOSTS].join(" "),
+    scriptSrc,
     // 'unsafe-inline' for styles is a scoped concession: next/font and the
     // styled-jsx runtime inject <style> tags, and App Router has no nonce
     // plumbing for them without per-request nonces on the render itself.
@@ -158,61 +204,115 @@ export function buildContentSecurityPolicy(nonce: string): string {
 }
 
 /**
- * Static variant for prerendered public routes.
+ * The SHA-256 CSP sources for every *executable* inline `<script>` in a
+ * prerendered page.
  *
- * For statically prerendered routes (e.g. /, /courses), no per-request nonce
- * exists at build time. If a nonce were sent in the CSP header, CSP3 would force
- * the browser to ignore 'unsafe-inline', blocking Next.js static inline hydration
- * scripts.
+ * This is what lets a build-time page carry a strict `script-src`: a static
+ * response has no request, so it can never have a nonce — but its inline
+ * scripts are byte-identical on every request, which is exactly what a hash
+ * matches. An injected `<script>` whose text is not in this list still cannot
+ * run, so the protection against XSS that `'unsafe-inline'` gave away is back.
  *
- * This policy maintains the same strict host allow-lists for connect, frame, font,
- * and media, but allows 'unsafe-inline' on scripts without a nonce. Safe for public
- * routes because they do not reflect user state or authenticated input.
+ * Two deliberate exclusions:
+ *
+ *   · `src=` tags are external — they are governed by the host allow-list,
+ *     never by a hash.
+ *   · A non-JavaScript `type` is a **data block**, not code: JSON-LD
+ *     (`application/ld+json`) and `importmap`-style payloads are not executed.
+ *     Hashing them anyway would be worse than pointless — `{"@context":"…"}`
+ *     parses as a labelled block in JavaScript, so putting its hash in
+ *     `script-src` would license an attacker to serve that exact text as an
+ *     executable script.
+ *
+ * The digest is over the element's exact source text (UTF-8), which is what
+ * the browser compares against.
  */
-export function buildStaticContentSecurityPolicy(): string {
-  return [
-    "default-src 'self'",
-    ["script-src", "'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", ...SCRIPT_HOSTS].join(" "),
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com data:",
-    "img-src 'self' data: blob: https:",
-    "media-src 'self' https://*.convex.site https://*.publit.io https://media.publit.io",
-    [
-      "connect-src",
-      "'self'",
-      "https://*.convex.cloud",
-      "https://*.convex.site",
-      "wss://*.convex.cloud",
-      "wss://*.convex.site",
-      "https://clerk.glypha.com.ng",
-      "https://*.clerk.accounts.dev",
-      "https://api.paystack.co",
-      "https://ipapi.co",
-      "https://*.uploadthing.com",
-      "https://uploadthing.com",
-      "https://unpkg.com",
-      "https://api.publit.io",
-      "https://*.publit.io",
-      "https://media.publit.io",
-      "https://va.vercel-scripts.com",
-      "https://challenges.cloudflare.com",
-      "https://*.protect.clerk.com:*",
-    ].join(" "),
-    [
-      "frame-src",
-      "'self'",
-      ...SCRIPT_HOSTS,
-      "https://hooks.stripe.com",
-      "https://checkout.paystack.com",
-      "https://*.publit.io",
-      "https://media.publit.io",
-      "https://publit.io",
-    ].join(" "),
-    "worker-src 'self' blob:",
-    "frame-ancestors 'none'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "upgrade-insecure-requests",
-  ].join("; ");
+export async function extractInlineScriptHashes(html: string): Promise<string[]> {
+  const hashes = new Set<string>();
+  const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = scriptPattern.exec(html)) !== null) {
+    const attributes = match[1];
+    const body = match[2];
+
+    if (/\ssrc\s*=/i.test(attributes)) continue;
+
+    const typeMatch = /\stype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes);
+    if (typeMatch) {
+      const type = (typeMatch[1] ?? typeMatch[2] ?? typeMatch[3] ?? "").trim().toLowerCase();
+      if (type && !JS_MIME_TYPES.has(type)) continue;
+    }
+
+    hashes.add(await sha256CspSource(body));
+  }
+
+  // Sorted so the header is stable for a given page — otherwise two renders of
+  // identical content would still produce a different policy string.
+  return [...hashes].sort();
+}
+
+/** MIME types (plus `type="module"`) whose content the browser will execute. */
+const JS_MIME_TYPES = new Set([
+  "",
+  "module",
+  "text/javascript",
+  "application/javascript",
+  "text/ecmascript",
+  "application/ecmascript",
+  "text/babel",
+]);
+
+async function sha256CspSource(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  const bytes = new Uint8Array(digest);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  // Base64 by hand rather than `Buffer`: this module is imported by the
+  // proxy, and keeping it free of Node-only globals means it can never quietly
+  // stop working there. `btoa` is what `generateNonce` above already relies on.
+  return `'sha256-${btoa(binary)}'`;
+}
+
+/**
+ * Hash-based variant for prerendered routes — the strict static policy.
+ *
+ * `scriptHashes` comes from {@link extractInlineScriptHashes} reading the very
+ * HTML file Next will serve for this path, so the list matches the response by
+ * construction. No `'unsafe-inline'`, no `'unsafe-eval'`, no nonce: a nonce
+ * here would be worse than useless, because CSP3 makes a nonce in the
+ * directive disable `'unsafe-inline'`, and the tags Next baked in at build
+ * time carry none.
+ *
+ * An empty array is a valid, maximally strict answer (a page with no inline
+ * scripts at all), not an error.
+ */
+export function buildStaticContentSecurityPolicy(scriptHashes: string[]): string {
+  return buildPolicy(
+    ["script-src", "'self'", ...scriptHashes, "blob:", ...SCRIPT_HOSTS].join(" "),
+  );
+}
+
+/**
+ * Degraded variant — used **only** when the build artifacts that make the hash
+ * policy possible are not readable at runtime (see `lib/prerendered-csp.ts`).
+ *
+ * It is the policy this app shipped before H-1 was fixed, kept as a floor so
+ * that a missing file degrades to today's behaviour instead of to a blank
+ * page: a `script-src` that refuses a prerendered page's own hydration scripts
+ * takes the storefront down, and availability is not a trade the fallback gets
+ * to make. `'unsafe-inline'` has to stay for exactly that reason — it is what
+ * those unhashed inline scripts need.
+ *
+ * `'unsafe-eval'` is NOT restored here: nothing that ships to the browser
+ * needs it (see the evidence in the note at the top of this file), so the
+ * fallback gives up only the one concession it cannot avoid.
+ *
+ * It should never appear in a response from a healthy deployment: `proxy.ts`
+ * warns once per path when this one is used.
+ */
+export function buildDegradedStaticContentSecurityPolicy(): string {
+  return buildPolicy(
+    ["script-src", "'self'", "'unsafe-inline'", "blob:", ...SCRIPT_HOSTS].join(" "),
+  );
 }

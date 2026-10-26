@@ -2,6 +2,8 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Webhook } from "svix";
+// The mismatch marker the settlement check throws (M-2) — see `payments.ts`.
+import { PAYMENT_MISMATCH } from "./payments";
 import { decodePlaybackToken, verifyPlaybackToken } from "../lib/video-playback-token";
 import { decorateMasterPlaylist, decorateMediaPlaylist } from "../lib/video-playlists";
 
@@ -163,7 +165,14 @@ http.route({
     // authenticated before it is decoded or parsed — an unauthenticated
     // caller never reaches the JSON parser.
     const rawBody = new TextDecoder().decode(bytes);
-    let event: { event?: string; data?: { reference?: string } };
+    let event: {
+      event?: string;
+      data?: {
+        reference?: string;
+        amount?: number;
+        currency?: string;
+      };
+    };
     try {
       event = JSON.parse(rawBody);
     } catch {
@@ -172,9 +181,33 @@ http.route({
 
     if (event.event === "charge.success" && event.data?.reference) {
       // markPurchasePaid is idempotent, so duplicate deliveries are safe.
-      await ctx.runMutation(internal.payments.markPurchasePaid, {
-        reference: event.data.reference,
-      });
+      //
+      // Paystack's own figures for the charge ride along so the mutation can
+      // check them against the checkout intent (M-2): the signature proves the
+      // payload came from Paystack, this proves it is the charge we asked for
+      // rather than a reference/amount mix-up.
+      try {
+        await ctx.runMutation(internal.payments.markPurchasePaid, {
+          reference: event.data.reference,
+          amount: typeof event.data.amount === "number" ? event.data.amount : undefined,
+          currency: typeof event.data.currency === "string" ? event.data.currency : undefined,
+        });
+      } catch (error) {
+        // A mismatch is a permanent condition — the charge is real but it is
+        // not the one this purchase was initialized for. Retrying will not fix
+        // it, so acknowledge and record it loudly rather than 500 and have
+        // Paystack retry the same payload twenty times. Anything else (a
+        // missing purchase, a database error) is re-thrown so Paystack retries
+        // and the failure is visible.
+        if (String(error).includes(PAYMENT_MISMATCH)) {
+          console.warn(`Paystack charge refused (M-2): ${String(error)}`);
+          return new Response(JSON.stringify({ received: true, refused: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw error;
+      }
     }
 
     // Always 200 so Paystack doesn't retry forever on unrelated events.

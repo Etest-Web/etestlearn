@@ -197,21 +197,51 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    `convex-backend`'s `local_backend/src/router.rs` mirrors the request origin on
    `/api/storage/{storage_id}`, so `fetch()` succeeds. If it ever fails the canvas
    falls back to the built-in artwork and says so rather than going blank.
-8. **CSP is per-request; the rest of the security headers are static.** `lib/csp.ts` builds the
-   Content-Security-Policy from a fresh nonce per request and `proxy.ts` writes it to both the
-   response header (what the browser enforces) and the request header `X-Nonce` (what Next.js and
-   Clerk read back to stamp `nonce` onto the scripts they render). It cannot live in
+8. **CSP is per-request and chosen from what will actually be served; the rest of the security
+   headers are static.** `lib/csp.ts` builds the policy strings and `proxy.ts` picks one per
+   response in `resolveContentSecurityPolicy`, writing it to BOTH the response header (what the
+   browser enforces) and the request header `content-security-policy` (what Next.js reads back with
+   `getScriptNonceFromHeader` to stamp `nonce="…"` onto the tags it renders). It cannot live in
    `next.config.ts` because `headers()` is evaluated once at boot and cannot carry a nonce.
    `next.config.ts` holds only the invariant headers (HSTS, COOP, X-Frame-Options,
    Permissions-Policy, …). Adding a new external origin (script, font, image, connect target)
    **requires editing the allow-list in `lib/csp.ts`** or the browser will block it.
-   `script-src` deliberately has no `'unsafe-inline'` — adding one silently defeats the nonce.
-   `tests/csp.test.ts` asserts the directives; do not change the policy by eye.
-   Three consequences worth knowing before touching this:
-   - `app/layout.tsx` reads `X-Nonce` and passes it to `<ThemeProvider nonce>`, because
-     next-themes' inline theme script is the one tag Next.js cannot nonce itself. That
-     `headers()` call is also what keeps the routes per-request — a prerendered page would bake in
-     a build-time nonce that matches no response's CSP. Expect `ƒ` in the build table.
+   Three shapes, plus a development carve-out (see the docblock in `proxy.ts`):
+   - **Prerendered route → SHA-256 hashes.** `/`, `/courses`, `/support`, … ship a fixed HTML file
+     written at build time, so `script-src` allows the digests of that file's own inline scripts
+     (`buildStaticContentSecurityPolicy`) and nothing else. The hashes are read **at request
+     time** from `.next/server/app/*.html` by `lib/prerendered-csp.ts` — never imported at compile
+     time, because the proxy is bundled *before* pages are prerendered and a build-time import
+     would be stale (or empty). Those files are named in
+     `next.config.ts#outputFileTracingIncludes`: without that entry Vercel packages only what
+     output-file tracing can see, the HTML would be absent from the function, and every public
+     route would silently fall back to the degraded policy.
+   - **Request-rendered route → nonce + layout hashes.** `/dashboard/**`, `/sign-in`, `/verify/…`,
+     404s: Next stamps the request nonce on every tag *it* emits (chunk tags, RSC payload,
+     hydration bootstrap). A `<script>` rendered by a React **component** gets no nonce, and the
+     one that matters is next-themes' pre-hydration theme script — so the root layout's inline
+     scripts are admitted by hash too, taken from the prerendered landing page
+     (`readLayoutScriptHashes`, since the root layout is part of every route's tree).
+   - **Build artifacts unreadable → degraded static** (`buildDegradedStaticContentSecurityPolicy`):
+     `'unsafe-inline'`, no `'unsafe-eval'`, warned once per path. This is an availability floor, not
+     a security decision — a hash or nonce policy aimed at a page rendered some other way blocks
+     that page's own hydration and takes the storefront down.
+   - **`next dev` keeps the pre-hash split** (public → degraded, everything else → nonce): there is
+     no prerendered artifact to hash in development, and any stale one carries text from a
+     different minification. The strict policies are a production property.
+   Neither variant carries `'unsafe-eval'` — measured, not assumed: 0 hits for `eval(`/`new Function`
+   across all 90 built client chunks, clerk-js@6.40.1 and Cloudflare's turnstile (the old GSAP
+   justification was stale; GSAP is a declared but never-imported dependency). `tests/csp.test.ts`
+   asserts the directives; do not change the policy by eye. To verify end-to-end after a build:
+   `pnpm build && pnpm exec next start -p 3100`, then `node scripts/verify-csp.mjs` (loads every
+   public route in Chromium, fails on any CSP console violation, checks the theme script ran and
+   the page hydrated, and proves enforcement by injecting a script that must be refused).
+   Four things worth knowing before touching this:
+   - `app/layout.tsx` deliberately does **not** read `headers()` to pass a nonce to
+     `<ThemeProvider nonce>`. Doing so would opt the whole tree into dynamic rendering, bake a
+     build-time nonce into pages whose response carries a different one, and cost the storefront
+     its prerendering — which is why the theme script is admitted by hash instead (H-1b). There is
+     **no `X-Nonce` request header**; nothing reads it, and it was masking that gap (L-10).
    - Clerk's `<script src="https://clerk.glypha.com.ng/…/clerk.browser.js">` ships **without** a
      nonce (it is rendered by Clerk's client `ClerkScripts`, which reads `nonce` from
      `ClerkProvider` props; that prop is not in Clerk's public types). The host allow-list is what
@@ -219,6 +249,8 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
    - That is why `'strict-dynamic'` is absent: it would make CSP3 browsers ignore `'self'` and
      that host entry, blocking clerk-js and taking sign-in down. Verify with
      `curl -s -D- -o/dev/null <url>` plus a scan of the rendered HTML before considering it.
+   - `script-src` deliberately has no `'unsafe-inline'` — adding one silently defeats both the
+     nonce and every hash in the directive.
 9. **Publishing is an operation, not a field.** `courses.updateCourse` deliberately has **no**
    `published` argument; visibility goes through `courses.publishCourse` /
    `courses.unpublishCourse` / `courses.requestUnpublish`. Do not add the field back — it would
@@ -255,7 +287,7 @@ proxy.ts             Next 16 middleware (route protection) — see gotchas
       `/api/instructor-applications/notify` left open so instructors can still apply. `/maintenance`
       must be in **both** `MAINTENANCE_ALLOWED_ROUTES` (else the rewrite loops) **and**
       `isPublicRoute` (else `auth.protect()` sends the outage page to sign-in). The toggle is at
-      `/dashboard/admin/maintenance`; `proxy.ts` caches the flag for 5s per isolate, so flipping it
+      `/dashboard/admin/maintenance`; `proxy.ts` caches the flag for 30s per isolate, so flipping it
       is not instant.
     - **Maintenance lapses on its own.** `setMode` stamps `disableAt` on the rising edge
       (default 2h, clamped to 5min–24h by `resolveMaintenanceDeadline` in `lib/maintenance.ts`)

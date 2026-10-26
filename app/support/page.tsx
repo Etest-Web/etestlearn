@@ -84,6 +84,14 @@ export default function SupportPublicPage() {
     setIsUploading(true);
     setUploadError(null);
 
+    // Minting an upload URL needs something to rate-limit against — the
+    // session, or the address the ticket will be filed under (M-3).
+    if (!user && !email.trim()) {
+      setUploadError("Enter your email address (or sign in) before attaching files.");
+      setIsUploading(false);
+      return;
+    }
+
     const uploadFiles = Array.from(files).filter((f) => f.size > 0);
     if (uploadFiles.length === 0) {
       setIsUploading(false);
@@ -102,7 +110,7 @@ export default function SupportPublicPage() {
 
     try {
       for (const file of uploadFiles) {
-        const uploadUrl = await generateUploadUrlMutation();
+        const uploadUrl = await generateUploadUrlMutation({ email: email.trim() || undefined });
         const res = await fetch(uploadUrl, {
           method: "POST",
           headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -392,7 +400,7 @@ export default function SupportPublicPage() {
 
               <div className="mt-4 flex flex-col gap-3">
                 <Input
-                  placeholder="Ticket Number (e.g. TICK-2026-1234)"
+                  placeholder="Ticket Number (e.g. TICK-2026-ABCD2345)"
                   value={lookupNumber}
                   onChange={(e) => setLookupNumber(e.target.value)}
                 />

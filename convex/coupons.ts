@@ -135,7 +135,19 @@ export const create = mutation({
     expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { course } = await requireCourseManager(ctx, args.courseId);
+    const { user, course } = await requireCourseManager(ctx, args.courseId);
+
+    // Instructors are limited to a maximum of 30% off on percentage coupons.
+    // Admins may create larger discounts.
+    if (user.role === "instructor" && args.kind === "percent") {
+      if (
+        typeof args.percentOff !== "number" ||
+        !Number.isFinite(args.percentOff) ||
+        args.percentOff > 30
+      ) {
+        throw new Error("Instructors may only create coupons for up to 30% off.");
+      }
+    }
 
     const code = normalizeCouponCode(args.code ?? generateCouponCode());
     const now = Date.now();

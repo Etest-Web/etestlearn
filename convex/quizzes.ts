@@ -329,15 +329,12 @@ export const createQuiz = mutation({
     passingScore: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser rather than an inline identity lookup: suspension has to
+    // revoke instructor power too, and getCurrentUser is the one place that
+    // reads a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -378,15 +375,12 @@ export const updateQuiz = mutation({
     passingScore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser rather than an inline identity lookup: suspension has to
+    // revoke instructor power too, and getCurrentUser is the one place that
+    // reads a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -426,15 +420,12 @@ export const addQuizQuestion = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser rather than an inline identity lookup: suspension has to
+    // revoke instructor power too, and getCurrentUser is the one place that
+    // reads a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -501,15 +492,12 @@ export const deleteQuizQuestion = mutation({
     questionId: v.id("quizQuestions"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser rather than an inline identity lookup: suspension has to
+    // revoke instructor power too, and getCurrentUser is the one place that
+    // reads a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 

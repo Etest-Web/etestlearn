@@ -345,7 +345,7 @@ function MaintenanceBody() {
                                 <code className="text-xs">
                                     npx convex env unset {MAINTENANCE_OVERRIDE_ENV}
                                 </code>
-                                . The gate re-reads this within five seconds.
+                                . The gate re-reads this within about thirty seconds.
                             </p>
                         </div>
                     </div>
@@ -647,8 +647,8 @@ function MaintenanceBody() {
                     </ul>
 
                     <p className="text-xs text-muted-foreground">
-                        The gate caches the flag for five seconds per server instance, so a toggle takes
-                        effect almost immediately rather than on the next request.
+                        The gate caches the flag for thirty seconds per server instance, so a toggle takes
+                        effect within half a minute rather than on the next request.
                     </p>
                 </CardContent>
             </Card>

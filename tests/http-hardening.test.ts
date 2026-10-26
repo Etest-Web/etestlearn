@@ -292,6 +292,108 @@ describe("webhook hardening — payload parsing", () => {
   });
 });
 
+describe("webhook hardening — charge verification (M-2)", () => {
+  /** A signed `charge.success` for `reference` carrying Paystack's figures. */
+  function charge(reference: string, amount: number, currency: string) {
+    return paystackPost(
+      JSON.stringify({
+        event: "charge.success",
+        data: { reference, amount, currency },
+      }),
+    );
+  }
+
+  async function purchaseRow(t: TestWorld, reference: string) {
+    return await t.run((ctx: TestCtx) =>
+      ctx.db
+        .query("purchases")
+        .withIndex("by_reference", (q) => q.eq("paystackReference", reference))
+        .unique(),
+    );
+  }
+
+  it("settles a charge whose amount and currency match the checkout intent", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedPendingPurchase(t, "ref_match");
+
+    const res = await t.fetch("/webhook/paystack", charge("ref_match", 50000, "NGN"));
+    expect(res.status).toBe(200);
+
+    expect((await purchaseRow(t, "ref_match"))?.status).toBe("paid");
+    const enrollments = await t.run((ctx: TestCtx) => ctx.db.query("enrollments").collect());
+    expect(enrollments).toHaveLength(1);
+  });
+
+  it("refuses — but still acknowledges — a charge for the wrong amount", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedPendingPurchase(t, "ref_short");
+
+    // A genuinely signed payload (this is not a forgery test — the signature
+    // is valid) charging 1 kobo for a ₦500 course.
+    const res = await t.fetch("/webhook/paystack", charge("ref_short", 1, "NGN"));
+
+    // 200 on purpose: the condition is permanent, so a 5xx would make Paystack
+    // retry the same payload until it gave up, and the refusal would be
+    // invisible as anything but noise.
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ received: true, refused: true });
+
+    // …and nothing was granted for the money we did not ask for.
+    expect((await purchaseRow(t, "ref_short"))?.status).toBe("pending");
+    const enrollments = await t.run((ctx: TestCtx) => ctx.db.query("enrollments").collect());
+    expect(enrollments).toHaveLength(0);
+  });
+
+  it("refuses a charge in the wrong currency", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedPendingPurchase(t, "ref_currency");
+
+    const res = await t.fetch("/webhook/paystack", charge("ref_currency", 50000, "USD"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ refused: true });
+    expect((await purchaseRow(t, "ref_currency"))?.status).toBe("pending");
+  });
+
+  it("checks a converted checkout against what was actually initialized", async () => {
+    const t = convexTest(testSchema, modules);
+    await seedPendingPurchase(t, "ref_converted");
+    // The buyer picked USD, so initialize charged 3000 cents — not the
+    // ₦50000/NGN the row's `amount`/`currency` still carry.
+    await t.run((ctx: TestCtx) =>
+      ctx.db
+        .query("purchases")
+        .withIndex("by_reference", (q) => q.eq("paystackReference", "ref_converted"))
+        .unique()
+        .then((p) => p && ctx.db.patch(p._id, { checkoutAmount: 3000, checkoutCurrency: "USD" })),
+    );
+
+    // The base-currency figure is NOT the intent any more — it is refused.
+    const wrong = await t.fetch("/webhook/paystack", charge("ref_converted", 50000, "NGN"));
+    expect(wrong.status).toBe(200);
+    expect(await wrong.json()).toMatchObject({ refused: true });
+    expect((await purchaseRow(t, "ref_converted"))?.status).toBe("pending");
+
+    // The figure initialize recorded settles it.
+    const right = await t.fetch("/webhook/paystack", charge("ref_converted", 3000, "USD"));
+    expect(right.status).toBe(200);
+    expect(await right.json()).toMatchObject({ received: true });
+    expect((await purchaseRow(t, "ref_converted"))?.status).toBe("paid");
+  });
+
+  it("still throws (and therefore still 5xxes) on a real failure, not just a mismatch", async () => {
+    const t = convexTest(testSchema, modules);
+    // No purchase with this reference: `Purchase not found` is a condition
+    // Paystack's retrying can help with (a write that has not landed yet), so
+    // it must NOT be swallowed by the mismatch handler. convex-test re-throws
+    // from the action rather than converting to a status — the platform turns
+    // an escaped httpAction error into a 5xx, which is what makes Paystack
+    // retry it.
+    await expect(
+      t.fetch("/webhook/paystack", charge("ref_missing", 50000, "NGN")),
+    ).rejects.toThrow(/Purchase not found/);
+  });
+});
+
 describe("webhook hardening — happy path still works", () => {
   it("marks the purchase paid on a valid charge.success and enrols the buyer", async () => {
     const t = convexTest(testSchema, modules);

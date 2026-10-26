@@ -5,7 +5,8 @@ import {
   emailLayout,
   emailParagraph,
 } from "@/lib/emails/layout";
-import { consumeDurableRateLimit } from "@/lib/durable-rate-limit";
+import { consumeDurableRateLimit, DurableRateLimitUnavailableError } from "@/lib/durable-rate-limit";
+import { normalizeEmailAddress } from "@/lib/email-address";
 
 type InstructorApplicationPayload = {
   fullName: string;
@@ -97,12 +98,26 @@ export async function POST(request: Request) {
     );
   }
 
-  // Keyed on the first address in X-Forwarded-For so a single user cannot
-  // trivially rotate identities behind the limiter.
+  // Header *order* here is a security decision, not a preference list: this
+  // address keys both limiters below (the in-memory map and the durable
+  // Convex bucket), so whoever picks it picks the quota.
+  //
+  // `x-real-ip` first because the platform overwrites it — on Vercel its
+  // value cannot have come from the request. `cf-connecting-ip` used to be
+  // checked first, but it is only authoritative when the request really did
+  // come through Cloudflare; against a direct Vercel target a client can send
+  // it verbatim and get a fresh limiter identity per request, which turns
+  // "5 an hour" into "unlimited" (and the admin inbox into a firehose).
+  //
+  // `x-forwarded-for` next for the same reason (Vercel overwrites it, client
+  // IP first). `cf-connecting-ip` stays last so a Cloudflare-fronted deploy
+  // still has a trustworthy key — it just must never outrank a platform-set
+  // header. `||` rather than `??` so an empty header value falls through
+  // instead of becoming the key.
   const ip =
-    request.headers.get("cf-connecting-ip")?.trim() ??
-    request.headers.get("x-real-ip")?.trim() ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("cf-connecting-ip")?.trim() ||
     "unknown";
 
   if (rateLimited(ip)) {
@@ -179,6 +194,18 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Format, not just presence: this address becomes the `replyTo` of the
+  // admin notification, so it must be an address — no CR/LF, within the RFC
+  // limits, shaped like one (M-9).
+  const email = normalizeEmailAddress(application.email);
+  if (!email) {
+    return NextResponse.json(
+      { error: "Please enter a valid email address." },
+      { status: 400 }
+    );
+  }
+  application.email = email;
 
   // Cap each field so one submission cannot be used to ship an arbitrarily
   // large message, and so the admin inbox cannot be flooded with megabytes.

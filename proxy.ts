@@ -4,9 +4,16 @@ import { ConvexHttpClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
 import {
   buildContentSecurityPolicy,
+  buildDegradedStaticContentSecurityPolicy,
   buildStaticContentSecurityPolicy,
   generateNonce,
 } from '@/lib/csp';
+import {
+  isPrerenderedRoute,
+  readLayoutScriptHashes,
+  readPrerenderedScriptHashes,
+  shouldWarnAboutFallback,
+} from '@/lib/prerendered-csp';
 import {
   isApiPath,
   isPathAllowedDuringMaintenance,
@@ -15,48 +22,146 @@ import {
 } from '@/lib/maintenance';
 
 /**
- * Content-Security-Policy (nonce-based)
- * ======================================
- * Built per request here rather than in `next.config.ts#headers()`, which is
- * evaluated once at boot and would hand every visitor the same static value —
- * useless for a nonce. See `lib/csp.ts` for the directives and for why the
- * policy is written to BOTH the response and the request headers: the browser
- * enforces the response copy, while Next.js and Clerk read the request copy to
- * stamp `nonce="…"` onto the tags they render.
+ * Content-Security-Policy — one policy per response, chosen from what that
+ * response will actually contain.
+ * ============================================================
+ * Built here rather than in `next.config.ts#headers()`, which is evaluated once
+ * at boot and would hand every visitor the same static value. See `lib/csp.ts`
+ * for the directives and for why the policy is written to BOTH the response and
+ * the request headers: the browser enforces the response copy, while Next.js
+ * and Clerk read the request copy to stamp `nonce="…"` onto the tags they
+ * render.
  *
- * This is what repairs the landing page: without a nonce, `script-src` had no
- * `'unsafe-inline'`, so all ~58 inline scripts (the RSC payload included) were
- * blocked, React never hydrated, and every `.reveal` block stayed at
- * `opacity: 0`.
+ * Three shapes, decided in `resolveContentSecurityPolicy`:
+ *
+ *   1. **Prerendered route → hashes.** The HTML was written at build time, so
+ *      it carries no nonce and none can be minted for it — but its inline
+ *      scripts are fixed, so their SHA-256 digests allow exactly those and
+ *      nothing else. No `'unsafe-inline'`, which is the whole point: this is
+ *      the storefront (`/`, `/courses`, …) where third-party content renders.
+ *   2. **Request-rendered route → nonce.** Next reads the nonce off the request
+ *      header and stamps it on every inline tag it emits, RSC payload
+ *      included. This covers `/dashboard/**` *and* the public dynamic routes
+ *      (`/sign-in`, `/verify/…`, `/courses/[slug]`, 404s) — which previously
+ *      took the permissive static policy despite being rendered per request.
+ *      The nonce alone is not quite enough: a `<script>` rendered by a React
+ *      *component* (next-themes' theme script) carries no nonce, because the
+ *      root layout cannot read `headers()` without de-prerendering the
+ *      storefront. Those layout scripts are therefore added to the same
+ *      directive by hash, read from the prerendered landing page so the value
+ *      can never drift from what the bundler emitted (H-1b).
+ *   3. **Build artifacts unreadable → degraded static.** Availability floor,
+ *      identical to what this app shipped before the hash policy existed. See
+ *      `buildDegradedStaticContentSecurityPolicy` for why "safe" rather than
+ *      "strict" is the right direction to fail in: a hash or nonce policy
+ *      aimed at a page that was rendered some other way blocks that page's own
+ *      hydration and takes the site down.
+ *   4. **`next dev` → the pre-H-1 split.** There is nothing to hash in
+ *      development (no prerendered artifact, and any stale one carries text
+ *      from a different minification), so public routes keep the permissive
+ *      static policy and everything else a plain nonce. The strict policies
+ *      are a production property, asserted by `tests/csp.test.ts` and by the
+ *      build-time verification in `docs/SECURITY_AUDIT.md`.
  *
  * The other security headers (HSTS, X-Frame-Options, …) are static and stay in
  * `next.config.ts`; they do not vary per response.
  *
  * `rewriteTo` exists because maintenance mode answers with a rewrite rather
- * than a short-circuit response: the outage page is a real React route, so it
- * gets the same treatment as the page it replaced — including the *request*
- * half of the policy, without which the rendered `/maintenance` markup would
- * carry no nonce and hydrate as a dead page.
+ * than a short-circuit response: the outage page is a real React route, so the
+ * policy is resolved for *that* path — the body being served is its body — and
+ * the request half rides along so the rendered `/maintenance` markup is nonced
+ * and hydrates.
  *
  * `extraHeaders` rides along because the rewrite branch sets `Retry-After` and
  * it has to be in the `ResponseInit`: the status is passed here rather than
  * assigned afterwards, since `Response.status` is read-only.
  */
-function withContentSecurityPolicy(
+async function resolveContentSecurityPolicy(
+  pathname: string,
+  isPublic: boolean,
+): Promise<string> {
+  // Development has no artifact to hash: pages are compiled and rendered per
+  // request, so `.next/server/app/*.html` is either missing or a stale copy of
+  // a previous production build — whose (re-minified) script text would never
+  // match what the dev server emits, and would break the page if served as a
+  // hash policy. So dev keeps the split this app shipped before H-1 — public
+  // routes get the permissive static policy, everything else a nonce — and the
+  // strict policies are a production property, verified below by `pnpm build`
+  // + the curl/Playwright checks rather than exercised in `next dev`.
+  if (process.env.NODE_ENV === "development") {
+    if (isPublic) return buildDegradedStaticContentSecurityPolicy();
+    return buildContentSecurityPolicy(generateNonce());
+  }
+
+  const prerendered = isPrerenderedRoute(pathname);
+
+  if (prerendered === true) {
+    const hashes = await readPrerenderedScriptHashes(pathname);
+    if (hashes) return buildStaticContentSecurityPolicy(hashes);
+
+    // The manifest says there is a file here and there is not: the build
+    // output is not fully visible to this process. Degrade, and say so once.
+    if (shouldWarnAboutFallback(pathname)) {
+      console.warn(
+        `[csp] ${pathname} is prerendered but its HTML is not readable — ` +
+          `serving the degraded static policy ('unsafe-inline')`,
+      );
+    }
+    return buildDegradedStaticContentSecurityPolicy();
+  }
+
+  // Manifest unavailable: nothing distinguishes a static file from a render
+  // here, so keep the split this app used before hashes existed — public
+  // routes get the degraded static policy, everything else a fresh nonce.
+  if (prerendered === null && isPublic) {
+    if (shouldWarnAboutFallback(pathname)) {
+      console.warn(
+        `[csp] prerender-manifest.json is unreadable — public route ${pathname} ` +
+          `is served with the degraded static policy ('unsafe-inline')`,
+      );
+    }
+    return buildDegradedStaticContentSecurityPolicy();
+  }
+
+  // Rendered for this request: a nonce, plus the layout's own inline scripts
+  // by hash (next-themes' theme script is rendered by React and carries no
+  // nonce — without this it is blocked and dark-mode users get a flash of the
+  // wrong theme; see H-1b and `readLayoutScriptHashes`).
+  const nonce = generateNonce();
+  const layoutHashes = await readLayoutScriptHashes();
+  if (layoutHashes.length === 0 && shouldWarnAboutFallback("(layout-hashes)")) {
+    console.warn(
+      `[csp] no readable landing-page HTML — nonce policy for ${pathname} omits ` +
+        `the layout's inline-script hashes, so next-themes' theme script is blocked`,
+    );
+  }
+  return buildContentSecurityPolicy(nonce, layoutHashes);
+}
+
+async function withContentSecurityPolicy(
   request: NextRequest,
   rewriteTo?: string,
   status = 200,
   extraHeaders?: Record<string, string>,
-  isStatic = false,
+  isPublic = false,
 ) {
-  const nonce = isStatic ? undefined : generateNonce();
-  const csp = nonce ? buildContentSecurityPolicy(nonce) : buildStaticContentSecurityPolicy();
+  // For a rewrite the served body is the *target's* render, so that is the
+  // path whose policy applies — hashing the requested path here would allow
+  // hashes that appear nowhere in the HTML actually sent.
+  const targetPath = rewriteTo ?? request.nextUrl.pathname;
+  const csp = await resolveContentSecurityPolicy(targetPath, isPublic);
 
+  // Next derives the nonce for every tag it renders by parsing this *request*
+  // copy of the policy (`getScriptNonceFromHeader`), so the header has to be
+  // written on both halves: the request copy is what makes the tags carry a
+  // nonce, the response copy is what makes the browser accept them.
+  //
+  // There used to be a second request header, `X-Nonce`, carrying the bare
+  // value. Nothing has read it since `app/layout.tsx` stopped passing a nonce
+  // to next-themes, and its presence masked the fact that the theme script was
+  // going unblessed (L-10 hid H-1b). Do not re-add it without a reader.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('Content-Security-Policy', csp);
-  if (nonce) {
-    requestHeaders.set('X-Nonce', nonce);
-  }
 
   const init = {
     request: { headers: requestHeaders },
@@ -333,7 +438,7 @@ async function isStaffRequest(auth: TokenBearer): Promise<boolean> {
  * resolves deliberately, not a rate limit, and a crawler or client that backs
  * off will come back on its own.
  */
-function maintenanceResponse(request: NextRequest) {
+async function maintenanceResponse(request: NextRequest) {
   const retryAfter = String(MAINTENANCE_RETRY_AFTER_SECONDS);
 
   if (isApiPath(request.nextUrl.pathname)) {
@@ -385,9 +490,10 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Reached only for requests allowed through the map above (a failed
-  // `auth.protect()` redirects instead), so every HTML response that actually
-  // renders carries the policy. Public routes receive the static CSP without
-  // a nonce so that statically prerendered pages can hydrate correctly.
+  // `auth.protect()` redirects instead), so every response that actually
+  // renders carries a policy — chosen there from what will be served (hashes
+  // for prerendered HTML, a nonce for anything rendered for this request, the
+  // degraded static policy only if the build artifacts are unreadable).
   return withContentSecurityPolicy(req, undefined, 200, undefined, isPublic)
 })
 

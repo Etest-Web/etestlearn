@@ -19,6 +19,15 @@
  *    a retried mutation may schedule the same drip step twice; the claim is
  *    what makes a duplicate impossible rather than merely unlikely.
  */
+
+function maskEmail(value: string | undefined | null): string {
+  if (!value) return "(none)";
+  const at = value.indexOf("@");
+  if (at <= 0) return "***";
+  const local = value.slice(0, at);
+  return `${local.slice(0, 2)}***@${value.slice(at + 1)}`;
+}
+
 import { internalAction, action } from "./_generated/server";
 import { v } from "convex/values";
 import { makeFunctionReference, type GenericActionCtx } from "convex/server";
@@ -94,7 +103,10 @@ async function deliver(
   // Cheap sanity check. A malformed address fails at the provider, which costs
   // a round trip and leaves a less useful error than this one.
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)) {
-    console.warn(`[email] invalid recipient for "${args.templateId}":`, args.to);
+    console.warn(
+      `[email] invalid recipient for "${args.templateId}":`,
+      maskEmail(args.to),
+    );
     return false;
   }
 
@@ -110,7 +122,7 @@ async function deliver(
 
   if (!claim.claimed) {
     console.log(
-      `[email] not sending "${args.templateId}" to ${recipient}:`,
+      `[email] not sending "${args.templateId}" to ${maskEmail(recipient)}:`,
       claim.reason,
     );
     return false;
@@ -133,11 +145,11 @@ async function deliver(
       outcome: "sent",
     });
 
-    console.log(`[email] sent "${args.templateId}" to ${recipient}`);
+    console.log(`[email] sent "${args.templateId}" to ${maskEmail(recipient)}`);
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[email] failed "${args.templateId}" to ${recipient}:`, message);
+    console.error(`[email] failed "${args.templateId}" to ${maskEmail(recipient)}:`, message);
 
     // Marked failed, not skipped: the key stays retryable on purpose. A
     // provider outage should not permanently disqualify a receipt.

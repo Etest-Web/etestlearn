@@ -15,8 +15,11 @@ function extractYouTubeId(url: URL): string | null {
 
 /**
  * Extracts a streamable embed URL for YouTube, Vimeo, or a Publit.io custom player.
+ *
+ * Exported so `tests/video-player-embed.test.ts` can pin the host allow-list;
+ * it is a pure string→string map with no React in it.
  */
-function getEmbedUrl(src: string): string | null {
+export function getEmbedUrl(src: string): string | null {
   let url: URL;
   try {
     url = new URL(src);
@@ -45,7 +48,12 @@ function getEmbedUrl(src: string): string | null {
 
   // Publit.io custom player embed ("main")
   // e.g. https://media.publit.io/file/8D4Nr5G1.mp4 or https://media.publit.io/file/8D4Nr5G1.html
-  if (host.includes("publit.io")) {
+  //
+  // Parsed as a hostname, not a substring: `host.includes("publit.io")` also
+  // accepted `publit.io.attacker.com` and `evil.publit.io.example`, so any
+  // host containing the brand would be promoted to a Publitio embed. Only the
+  // domain itself and its subdomains qualify (M-6).
+  if (host === "publit.io" || host.endsWith(".publit.io")) {
     // If it's already an embed link (ends with .html), ensure player param is attached
     if (url.pathname.endsWith(".html")) {
       url.searchParams.set("player", "main");

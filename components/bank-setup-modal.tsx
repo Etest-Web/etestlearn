@@ -239,7 +239,9 @@ function BankSetupDialog({
     setSaving(true);
     try {
       const { accountName } = verifiedPreview;
-      await confirm(verifiedPreview);
+      // No arguments on purpose: the mutation commits the record the verify
+      // action staged, so a tampered client cannot choose what gets saved.
+      await confirm({});
       setVerifiedPreview(null);
       setSavedAccountName(accountName);
       // Hold the dialog open through the `needsSetup` flip.

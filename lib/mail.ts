@@ -6,6 +6,7 @@ import {
   senderForGroup,
   type MailSenderGroup,
 } from "./mail-senders";
+import { replyToAddress } from "./email-address";
 
 /**
  * Shared outbound mail transport. Previously inlined in the instructor-
@@ -120,9 +121,21 @@ export type SendMailOptions = {
 };
 
 export async function sendMail(options: SendMailOptions): Promise<void> {
+  // The reply-to is the one address that comes from outside this codebase in
+  // several flows (an applicant's own typed address, a support requester's),
+  // and it lands in a mail header. Validate it at this single choke point
+  // rather than trusting each caller to have done so (M-9): an unparseable or
+  // CR/LF-bearing value is dropped, with the From address taking the replies
+  // instead.
+  const replyTo = replyToAddress(options.replyTo);
+  if (options.replyTo && !replyTo) {
+    console.warn("Dropping invalid replyTo address — is it a real email address?");
+  }
+  const payload: SendMailOptions = replyTo ? { ...options, replyTo } : options;
+
   const provider = activeMailProvider();
 
-  if (provider === "resend") return sendViaResend(options);
+  if (provider === "resend") return sendViaResend(payload);
   if (provider === "smtp") {
     // A half-set-up Resend key is worth a warning: mail still goes out, but
     // from the SMTP identity the operator may not expect.
@@ -131,7 +144,7 @@ export async function sendMail(options: SendMailOptions): Promise<void> {
         "RESEND_API_KEY is set but RESEND_FROM is missing or empty — falling back to SMTP.",
       );
     }
-    return sendViaSmtp(options);
+    return sendViaSmtp(payload);
   }
 
   throw new Error(

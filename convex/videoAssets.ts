@@ -3,7 +3,14 @@ import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { GenericMutationCtx, GenericQueryCtx } from "convex/server";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { canManageCourse, getCurrentUser, isStaff, requireUser } from "./helpers/auth";
+import {
+  canManageCourse,
+  getCurrentUser,
+  hasEnrollment,
+  isPreviewLesson,
+  isStaff,
+  requireUser,
+} from "./helpers/auth";
 import { signPlaybackToken } from "../lib/video-playback-token";
 import { assertUploadthingFileUrl } from "../lib/video-source";
 
@@ -23,18 +30,6 @@ async function requireManager(ctx: GenericMutationCtx<DataModel>, lessonId: Id<"
     throw new Error("Not authorized to manage this course");
   }
   return { user, lesson, course };
-}
-
-async function hasEnrollment(
-  ctx: GenericMutationCtx<DataModel> | GenericQueryCtx<DataModel>,
-  userId: Id<"users">,
-  courseId: Id<"courses">,
-): Promise<boolean> {
-  const enrollment = await ctx.db
-    .query("enrollments")
-    .withIndex("by_user_course", (q) => q.eq("userId", userId).eq("courseId", courseId))
-    .unique();
-  return !!enrollment;
 }
 
 /**
@@ -118,8 +113,8 @@ export const getAssetStatus = query({
     }
     if (asset.status !== "ready") return null;
 
-    // ponytail: lesson 1 defaults to public preview; upgrade to per-lesson isPreview flag when authored
-    if (lesson.order === 1) {
+    // Public preview — see isPreviewLesson for why the rule lives in one place.
+    if (isPreviewLesson(lesson)) {
       return {
         role: "preview" as const,
         asset: {
@@ -156,7 +151,7 @@ export const issuePlaybackToken = mutation({
     const course = await ctx.db.get(lesson.courseId);
     const manager = user && isStaff(user) && (await canManageCourse(ctx, user, course));
     const isEnrolled = user ? await hasEnrollment(ctx, user._id, lesson.courseId) : false;
-    const isPreview = lesson.order === 1;
+    const isPreview = isPreviewLesson(lesson);
 
     if (!manager && !isEnrolled && !isPreview) {
       throw new Error("Not enrolled in this course");
@@ -339,8 +334,8 @@ export const checkPlaybackAccess = internalQuery({
     if (!asset || asset.status !== "ready") return false;
     const lesson = await ctx.db.get(asset.lessonId);
     if (!lesson) return false;
-    // ponytail: lesson 1 defaults to public preview; upgrade to per-lesson isPreview flag when authored
-    if (lesson.order === 1) return true;
+    // Public preview — same rule as the content gate in courses.getCourseBySlug.
+    if (isPreviewLesson(lesson)) return true;
     if (args.userId === "anonymous") return false;
 
     const user = await ctx.db.get(args.userId);

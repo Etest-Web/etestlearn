@@ -549,3 +549,228 @@ describe("quiz submission rate limiting", () => {
     expect(afterOtherUser).toHaveLength(11);
   });
 });
+
+/**
+ * H-2 regression: getCourseBySlug/getCourseById used to hand every caller the
+ * draft syllabus and full lesson content, and left the paywall to a client-side
+ * flag. These pin the two gates — draft invisibility and content stripping.
+ */
+describe("course content gating", () => {
+  /** A draft course owned by the seeded instructor, with two lessons. */
+  async function seedDraft(t: any) {
+    const now = Date.now();
+    const { instructorId } = await seedWorld(t);
+    const draftId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("courses", {
+        title: "Unreleased Course",
+        slug: "unreleased-course",
+        description: "Still being written",
+        instructorId,
+        published: false,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const lessonId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("lessons", {
+        courseId: draftId,
+        title: "Secret lesson",
+        contentType: "article",
+        order: 0,
+        content: "# unpublished text",
+        createdAt: now,
+      }),
+    );
+    return { draftId, lessonId };
+  }
+
+  test("a draft is invisible to anonymous and non-owner callers", async () => {
+    const t = convexTest(testSchema, modules);
+    const { draftId } = await seedDraft(t);
+
+    // Anonymous: null, not an empty shell — a guessed slug must not confirm
+    // that an unpublished course exists.
+    await expect(
+      t.query(api.courses.getCourseBySlug, { slug: "unreleased-course" }),
+    ).resolves.toBeNull();
+    await expect(t.query(api.courses.getCourseById, { courseId: draftId })).resolves.toBeNull();
+
+    // A different signed-in instructor is not the owner either.
+    const otherInstructor = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("users", {
+        clerkId: "clerk_other_instructor",
+        email: "other@test.com",
+        name: "Other Instructor",
+        role: "instructor",
+        createdAt: Date.now(),
+      }),
+    );
+    expect(otherInstructor).toBeTruthy();
+    await expect(
+      as(t, "clerk_other_instructor").query(api.courses.getCourseBySlug, {
+        slug: "unreleased-course",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      as(t, "clerk_other_instructor").query(api.courses.getCourseById, { courseId: draftId }),
+    ).resolves.toBeNull();
+
+    // A student can read neither surface.
+    await expect(
+      as(t, "clerk_student").query(api.courses.getCourseBySlug, { slug: "unreleased-course" }),
+    ).resolves.toBeNull();
+    await expect(
+      as(t, "clerk_student").query(api.courses.getCourseById, { courseId: draftId }),
+    ).resolves.toBeNull();
+  });
+
+  test("a draft stays readable by its own instructor and by admins", async () => {
+    const t = convexTest(testSchema, modules);
+    const { draftId } = await seedDraft(t);
+
+    const owner = await as(t, "clerk_instructor").query(api.courses.getCourseBySlug, {
+      slug: "unreleased-course",
+    });
+    expect(owner?.course.published).toBe(false);
+    expect(owner?.lessons[0].content).toBe("# unpublished text");
+
+    const admin = await as(t, "clerk_admin").query(api.courses.getCourseById, {
+      courseId: draftId,
+    });
+    expect(admin?.lessons).toHaveLength(1);
+  });
+
+  test("getCourseById is owner/admin only, even for a published course", async () => {
+    const t = convexTest(testSchema, modules);
+    const { courseId } = await seedWorld(t);
+
+    // The editor's endpoint: any holder of a course id used to get full
+    // lessons back. Published does not mean editable.
+    await expect(
+      as(t, "clerk_student").query(api.courses.getCourseById, { courseId }),
+    ).resolves.toBeNull();
+    await expect(t.query(api.courses.getCourseById, { courseId })).resolves.toBeNull();
+
+    const owner = await as(t, "clerk_instructor").query(api.courses.getCourseById, { courseId });
+    expect(owner?.course._id).toBe(courseId);
+    const admin = await as(t, "clerk_admin").query(api.courses.getCourseById, { courseId });
+    expect(admin?.course._id).toBe(courseId);
+  });
+
+  test("paid lesson content is stripped unless entitled; preview lesson excepted", async () => {
+    const t = convexTest(testSchema, modules);
+    const { courseId, studentId } = await seedWorld(t);
+    const now = Date.now();
+
+    // order 0 = paid content, order 1 = the public preview (isPreviewLesson).
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.insert("lessons", {
+        courseId,
+        title: "Paid lesson",
+        contentType: "article",
+        order: 0,
+        content: "# the goods",
+        createdAt: now,
+      });
+      await ctx.db.insert("lessons", {
+        courseId,
+        title: "Preview lesson",
+        contentType: "article",
+        order: 1,
+        content: "# free sample",
+        createdAt: now,
+      });
+    });
+
+    const anon = await t.query(api.courses.getCourseBySlug, { slug: "paid-course" });
+    expect(anon).not.toBeNull();
+    const byOrder = new Map(anon!.lessons.map((l) => [l.order, l]));
+    // The paying lesson's text must not travel over the wire...
+    expect(byOrder.get(0)!.content).toBeUndefined();
+    expect(byOrder.get(0)!.videoAssetId).toBeUndefined();
+    // ...while the lesson the course page already shows everyone keeps its text.
+    expect(byOrder.get(1)!.content).toBe("# free sample");
+
+    // Signed in but not enrolled: same gate, no identity bypass.
+    const signedIn = await as(t, "clerk_student").query(api.courses.getCourseBySlug, {
+      slug: "paid-course",
+    });
+    expect(signedIn!.lessons.find((l) => l.order === 0)!.content).toBeUndefined();
+
+    // Enrolled: full content.
+    await t.run((ctx: TestCtx) =>
+      ctx.db.insert("enrollments", {
+        userId: studentId,
+        courseId,
+        progressPercent: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const enrolled = await as(t, "clerk_student").query(api.courses.getCourseBySlug, {
+      slug: "paid-course",
+    });
+    expect(enrolled!.lessons.find((l) => l.order === 0)!.content).toBe("# the goods");
+
+    // Suspended: getCurrentUser returns null, so entitlement must lapse even
+    // though the enrollment row is still there. (Asserting the row survives
+    // proves the strip below came from the identity gate, not from a missing
+    // enrollment.)
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(studentId, { suspendedAt: now });
+      const stillEnrolled = await ctx.db
+        .query("enrollments")
+        .withIndex("by_user_course", (q) => q.eq("userId", studentId).eq("courseId", courseId))
+        .unique();
+      expect(stillEnrolled).not.toBeNull();
+    });
+    const suspended = await as(t, "clerk_student").query(api.courses.getCourseBySlug, {
+      slug: "paid-course",
+    });
+    expect(suspended!.lessons.find((l) => l.order === 0)!.content).toBeUndefined();
+  });
+
+  test("a free course keeps its syllabus public while its lessons stay gated", async () => {
+    const t = convexTest(testSchema, modules);
+    const { freeCourseId, studentId } = await seedWorld(t);
+    const now = Date.now();
+    await t.run((ctx: TestCtx) =>
+      ctx.db.insert("lessons", {
+        courseId: freeCourseId,
+        title: "Open lesson",
+        contentType: "article",
+        order: 0,
+        content: "# free for all",
+        createdAt: now,
+      }),
+    );
+
+    // The storefront must not over-block: title, description and lesson list
+    // are what a prospective learner is shopping with, and they are public.
+    const anon = await t.query(api.courses.getCourseBySlug, { slug: "free-course" });
+    expect(anon).not.toBeNull();
+    expect(anon!.course.title).toBe("Free Course");
+    expect(anon!.lessons).toHaveLength(1);
+    expect(anon!.lessons[0].title).toBe("Open lesson");
+
+    // Lesson *text*, though, follows the same rule as the client's
+    // `isLessonUnlocked` (enrolled || order === 1) — which gates free courses
+    // identically: one click to enroll, then the text is there. Without that
+    // enrollment the server and the page would disagree about what is open.
+    expect(anon!.lessons[0].content).toBeUndefined();
+
+    await t.run((ctx: TestCtx) =>
+      ctx.db.insert("enrollments", {
+        userId: studentId,
+        courseId: freeCourseId,
+        progressPercent: 0,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const enrolled = await as(t, "clerk_student").query(api.courses.getCourseBySlug, {
+      slug: "free-course",
+    });
+    expect(enrolled!.lessons[0].content).toBe("# free for all");
+  });
+});

@@ -39,7 +39,13 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
     setStatusMessage("Requesting secure upload URL…");
 
     try {
-      const urlRes = await fetch("/api/publitio/upload-url", { method: "POST" });
+      // The route signs only for a lesson this session may manage, so the
+      // lesson id travels with the request (M-5).
+      const urlRes = await fetch("/api/publitio/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lessonId }),
+      });
       if (!urlRes.ok) {
         const errorData = await urlRes.json().catch(() => ({}));
         throw new Error(errorData.error || "Failed to initialize video upload");

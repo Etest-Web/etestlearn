@@ -195,15 +195,25 @@ describe("course preview & video assets", () => {
       previewVideoUrl: "https://www.youtube.com/watch?v=sample-trailer",
     });
 
-    let courseData = await t.query(api.courses.getCourseBySlug, { slug: "filmmaking-101" });
+    let courseData = await asInstructor.query(api.courses.getCourseBySlug, {
+      slug: "filmmaking-101",
+    });
     expect(courseData?.course.previewVideoUrl).toBe("https://www.youtube.com/watch?v=sample-trailer");
+
+    // A draft is invisible to everyone but its own instructor: the slug must
+    // not resolve for an anonymous caller (or confirm the course exists).
+    await expect(
+      t.query(api.courses.getCourseBySlug, { slug: "filmmaking-101" }),
+    ).resolves.toBeNull();
 
     await asInstructor.mutation(api.courses.updateCourse, {
       courseId,
       previewVideoUrl: "https://vimeo.com/123456789",
     });
 
-    courseData = await t.query(api.courses.getCourseBySlug, { slug: "filmmaking-101" });
+    courseData = await asInstructor.query(api.courses.getCourseBySlug, {
+      slug: "filmmaking-101",
+    });
     expect(courseData?.course.previewVideoUrl).toBe("https://vimeo.com/123456789");
   });
 });

@@ -251,6 +251,63 @@ export const persistVerifiedAccount = internalMutation({
 });
 
 /**
+ * How long a resolved-but-unsaved verification stays committable. Long enough
+ * to read the name and decide, short enough that a stale record is not a
+ * standing authorization.
+ */
+const PENDING_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * Stage a Paystack-resolved account for `confirmBankAccount` to consume.
+ *
+ * Internal: only the `verifyBankAccount` action calls it, and only after the
+ * resolve endpoint has returned an account name. This is the whole of M-1 —
+ * the client's `confirmBankAccount` sends nothing about the account, so what
+ * lands in the database is whatever *this* record says.
+ *
+ * The number is encrypted on the way in (same key as the final copy) so the
+ * module's "plaintext never stored" rule survives the intermediate step, and
+ * the record expires: a resolve that is never confirmed must not become a
+ * standing authorization to save an account the instructor walked away from.
+ */
+export const storePendingVerification = internalMutation({
+  args: {
+    accountNumber: v.string(),
+    bankCode: v.string(),
+    accountName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    if (!isStaff(user)) {
+      throw new Error("Only instructors and admins can save payout details");
+    }
+    // Fail at the same place the final write would, so the user sees the
+    // support-route message instead of a confusing "expired" on the next step.
+    if (user.bankVerified) {
+      throw new Error(
+        "Your bank details are already saved and cannot be changed here. " +
+          "Request a change from your Earnings page, or email " +
+          `${supportEmail()} from the address on your account.`,
+      );
+    }
+
+    const accountNumber = args.accountNumber.trim();
+    if (!/^\d{10}$/.test(accountNumber)) {
+      throw new Error("Account number must be exactly 10 digits");
+    }
+
+    await ctx.db.patch(user._id, {
+      bankPendingVerification: {
+        accountNumberEncrypted: await encryptAccountNumber(accountNumber),
+        bankCode: args.bankCode.trim(),
+        accountName: args.accountName.trim(),
+        expiresAt: Date.now() + PENDING_VERIFICATION_TTL_MS,
+      },
+    });
+  },
+});
+
+/**
  * Result shape of `persistVerifiedAccount` — mask and provenance only,
  * never the raw number.
  *
@@ -267,33 +324,65 @@ export interface SavedBankView {
 }
 
 /**
- * Public wrapper around the internal persist — called after the instructor
- * has seen the resolved name and clicks "Save". This mutation does the
- * encryption, audit, notification and email (via the same action pattern,
- * but the email is fire-and-forget from here since the action already ran).
+ * Commit the account Paystack resolved in the preceding `verifyBankAccount`
+ * call.
  *
- * The action flow is: verifyBankAccount (action) → confirmBankAccount (mutation).
- * This split lets the UI show the resolved name before the instructor commits.
+ * **This mutation deliberately takes no account arguments** (M-1). It used to
+ * accept `accountNumber`/`bankCode`/`accountName` straight from the client and
+ * write them with `bankVerified: true` — the resolve round-trip happened in a
+ * separate call whose result was never bound to this one, so any crafted
+ * client call could stamp an unverified account as verified, with a name it
+ * chose itself. Now the only inputs are read from `bankPendingVerification`,
+ * which is written by the server-side action after Paystack answers.
+ *
+ * Returns the same masked view the UI renders, so the success step can name
+ * the account it just stored.
  */
 export const confirmBankAccount = mutation({
-  args: {
-    accountNumber: v.string(),
-    bankCode: v.string(),
-    accountName: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx): Promise<SavedBankView> => {
+    const user = await requireUser(ctx);
+
+    // Checked before the pending record so a second save reports the real
+    // reason (one-shot policy) rather than "verification expired".
+    if (user.bankVerified) {
+      throw new Error(
+        "Your bank details are already saved and cannot be changed here. " +
+          "Request a change from your Earnings page, or email " +
+          `${supportEmail()} from the address on your account.`,
+      );
+    }
+
+    const pending = user.bankPendingVerification;
+    if (!pending || pending.expiresAt < Date.now()) {
+      throw new Error(
+        "That verification has expired — enter the account again to verify and save it.",
+      );
+    }
+
+    const accountNumber = await decryptAccountNumber(pending.accountNumberEncrypted);
     const saved: SavedBankView = await ctx.runMutation(
       internal.instructorBank.persistVerifiedAccount,
-      args,
+      {
+        accountNumber,
+        bankCode: pending.bankCode,
+        accountName: pending.accountName,
+      },
     );
-    // The persist mutation returns the mask etc., but we also need to send
-    // the confirmation email. Since we're in a mutation (no fetch), we schedule
-    // the email action.
+
+    // One-shot: the record is spent the moment it is used, so a replay of this
+    // mutation (a retried request, a second tab) has nothing left to commit.
+    await ctx.db.patch(user._id, { bankPendingVerification: undefined });
+
+    // Server-authored values throughout — the email cannot be steered by what
+    // the client sent. The recipient comes from the stored user rather than
+    // from `ctx.auth`, because a function scheduled with `runAfter` runs
+    // without the caller's auth context.
     await ctx.scheduler.runAfter(0, internal.bankVerification.sendBankConfirmationEmail, {
-      accountNumber: args.accountNumber,
-      bankCode: args.bankCode,
-      accountName: args.accountName,
+      accountName: pending.accountName,
       accountNumberMasked: saved.accountNumberMasked,
+      recipientEmail: user.email,
+      recipientName: user.name,
     });
     return saved;
   },

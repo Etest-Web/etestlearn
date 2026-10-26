@@ -7,6 +7,7 @@ import {
 } from "./_generated/server";
 import { makeFunctionReference } from "convex/server";
 import { logAudit } from "./helpers/audit";
+import { requireAdmin } from "./helpers/auth";
 import { createNotification } from "./helpers/notifications";
 import { consumeGrant } from "./referrals";
 import { settleSale } from "../lib/settlement";
@@ -262,6 +263,54 @@ export const hasAccessToCourse = query({
 
 // ─── Internal helpers (used by paystack.ts actions and the webhook) ───────
 
+/**
+ * Prefix for an amount/currency disagreement between Paystack's charge and the
+ * checkout intent (M-2).
+ *
+ * It is a prefix rather than a dedicated error type because the webhook needs
+ * to tell "this payload is not the charge we asked for" apart from "the
+ * database is broken" — the first is a permanent condition and gets a 200 so
+ * Paystack stops retrying, the second deserves a 5xx so it is retried and
+ * seen. Matching on a documented prefix keeps that distinction without
+ * threading a custom error class through the action boundary.
+ */
+export const PAYMENT_MISMATCH = "PAYMENT_MISMATCH:";
+
+/**
+ * Record exactly what we asked Paystack to charge for this reference.
+ *
+ * Called by the checkout action straight after `transaction/initialize`
+ * succeeds, so verification has a server-side figure to check the eventual
+ * charge against (M-2). It must be written *before* the buyer can pay — the
+ * window between initialize and webhook is the whole lifetime of the intent.
+ *
+ * The fields are optional on the row rather than required, because every
+ * purchase written before this existed has none; readers fall back to
+ * `amount`/`currency`, which is what those rows were initialized with.
+ */
+export const recordCheckoutIntent = internalMutation({
+  args: {
+    reference: v.string(),
+    checkoutAmount: v.number(),
+    checkoutCurrency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const purchase = await ctx.db
+      .query("purchases")
+      .withIndex("by_reference", (q) => q.eq("paystackReference", args.reference))
+      .unique();
+    if (!purchase) return;
+    // Never rewrite an intent — a second initialize for the same reference
+    // must not move the goalposts on a charge already in flight.
+    if (purchase.checkoutAmount !== undefined) return;
+
+    await ctx.db.patch(purchase._id, {
+      checkoutAmount: args.checkoutAmount,
+      checkoutCurrency: args.checkoutCurrency,
+    });
+  },
+});
+
 export const getPurchaseByRef = internalQuery({
   args: { reference: v.string() },
   handler: async (ctx, args) => {
@@ -297,9 +346,30 @@ export const getPurchaseByRef = internalQuery({
  * `listAmount` falls back to `amount` for rows created before the snapshot
  * existed; for those the two are equal, since the referral discount did not yet
  * exist.
+ *
+ * ── What the charge is checked against (M-2) ───────────────────────────────
+ *
+ * Callers may relay Paystack's own figures for the charge (`amount`,
+ * `currency` — the webhook does, the redirect fallback does). When they are
+ * present they are compared against the checkout intent: what *we* asked
+ * Paystack to charge, which is `checkoutAmount`/`checkoutCurrency` when the
+ * buyer picked another currency and `amount`/`currency` otherwise. A charge
+ * that does not match is refused rather than settled — the course must not be
+ * granted for money we did not ask for.
+ *
+ * The signature check on the webhook already proves the payload came from
+ * Paystack; this is the check that proves it is the *right* payload for this
+ * purchase, and it is what catches a reference/amount mix-up rather than a
+ * forgery.
  */
 export const markPurchasePaid = internalMutation({
-  args: { reference: v.string() },
+  args: {
+    reference: v.string(),
+    /** Paystack's charged amount in the charge's own currency (kobo/cop). */
+    amount: v.optional(v.number()),
+    /** Paystack's charged currency, e.g. "NGN". */
+    currency: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const purchase = await ctx.db
       .query("purchases")
@@ -309,6 +379,19 @@ export const markPurchasePaid = internalMutation({
 
     // Idempotent — webhook + verify may both fire.
     if (purchase.status === "paid") return;
+
+    const expectedAmount = purchase.checkoutAmount ?? purchase.amount;
+    const expectedCurrency = purchase.checkoutCurrency ?? purchase.currency;
+    if (args.amount !== undefined && Math.round(args.amount) !== Math.round(expectedAmount)) {
+      throw new Error(
+        `${PAYMENT_MISMATCH} amount ${args.amount} ≠ expected ${expectedAmount} (${expectedCurrency})`,
+      );
+    }
+    if (args.currency !== undefined && args.currency !== expectedCurrency) {
+      throw new Error(
+        `${PAYMENT_MISMATCH} currency ${args.currency} ≠ expected ${expectedCurrency}`,
+      );
+    }
 
     const now = Date.now();
 
@@ -467,15 +550,7 @@ export const adminListPurchases = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!admin || admin.role !== "admin") {
-      throw new Error("Not authorized — admin access required");
-    }
+    const admin = await requireAdmin(ctx);
 
     const limit = Math.max(1, Math.min(500, Math.floor(args.limit ?? 100)));
 
@@ -529,15 +604,7 @@ export const markRefunded = mutation({
     clearRefund: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!admin || admin.role !== "admin") {
-      throw new Error("Not authorized — admin access required");
-    }
+    const admin = await requireAdmin(ctx);
 
     const purchase = await ctx.db.get(args.purchaseId);
     if (!purchase) throw new Error("Purchase not found");

@@ -87,6 +87,23 @@ export default defineSchema({
     // from a generic `updatedAt`, which the users table does not have (and
     // should not grow just for this).
     bankDetailsUpdatedAt: v.optional(v.number()),
+    // ── Pending verification (M-1) ──────────────────────────────────────────
+    // The hand-off between the two halves of verification: the
+    // `verifyBankAccount` action writes what Paystack resolved here, and
+    // `confirmBankAccount` consumes it. The public confirm mutation takes **no
+    // account arguments at all** — it can only commit a record the server
+    // itself wrote — so `bankVerified` can only ever mean "Paystack said so",
+    // however the client is called. Expires after 15 minutes, cleared on save.
+    // The number is encrypted here too, so the "plaintext never stored"
+    // invariant above holds for this record as well.
+    bankPendingVerification: v.optional(
+      v.object({
+        accountNumberEncrypted: v.string(),
+        bankCode: v.string(),
+        accountName: v.string(),
+        expiresAt: v.number(),
+      }),
+    ),
     // Permanent share code, generated lazily by `referrals.ensureMyCode` rather
     // than by the Clerk webhook: a code is only needed when someone opens the
     // referral page, so new and existing accounts share one generation path and
@@ -566,6 +583,17 @@ export default defineSchema({
     paystackReference: v.string(),
     amount: v.number(), // kobo
     currency: v.string(),
+    // Exactly what was handed to Paystack for *this* purchase, when that
+    // differs from `amount`/`currency` — i.e. when the buyer picked another
+    // currency at checkout and `initializeCheckout` converted the price. The
+    // documented "`amount` is ALWAYS the number sent to Paystack" invariant is
+    // only true for base-currency checkouts, so verification (webhook **and**
+    // redirect) reads these two first and falls back to `amount`/`currency`
+    // for rows written before they existed. Written by
+    // `internal.payments.recordCheckoutIntent` right after Paystack accepts
+    // the initialize call.
+    checkoutAmount: v.optional(v.number()), // kobo, denominated in checkoutCurrency
+    checkoutCurrency: v.optional(v.string()),
     status: v.union(
       v.literal("pending"),
       v.literal("paid"),

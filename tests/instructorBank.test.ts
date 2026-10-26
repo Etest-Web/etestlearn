@@ -468,11 +468,10 @@ describe("verifyBankAccount action + confirmBankAccount mutation", () => {
     let row = await userRow(t, INSTRUCTOR);
     expect(row?.bankVerified).toBeFalsy();
 
-    // Step 2: confirm
-    const confirmResult = await t.mutation(
-      api.instructorBank.confirmBankAccount,
-      { accountNumber: ACCOUNT_NUMBER, bankCode: BANK_CODE, accountName: "Ada Obi" },
-    );
+    // Step 2: confirm — no arguments, deliberately. Whatever the client would
+    // have sent for `accountNumber`/`bankCode`/`accountName` is ignored, so
+    // the name that lands is the one Paystack returned above (M-1).
+    const confirmResult = await t.mutation(api.instructorBank.confirmBankAccount, {});
 
     expect(confirmResult.accountName).toBe("Ada Obi");
     expect(confirmResult.accountNumberMasked).toBe("******6789");
@@ -550,20 +549,28 @@ describe("verifyBankAccount action + confirmBankAccount mutation", () => {
       accountNumber: ACCOUNT_NUMBER,
       bankCode: BANK_CODE,
     });
-    await t.mutation(api.instructorBank.confirmBankAccount, {
-      accountNumber: ACCOUNT_NUMBER,
-      bankCode: BANK_CODE,
-      accountName: "Ada Obi",
-    });
+    await t.mutation(api.instructorBank.confirmBankAccount, {});
 
     // Second confirm should fail
     await expect(
-      t.mutation(api.instructorBank.confirmBankAccount, {
-        accountNumber: "9988776655",
-        bankCode: BANK_CODE,
-        accountName: "Different Name",
-      }),
+      t.mutation(api.instructorBank.confirmBankAccount, {}),
     ).rejects.toThrow(/already saved/);
+  });
+
+  test("confirm with no staged verification saves nothing (M-1)", async () => {
+    const t = await as(INSTRUCTOR, "instructor");
+    stubFetch(() => resolveOk("Ada Obi"));
+
+    // Straight to confirm: there is no server-side record to commit, so the
+    // client-supplied shape of the old API cannot buy a "verified" account.
+    await expect(
+      t.mutation(api.instructorBank.confirmBankAccount, {}),
+    ).rejects.toThrow(/expired/);
+
+    const row = await userRow(t, INSTRUCTOR);
+    expect(row?.bankVerified).toBeFalsy();
+    expect(row?.bankAccountEncrypted).toBeUndefined();
+    expect(row?.bankAccountName).toBeUndefined();
   });
 });
 

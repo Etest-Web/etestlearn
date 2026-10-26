@@ -203,7 +203,7 @@ function ReferrerPageContent() {
                     <Gift className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold">{(summary.totalRewardKobo / 1000).toFixed(1)}₦</div>
+                    <div className="text-2xl font-bold">₦{(summary.totalRewardKobo / 1000).toFixed(1)}</div>
                     <div className="text-sm text-muted-foreground">Total earned</div>
                   </div>
                 </div>
@@ -217,7 +217,7 @@ function ReferrerPageContent() {
                     <Clock className="h-4 w-4 text-warning" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold">{(summary.availableCreditKobo / 1000).toFixed(1)}₦</div>
+                    <div className="text-2xl font-bold">₦{(summary.availableCreditKobo / 1000).toFixed(1)}</div>
                     <div className="text-sm text-muted-foreground">Available credit</div>
                   </div>
                 </div>

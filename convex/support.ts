@@ -30,19 +30,108 @@ export const statusValidator = v.union(
   v.literal("closed")
 );
 
+/**
+ * A ticket number is the only credential a *guest* holds: `lookupPublicTicket`
+ * is unauthenticated, so whoever can guess a number plus the requester's email
+ * reads their message and attachments.
+ *
+ * The old shape was `Math.random()` over ~4 digits per year (`TICK-2026-` +
+ * 3 time digits + 4 random ones) — brute-forceable by anyone who knows a
+ * support address. This one is 8 characters of Crockford base32 from
+ * `crypto.getRandomValues`: 40 bits, ~4.3 × 10⁹ per year. Alphabet size 32
+ * divides 256 exactly, so `byte % 32` is unbiased — the same trick
+ * `convex/coupons.ts` and `convex/referrals.ts` use.
+ *
+ * The format is intentionally *not* validated anywhere before lookup (legacy
+ * 7-character numbers are still in the table), so this can change again
+ * without a migration.
+ */
 function generateTicketNumber(): string {
   const year = new Date().getFullYear();
-  const randomPart = Math.floor(1000 + Math.random() * 9000);
-  const timePart = Date.now().toString().slice(-3);
-  return `TICK-${year}-${timePart}${randomPart}`;
+  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  let suffix = "";
+  for (const byte of bytes) suffix += alphabet[byte % alphabet.length];
+  return `TICK-${year}-${suffix}`;
 }
 
+/** Attachments per ticket, and the per-file ceiling the UI already enforces. */
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 16 * 1024 * 1024;
+const MAX_FILE_NAME_CHARS = 200;
+
+/**
+ * Mint a Convex storage upload URL.
+ *
+ * This used to have **no auth and no rate limit**, so anyone could mint
+ * unlimited upload URLs (any file type, up to Convex's cap) — free object
+ * hosting on this deployment, and step 1 of any "upload something then link it
+ * from the app" chain (M-3).
+ *
+ * Support tickets may be opened by guests, so a session cannot be mandatory
+ * here without breaking that flow. The gate is therefore the same one
+ * `createTicket` uses: a signed-in identity **or** a validated email address,
+ * either of which gives the rate limiter a key to count against.
+ */
 export const generateSupportUploadUrl = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+
+    let rateKey: string;
+    if (user) {
+      rateKey = `support:upload:${user._id}`;
+    } else {
+      const email = args.email?.trim().toLowerCase() ?? "";
+      if (!email || !email.includes("@") || !email.includes(".") || email.length > 320) {
+        throw new Error("Provide your email address (or sign in) to attach files");
+      }
+      rateKey = `support:upload:${email}`;
+    }
+
+    await requireRateLimit(ctx, rateKey, 20, 60 * 60 * 1000);
+
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+/**
+ * Declared attachment fields are checked before they are stored.
+ *
+ * The values come from the client and are what support staff (and the guest
+ * looking their ticket up later) see, so they are capped and shaped here
+ * rather than trusted: a count cap stops a ticket carrying a thousand rows, a
+ * size cap matches the 16 MB the UI promises, and the MIME/name checks reject
+ * control characters and malformed types instead of storing them verbatim.
+ *
+ * The `storageId` itself cannot be proven to belong to the caller — Convex
+ * storage has no owner field — but it must be a real `_storage` id, which the
+ * validator enforces, and guessing one is not feasible.
+ */
+function validateAttachments(
+  attachments: Array<{ storageId: string; fileName: string; mimeType: string; size: number }>,
+): void {
+  if (attachments.length > MAX_ATTACHMENTS) {
+    throw new Error(`A ticket may carry at most ${MAX_ATTACHMENTS} attachments`);
+  }
+
+  for (const att of attachments) {
+    const fileName = att.fileName.trim();
+    if (!fileName || fileName.length > MAX_FILE_NAME_CHARS || /[\r\n\0]/.test(fileName)) {
+      throw new Error("Attachment name is invalid");
+    }
+    // A MIME type is a token/token pair; anything else is malformed input.
+    if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(att.mimeType) || att.mimeType.length > 100) {
+      throw new Error("Attachment type is invalid");
+    }
+    if (!Number.isFinite(att.size) || att.size <= 0 || att.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error(`Attachments must be smaller than ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB`);
+    }
+  }
+}
 
 /**
  * Public/authenticated ticket creation.
@@ -78,6 +167,11 @@ export const createTicket = mutation({
       throw new Error("Please provide a valid email address");
     }
 
+    // Declared attachment fields are attacker-controlled: cap and shape them
+    // before anything is written (see `validateAttachments`).
+    const attachments = args.attachments ?? [];
+    validateAttachments(attachments);
+
     // Rate limit: 5 tickets per hour per IP / user
     const rateLimitKey = user
       ? `support:createTicket:${user._id}`
@@ -110,13 +204,13 @@ export const createTicket = mutation({
       createdAt: now,
     });
 
-    // Store attachments if provided
-    if (args.attachments && args.attachments.length > 0) {
-      for (const att of args.attachments) {
+    // Store attachments if provided (already validated above)
+    if (attachments.length > 0) {
+      for (const att of attachments) {
         await ctx.db.insert("supportTicketAttachments", {
           ticketId,
           storageId: att.storageId,
-          fileName: att.fileName,
+          fileName: att.fileName.trim(),
           mimeType: att.mimeType,
           size: att.size,
           createdAt: now,

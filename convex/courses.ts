@@ -11,6 +11,9 @@ import { logAudit, type AuditEntry } from "./helpers/audit";
 import {
   AnyCtx,
   canManageCourse,
+  getCurrentUser,
+  hasEnrollment,
+  isPreviewLesson,
   isStaff,
   requireUser,
   type Id,
@@ -90,17 +93,11 @@ export const listPublishedCourses = query({
 export const listInstructorCourses = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    // requireUser, not an inline identity lookup — suspension must revoke
+    // instructor power (see helpers/auth.getCurrentUser).
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -164,6 +161,18 @@ export const getCourseBySlug = query({
       return null;
     }
 
+    // Who is asking — resolved once, used for both gates below. Anonymous and
+    // suspended callers read as signed out (getCurrentUser is the choke point
+    // for suspension), so neither can reach draft or paid content.
+    const viewer = await getCurrentUser(ctx);
+    const canManage = viewer ? await canManageCourse(ctx, viewer, course) : false;
+
+    // Drafts are invisible to everyone but their own instructor and admins.
+    // null rather than an empty shell: a guessed slug must not confirm that an
+    // unpublished course exists, or distinguish "unpublished" from "no such
+    // course" — otherwise slug enumeration maps the catalog before launch.
+    if (!course.published && !canManage) return null;
+
     const lessons = await ctx.db
       .query("lessons")
       .withIndex("by_course_order", (q) => q.eq("courseId", course._id))
@@ -180,7 +189,28 @@ export const getCourseBySlug = query({
           .map((s) => ({ _id: s._id, name: s.name, slug: s.slug }))
       : [];
 
-    return { course, lessons, skills };
+    // Content gate. This query used to hand every lesson's `content` — full
+    // article text and legacy video URLs — to any caller who knew the slug,
+    // leaving the paywall to the client's `isActiveLessonUnlocked` flag.
+    // The rule mirrors internal.videoAssets.checkPlaybackAccess, which already
+    // gates the encrypted-video path: staff, enrolled learners, and lesson 1
+    // as the public preview (the same preview the course page offers
+    // non-enrolled visitors).
+    const entitled =
+      canManage ||
+      (viewer ? await hasEnrollment(ctx, viewer._id, course._id) : false);
+
+    return {
+      course,
+      lessons: entitled
+        ? lessons
+        : lessons.map((lesson) =>
+            isPreviewLesson(lesson)
+              ? lesson
+              : { ...lesson, content: undefined, videoAssetId: undefined },
+          ),
+      skills,
+    };
   },
 });
 
@@ -192,6 +222,13 @@ export const getCourseById = query({
     if (!course) {
       return null;
     }
+
+    // Editing surface — instructor-owner or admin only. This used to be open
+    // to any caller holding a course id, which made every draft's full
+    // syllabus and lesson content readable by enumeration, and let a student
+    // read an unpublished course straight out of the editor's endpoint.
+    const viewer = await getCurrentUser(ctx);
+    if (!viewer || !(await canManageCourse(ctx, viewer, course))) return null;
 
     const lessons = await ctx.db
       .query("lessons")
@@ -217,17 +254,9 @@ export const createCourse = mutation({
     currency: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized to create courses");
     }
 
@@ -278,17 +307,11 @@ export const updateCourse = mutation({
     currency: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    // requireUser, not an inline identity lookup — suspension must revoke
+    // instructor power (see helpers/auth.getCurrentUser).
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -344,15 +367,12 @@ export const createLesson = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser, not an inline identity lookup: suspension has to revoke
+    // instructor power too, and getCurrentUser is the single place that reads
+    // a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -382,15 +402,12 @@ export const updateLesson = mutation({
     videoStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser, not an inline identity lookup: suspension has to revoke
+    // instructor power too, and getCurrentUser is the single place that reads
+    // a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -423,15 +440,12 @@ export const updateLesson = mutation({
 export const deleteLesson = mutation({
   args: { lessonId: v.id("lessons") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    // requireUser, not an inline identity lookup: suspension has to revoke
+    // instructor power too, and getCurrentUser is the single place that reads
+    // a suspended account as signed out.
+    const user = await requireUser(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -505,15 +519,7 @@ export const deleteLesson = mutation({
 export const getCourseAnalytics = query({
   args: { courseId: v.id("courses") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!user) throw new Error("User record not found");
+    const user = await requireUser(ctx);
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new Error("Course not found");

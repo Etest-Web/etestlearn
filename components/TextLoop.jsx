@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { gsap } from 'gsap';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { gsap } from "gsap";
 
 import './TextLoop.css';
 
@@ -141,29 +141,38 @@ const TextLoop = ({
       typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced || speed <= 0) return undefined;
 
-    const state = { offset: 0 };
-    const tween = gsap.to(state, {
-      offset: direction === 'reverse' ? -length : length,
-      duration: length / speed,
-      ease: 'none',
-      repeat: -1,
-      onUpdate: () => apply(state.offset)
+    const tweenRef = { current: null };
+    const pauseRef = { current: null };
+    const resumeRef = { current: null };
+    const rootElRef = { current: null };
+
+    import("gsap").then(({ gsap }) => {
+      const state = { offset: 0 };
+      tweenRef.current = gsap.to(state, {
+        offset: direction === 'reverse' ? -length : length,
+        duration: length / speed,
+        ease: 'none',
+        repeat: -1,
+        onUpdate: () => apply(state.offset)
+      });
+
+      const root = rootRef.current;
+      rootElRef.current = root;
+
+      pauseRef.current = () => tweenRef.current?.pause();
+      resumeRef.current = () => tweenRef.current?.resume();
+
+      if (pauseOnHover && root) {
+        root.addEventListener('pointerenter', pauseRef.current);
+        root.addEventListener('pointerleave', resumeRef.current);
+      }
     });
 
-    const root = rootRef.current;
-    const pause = () => tween.pause();
-    const resume = () => tween.resume();
-
-    if (pauseOnHover && root) {
-      root.addEventListener('pointerenter', pause);
-      root.addEventListener('pointerleave', resume);
-    }
-
     return () => {
-      tween.kill();
-      if (pauseOnHover && root) {
-        root.removeEventListener('pointerenter', pause);
-        root.removeEventListener('pointerleave', resume);
+      if (tweenRef.current) tweenRef.current.kill();
+      if (pauseOnHover && rootElRef.current && pauseRef.current && resumeRef.current) {
+        rootElRef.current.removeEventListener('pointerenter', pauseRef.current);
+        rootElRef.current.removeEventListener('pointerleave', resumeRef.current);
       }
     };
   }, [metrics, speed, direction, pauseOnHover]);

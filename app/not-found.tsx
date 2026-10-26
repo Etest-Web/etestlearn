@@ -2,6 +2,15 @@ import { Button, EmptyState } from "@/components/ui";
 import { Compass, GraduationCap } from "lucide-react";
 import Link from "next/link";
 
+/**
+ * `/_not-found` is not in `proxy.ts`'s public-route map, so it is served the
+ * nonce-based CSP. A nonce only lands on inline scripts during a per-request
+ * render, so this boundary must stay dynamic to hydrate like every other
+ * nonce-protected page. (Its content and links would still show from static
+ * HTML, but keeping it dynamic keeps the nonce story uniform.)
+ */
+export const dynamic = "force-dynamic";
+
 export default function NotFound() {
     return (
         <main className="flex min-h-dvh items-center justify-center px-4 py-12">

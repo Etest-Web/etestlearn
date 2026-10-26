@@ -9,9 +9,9 @@ import { OG_HEIGHT, OG_WIDTH } from "@/lib/og-brand";
  * walks the route tree from the root segment and the leaf-most `opengraph-image`
  * that exists wins (`resolve-metadata.js`, `mergeStaticMetadata`).
  *
- * `runtime` is node, not edge, because the fonts are read off disk — see
- * `loadOgFonts` in `lib/og-brand.ts` for why they are files rather than a
- * remote fetch.
+ * `runtime` is node, not edge, because `loadOgFonts` reads the TTFs off disk
+ * via `node:fs/promises`. Edge runtime has no filesystem access, so fonts
+ * would need to be base64-inlined at build time before Edge works here.
  */
 export const runtime = "nodejs";
 

@@ -68,7 +68,6 @@ export function Navbar() {
               alt="Glypha"
               width={96}
               height={48}
-              priority
               className="h-auto w-full"
             />
           </div>

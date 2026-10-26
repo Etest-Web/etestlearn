@@ -156,3 +156,63 @@ export function buildContentSecurityPolicy(nonce: string): string {
     "upgrade-insecure-requests",
   ].join("; ");
 }
+
+/**
+ * Static variant for prerendered public routes.
+ *
+ * For statically prerendered routes (e.g. /, /courses), no per-request nonce
+ * exists at build time. If a nonce were sent in the CSP header, CSP3 would force
+ * the browser to ignore 'unsafe-inline', blocking Next.js static inline hydration
+ * scripts.
+ *
+ * This policy maintains the same strict host allow-lists for connect, frame, font,
+ * and media, but allows 'unsafe-inline' on scripts without a nonce. Safe for public
+ * routes because they do not reflect user state or authenticated input.
+ */
+export function buildStaticContentSecurityPolicy(): string {
+  return [
+    "default-src 'self'",
+    ["script-src", "'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", ...SCRIPT_HOSTS].join(" "),
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' https://*.convex.site https://*.publit.io https://media.publit.io",
+    [
+      "connect-src",
+      "'self'",
+      "https://*.convex.cloud",
+      "https://*.convex.site",
+      "wss://*.convex.cloud",
+      "wss://*.convex.site",
+      "https://clerk.glypha.com.ng",
+      "https://*.clerk.accounts.dev",
+      "https://api.paystack.co",
+      "https://ipapi.co",
+      "https://*.uploadthing.com",
+      "https://uploadthing.com",
+      "https://unpkg.com",
+      "https://api.publit.io",
+      "https://*.publit.io",
+      "https://media.publit.io",
+      "https://va.vercel-scripts.com",
+      "https://challenges.cloudflare.com",
+      "https://*.protect.clerk.com:*",
+    ].join(" "),
+    [
+      "frame-src",
+      "'self'",
+      ...SCRIPT_HOSTS,
+      "https://hooks.stripe.com",
+      "https://checkout.paystack.com",
+      "https://*.publit.io",
+      "https://media.publit.io",
+      "https://publit.io",
+    ].join(" "),
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}

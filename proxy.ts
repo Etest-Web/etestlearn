@@ -2,7 +2,11 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
-import { buildContentSecurityPolicy, generateNonce } from '@/lib/csp';
+import {
+  buildContentSecurityPolicy,
+  buildStaticContentSecurityPolicy,
+  generateNonce,
+} from '@/lib/csp';
 import {
   isApiPath,
   isPathAllowedDuringMaintenance,
@@ -43,13 +47,16 @@ function withContentSecurityPolicy(
   rewriteTo?: string,
   status = 200,
   extraHeaders?: Record<string, string>,
+  isStatic = false,
 ) {
-  const nonce = generateNonce();
-  const csp = buildContentSecurityPolicy(nonce);
+  const nonce = isStatic ? undefined : generateNonce();
+  const csp = nonce ? buildContentSecurityPolicy(nonce) : buildStaticContentSecurityPolicy();
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('Content-Security-Policy', csp);
-  requestHeaders.set('X-Nonce', nonce);
+  if (nonce) {
+    requestHeaders.set('X-Nonce', nonce);
+  }
 
   const init = {
     request: { headers: requestHeaders },
@@ -169,7 +176,7 @@ const isPublicRoute = createRouteMatcher([
  * applies to the *staff* check below, where failing open would hand anonymous
  * callers the whole site.
  */
-const MAINTENANCE_CACHE_TTL_MS = 5_000;
+const MAINTENANCE_CACHE_TTL_MS = 30_000;
 
 type MaintenanceStatus = {
   enabled: boolean;
@@ -200,10 +207,11 @@ const isMaintenanceStaff = makeFunctionReference<
 >('maintenance:isStaffCaller');
 
 // Module scope, so the read is once per Edge isolate per TTL rather than once
-// per request. 5s is the price of the toggle: flipping it takes effect within
-// five seconds anywhere, which is invisible during an outage and bounded during
-// an incident. Storing only "the site is down or it is not" keeps this free of
-// per-user state — nothing cached here is ever decision-relevant to a caller.
+// per request. 30s is the price of the toggle: flipping it takes effect within
+// thirty seconds anywhere, which is acceptable during an outage and bounded
+// during an incident. Storing only "the site is down or it is not" keeps this
+// free of per-user state — nothing cached here is ever decision-relevant to a
+// caller.
 let maintenanceCache: { status: MaintenanceStatus; expiresAt: number } | null = null;
 
 const MAINTENANCE_OFF: MaintenanceStatus = {
@@ -371,14 +379,16 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 
-  if (!isPublicRoute(req)) {
+  const isPublic = isPublicRoute(req);
+  if (!isPublic) {
     await auth.protect()
   }
 
   // Reached only for requests allowed through the map above (a failed
   // `auth.protect()` redirects instead), so every HTML response that actually
-  // renders carries the policy.
-  return withContentSecurityPolicy(req)
+  // renders carries the policy. Public routes receive the static CSP without
+  // a nonce so that statically prerendered pages can hydrate correctly.
+  return withContentSecurityPolicy(req, undefined, 200, undefined, isPublic)
 })
 
 export const config = {

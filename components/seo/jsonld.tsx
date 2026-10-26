@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import type { SchemaOrg } from "./types";
 
 /**
@@ -10,21 +9,24 @@ import type { SchemaOrg } from "./types";
  * is invisible to anything that does not run JavaScript, and Google explicitly
  * documents that structured data must be present in the initial response.
  *
- * The nonce comes from the request header rather than from the caller. It has
- * to: `script-src` here carries no `'unsafe-inline'` (see `lib/csp.ts`), so an
- * inline `<script>` without the per-request nonce is blocked by the browser.
- * Threading a nonce through every call site would put that obligation on
- * whoever adds the next schema, and the failure mode is silent — the tag is in
- * the HTML but the browser refuses it.
+ * This component is deliberately **synchronous** and carries no `nonce`. An
+ * `<script type="application/ld+json">` element is an inert data block, not an
+ * executable script: the browser parses its text content and never runs it, so
+ * CSP's `script-src` (the directive that would require a nonce) does not apply
+ * to it. Reading `headers()` to thread a nonce here would opt every route that
+ * renders a schema — the root layout, the landing page, the course and
+ * instructor pages — into per-request dynamic rendering, which is exactly what
+ * keeps them from being statically prerendered. Structured data must ship in
+ * the initial HTML, so these pages need to stay static; a nonce on an inert
+ * data block would cost that for nothing.
  */
-export default async function JsonLd({
+export default function JsonLd({
   schema,
   id,
 }: {
   schema: SchemaOrg | SchemaOrg[];
   id?: string;
 }) {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const documents = Array.isArray(schema) ? schema : [schema];
 
   return (
@@ -34,7 +36,6 @@ export default async function JsonLd({
           key={id ? `${id}-${index}` : index}
           type="application/ld+json"
           id={id && documents.length === 1 ? id : undefined}
-          nonce={nonce}
           // `</script>` inside a course description would close the tag early
           // and let the rest of that description be parsed as markup. Escaping
           // the sequence keeps the JSON valid and the document inert.

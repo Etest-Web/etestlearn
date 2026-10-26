@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildContentSecurityPolicy, generateNonce } from "../lib/csp";
+import {
+  buildContentSecurityPolicy,
+  buildStaticContentSecurityPolicy,
+  generateNonce,
+} from "../lib/csp";
 
 /**
  * Pins the policy that `proxy.ts` puts on every response.
@@ -117,5 +121,61 @@ describe("buildContentSecurityPolicy", () => {
     ]) {
       expect(connectSrc).toContain(origin);
     }
+  });
+});
+
+describe("buildStaticContentSecurityPolicy", () => {
+  const csp = buildStaticContentSecurityPolicy();
+
+  it("emits parseable directives", () => {
+    expect(csp).not.toContain("\n");
+    for (const [name, values] of directives(csp)) {
+      expect(name, `${name} has no sources`).not.toBe("");
+      if (VALUELESS_DIRECTIVES.has(name)) {
+        expect(values, `${name} should be valueless`).toEqual([]);
+      } else {
+        expect(values.length, `${name} has no sources`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("allows inline scripts so prerendered pages can hydrate", () => {
+    const scriptSrc = sources(csp, "script-src");
+
+    // Statically prerendered pages bake Next.js' hydration scripts and the
+    // next-themes theme script into the HTML at build time, with no runtime
+    // nonce to stamp on them. Without 'unsafe-inline' the browser would refuse
+    // every inline script and the page would never hydrate.
+    expect(scriptSrc).toContain("'unsafe-inline'");
+    // No nonce on the static variant: a nonce would cause CSP3 browsers to
+    // IGNORE 'unsafe-inline', which is precisely what must not happen here.
+    expect(scriptSrc.some((s) => s.startsWith("'nonce-"))).toBe(false);
+    // 'strict-dynamic' would drop 'self' and the Clerk host, blocking
+    // clerk.browser.js. Keep it absent, as on the nonce policy.
+    expect(scriptSrc).not.toContain("'strict-dynamic'");
+    expect(scriptSrc).toContain("'self'");
+    expect(scriptSrc).toContain("'unsafe-eval'");
+    expect(scriptSrc).toContain("https://clerk.glypha.com.ng");
+  });
+
+  it("keeps the same host allow-list and lockdown as the nonce policy", () => {
+    const staticConnect = sources(csp, "connect-src");
+    for (const origin of [
+      "https://*.convex.cloud",
+      "https://*.convex.site",
+      "wss://*.convex.cloud",
+      "wss://*.convex.site",
+      "https://clerk.glypha.com.ng",
+      "https://api.paystack.co",
+    ]) {
+      expect(staticConnect).toContain(origin);
+    }
+
+    expect(directives(csp).get("default-src")).toEqual(["'self'"]);
+    expect(directives(csp).get("object-src")).toEqual(["'none'"]);
+    expect(directives(csp).get("frame-ancestors")).toEqual(["'none'"]);
+    expect(directives(csp).get("base-uri")).toEqual(["'self'"]);
+    expect(directives(csp).get("form-action")).toEqual(["'self'"]);
+    expect(sources(csp, "style-src")).toContain("'unsafe-inline'");
   });
 });

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ArrowRight, MoreVertical, UserPlus, Play, Sparkles, Target, Trophy, Clock, Flame, BookOpen, Award, TrendingUp } from "lucide-react";
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area } from "recharts";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +25,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/dashboard-shell";
 import { AnnouncementBanner } from "@/components/announcement-banner";
+
+const DashboardWeeklyChart = dynamic(
+  () =>
+    import("@/components/dashboard-overview-charts").then(
+      (mod) => mod.DashboardWeeklyChart,
+    ),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-32 w-full rounded-md" />,
+  },
+);
 
 /**
  * Where `/dashboard` should actually go.
@@ -429,42 +440,7 @@ export default function DashboardPage() {
           </p>
           
           {/* Weekly Activity Mini Chart */}
-          <div className="w-full h-32 px-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--brand)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--brand)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <RechartsTooltip 
-                  cursor={{fill: 'transparent'}} 
-                  contentStyle={{
-                    // The chart tooltip is the one genuinely floating layer on this
-                    // page, so it takes the overlay elevation token rather than a
-                    // hand-written shadow.
-                    borderRadius: 'var(--radius-md)',
-                    border: 'none',
-                    boxShadow: 'var(--elevation-overlay)',
-                    backgroundColor: 'var(--popover)',
-                    color: 'var(--popover-foreground)'
-                  }}
-                  formatter={(value: number, name: string) => [value, name === 'lessonsCompleted' ? 'Lessons' : name === 'quizzesPassed' ? 'Quizzes' : 'Hours']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="lessonsCompleted" 
-                  stroke="var(--brand)" 
-                  fillOpacity={1} 
-                  fill="url(#colorProgress)"
-                  strokeWidth={2}
-                />
-                <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: 'var(--muted-foreground)'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: 'var(--muted-foreground)'}} dx={-10} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div >
+          <DashboardWeeklyChart data={chartData} />
         </Card>
 
         {/* Stats Grid */}

@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Geist_Mono, Inter, Outfit } from "next/font/google";
-import { headers } from "next/headers";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next"
 import { cn } from "@/lib/utils";
+import { AnalyticsWrapper } from "@/components/analytics-wrapper";
 import { LocalizationProvider } from "@/components/localization-provider";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { TooltipProvider } from "@/components/ui";
@@ -91,25 +90,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // `proxy.ts` mints a fresh nonce per request and forwards it on `X-Nonce`
-  // (alongside the CSP header itself).
-  //
-  // Next.js reads the nonce back off the request's Content-Security-Policy
-  // and stamps it onto every script it renders, so the only tag that needs it
-  // handed over explicitly is next-themes' inline theme script — an inline
-  // script with no nonce is exactly what `script-src` blocks.
-  //
-  // Reading headers() here also opts this tree into per-request rendering,
-  // which a nonce requires: a statically prerendered page would bake a
-  // build-time nonce into its HTML, and that value would never match any
-  // request's CSP — the fix would silently not work in production.
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
-
   return (
     <>
       <html
@@ -139,10 +124,9 @@ export default async function RootLayout({
         <body
           className={`${archivo.variable} ${geistMono.variable} ${outfit.className} antialiased`}
         >
-          <Analytics/>
+          <AnalyticsWrapper />
           <LocalizationProvider>
             <ThemeProvider
-              nonce={nonce}
               attribute="class"
               defaultTheme="system"
               enableSystem

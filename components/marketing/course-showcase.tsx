@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
-import { useQuery } from "convex/react";
+import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { ArrowUpRight, BookOpen } from "lucide-react";
@@ -38,77 +36,65 @@ export function CourseCard({ course }: { course: Doc<"courses"> }) {
         {course.thumbnailUrl ? (
           <Image
             src={course.thumbnailUrl}
-            alt=""
+            alt={course.title}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <span className="display-subheading text-4xl text-muted-foreground/40">
-              {course.title.slice(0, 24)}
-            </span>
+          <div className="absolute inset-0 grid place-items-center">
+            <BookOpen className="h-8 w-8 text-muted-foreground/60" />
           </div>
         )}
-        <span className="absolute left-3 top-3 rounded-sm bg-background/90 px-3 py-1 text-[11px] font-semibold backdrop-blur-sm">
-          {price ? (
-            <span className="tabular">{price}</span>
-          ) : (
-            <span className="text-success">Free</span>
-          )}
-        </span>
+        {course.category ? (
+          <span className="absolute left-3 top-3 rounded-sm bg-background/90 px-2 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground backdrop-blur">
+            {course.category}
+          </span>
+        ) : null}
       </div>
-
       <div className="flex flex-1 flex-col gap-3 p-5">
-        <div className="flex items-center justify-between gap-2">
-          {course.category ? (
-            <span className="text-[11px] font-semibold uppercase tracking-label text-primary">
-              {course.category}
-            </span>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="line-clamp-2 text-lg font-semibold leading-snug tracking-[-0.01em]">
+            {course.title}
+          </h3>
+          {price ? (
+            <span className="shrink-0 text-sm font-semibold">{price}</span>
           ) : (
-            <span />
+            <span className="shrink-0 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Free
+            </span>
           )}
-          <div className="flex items-center gap-1" title={course.level ?? undefined}>
-            {[1, 2, 3].map((n) => (
-              <span
-                key={n}
-                aria-hidden="true"
-                className={`size-1.5 rounded-full ${dots >= n ? "bg-brand" : "bg-rule-strong"}`}
-              />
-            ))}
-          </div>
         </div>
-
-        <h3 className="text-base font-semibold leading-snug text-balance group-hover:text-primary">
-          {course.title}
-        </h3>
-        <p className="line-clamp-2 text-sm text-muted-foreground">{course.description}</p>
-
-        <span className="mt-auto inline-flex items-center gap-1 pt-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
-          View course
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-        </span>
+        <p className="line-clamp-2 text-sm leading-body text-muted-foreground">
+          {course.description}
+        </p>
+        <div className="mt-auto flex items-center justify-between pt-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    i < dots ? "bg-brand" : "bg-rule-strong"
+                  }`}
+                />
+              ))}
+            </span>
+            <span className="capitalize">{course.level || "All levels"}</span>
+          </div>
+          <span className="inline-flex items-center gap-1 transition-transform group-hover:translate-x-0.5">
+            View course
+            <ArrowUpRight className="h-4 w-4" />
+          </span>
+        </div>
       </div>
     </Link>
   );
 }
 
-function CardSkeleton() {
-  return (
-    <div className="flex h-full animate-pulse flex-col overflow-hidden rounded-sm border border-rule bg-card">
-      <div className="aspect-[16/10] bg-surface-sunken" />
-      <div className="space-y-3 p-5">
-        <div className="h-3 w-16 rounded-sm bg-surface-sunken" />
-        <div className="h-4 w-3/4 rounded-sm bg-surface-sunken" />
-        <div className="h-3 w-full rounded-sm bg-surface-sunken" />
-      </div>
-    </div>
-  );
-}
-
 function CatalogEmptyState() {
   return (
-    <div className="col-span-full border border-rule bg-card">
+    <div className="sm:col-span-2 lg:col-span-3">
       <EmptyState
         icon={BookOpen}
         tone="brand"
@@ -124,9 +110,40 @@ function CatalogEmptyState() {
   );
 }
 
-export function CourseShowcase() {
-  const courses = useQuery(api.courses.listPublishedCourses);
-  const featured = courses?.slice(0, 6);
+function CardSkeleton() {
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-sm border border-rule bg-card">
+      <div className="aspect-[16/10] animate-pulse bg-surface-sunken" />
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="h-5 w-2/3 animate-pulse rounded-sm bg-surface-sunken" />
+          <div className="h-4 w-14 animate-pulse rounded-sm bg-surface-sunken" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 w-full animate-pulse rounded-sm bg-surface-sunken" />
+          <div className="h-3 w-4/5 animate-pulse rounded-sm bg-surface-sunken" />
+        </div>
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <div className="h-3 w-24 animate-pulse rounded-sm bg-surface-sunken" />
+          <div className="h-3 w-20 animate-pulse rounded-sm bg-surface-sunken" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export async function CourseShowcase() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  let courses: Doc<"courses">[] = [];
+  if (url) {
+    try {
+      const client = new ConvexHttpClient(url);
+      courses = (await client.query(api.courses.listPublishedCourses, {})) ?? [];
+    } catch {
+      courses = [];
+    }
+  }
+  const featured = courses.slice(0, 6);
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-20 md:py-28">
@@ -138,10 +155,7 @@ export function CourseShowcase() {
       </Reveal>
 
       <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {courses === undefined &&
-          Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
-
-        {courses !== undefined && featured && featured.length > 0 && (
+        {featured.length > 0 && (
           <>
             {featured.map((course, i) => (
               <Reveal key={course._id} delay={(i % 3) * 90}>
@@ -151,13 +165,11 @@ export function CourseShowcase() {
           </>
         )}
 
-        {courses !== undefined && courses.length === 0 && <CatalogEmptyState />}
+        {featured.length === 0 && <CatalogEmptyState />}
       </div>
 
-      {courses !== undefined && courses.length > 6 && (
+      {courses.length > 6 && (
         <div className="mt-10 flex justify-center">
-          {/* Same intent, same label as the hero's primary. The old copy here
-              was "Browse all 24 courses", a third label for one destination. */}
           <Link
             href="/courses"
             className="inline-flex h-11 items-center justify-center rounded-sm border border-rule-strong px-6 text-sm font-medium transition-colors hover:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

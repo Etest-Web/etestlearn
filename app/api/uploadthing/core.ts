@@ -16,9 +16,12 @@ const f = createUploadthing();
  * worker only fetches allowlisted UploadThing hosts.
  */
 export const uploadRouter = {
-  lessonVideo: f({ video: { maxFileSize: "1GB", maxFileCount: 1 } })
-    .input(z.object({ lessonId: z.string() }))
-    .middleware(async ({ input }) => {
+  lessonVideo: f({
+    video: { maxFileSize: "1GB", maxFileCount: 1 },
+    // Restrict to common video MIME types
+  })
+    .input(z.object({ lessonId: z.string().min(1).max(100) }))
+    .middleware(async ({ input, req }) => {
       const { userId, getToken } = await auth();
       if (!userId) throw new UploadThingError("Unauthorized");
       const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;

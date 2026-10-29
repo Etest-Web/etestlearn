@@ -53,7 +53,7 @@ function CoursesWrapper() {
                   Every course in this catalog is hand-picked and reviewed before it goes
                   live — no filler, no outdated tutorials. Whether you're starting a
                   <strong>graphic design course</strong> to build a portfolio, a
-                  <strong>web development course</strong> to switch careers, or a
+                  <strong>web development course</strong> to switch careers, or a 
                   <strong>data analysis course</strong> to level up at work, you'll
                   find structured lessons, real assessments, and the price in naira shown
                   before you enroll.

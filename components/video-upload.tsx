@@ -34,6 +34,20 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Client-side validation
+    const allowedTypes = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/ogg"];
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith("video/")) {
+      setErrorModal({ open: true, message: "Only video files are allowed." });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const maxSize = 1024 * 1024 * 1024; // 1GB
+    if (file.size > maxSize) {
+      setErrorModal({ open: true, message: "File exceeds 1GB limit." });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     setProgressPercent(5);
     setStatusMessage("Requesting secure upload URL…");

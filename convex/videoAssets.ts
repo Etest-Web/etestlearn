@@ -76,6 +76,13 @@ export const registerSource = mutation({
     if (args.sourceFileKey.length === 0 || args.sourceFileKey.length > 256) {
       throw new Error("Invalid upload reference");
     }
+    // Sanitize URL
+    try {
+      const url = new URL(args.sourceFileUrl);
+      if (url.protocol !== "https:") throw new Error("Invalid upload source");
+    } catch {
+      throw new Error("Invalid upload source");
+    }
 
     const now = Date.now();
     const assetId = await ctx.db.insert("videoAssets", {

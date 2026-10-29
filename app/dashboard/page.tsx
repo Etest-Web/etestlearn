@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/dashboard-shell";
 import { AnnouncementBanner } from "@/components/announcement-banner";
+import { ActivityHeatmap } from "@/components/activity-heatmap";
 
 const DashboardWeeklyChart = dynamic(
   () =>
@@ -103,6 +104,10 @@ export default function DashboardPage() {
   const userGoals = useQuery(
     api.goals.getUserGoals,
     dbUser ? { activeOnly: true } : "skip",
+  );
+  const dailyActivity = useQuery(
+    api.statistics.getDailyActivity,
+    dbUser ? { days: 365 } : "skip",
   );
 
   // Loading state. `!ready` covers the mode cookie as well as the queries —
@@ -540,6 +545,18 @@ export default function DashboardPage() {
               <div className="eyebrow">Study</div>
             </div >
           </div >
+        </Card>
+
+        {/* Learning activity heatmap */}
+        <Card>
+          <CardTitle className="mb-4 flex items-center gap-2">
+            <Flame className="w-5 h-5 text-brand" />
+            Learning activity
+          </CardTitle>
+          <div className="overflow-x-auto">
+            <ActivityHeatmap data={dailyActivity ?? []} days={365} />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Glowing dots show daily learning activity over last year.</p>
         </Card>
       </div >
     </PageShell>

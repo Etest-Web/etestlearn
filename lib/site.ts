@@ -3,7 +3,7 @@ export const siteConfig = {
     tagline: "Learn skills that move you forward",
     description:
         "Glypha Learn is an online learning platform offering expert-led courses with quizzes, certificates, and verified completion — built for learners across Nigeria and beyond.",
-    url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://learn.glypha.com.ng",
     // The static fallback image, for structured data only —
     // `buildCourseSchema` uses it when a course has no thumbnail. It is NOT
     // the OpenGraph card any more: the share cards are generated per route by

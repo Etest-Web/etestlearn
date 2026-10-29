@@ -298,6 +298,30 @@ export const getWeeklyActivityChart = query({
   },
 });
 
+export const getDailyActivity = query({
+  args: { days: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const days = Math.min(Math.max(args.days ?? 365, 7), 365);
+    const since = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const activities = await ctx.db
+      .query("learningActivities")
+      .withIndex("by_user_created", (q) => q.eq("userId", user._id))
+      .filter((q) => q.gte(q.field("createdAt"), since))
+      .collect();
+
+    const map = new Map<string, number>();
+    for (const a of activities) {
+      const d = new Date(a.createdAt);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+
+    return Array.from(map.entries()).map(([date, count]) => ({ date, count }));
+  },
+});
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function calculateCurrentStreak(ctx: ReadCtx, userId: Id<"users">): Promise<number> {

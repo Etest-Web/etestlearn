@@ -14,6 +14,7 @@ import { settleSale } from "../lib/settlement";
 import { applyDiscount, chargedAmountFor } from "../lib/referrals";
 import { formatNaira } from "../lib/instructor-earnings";
 import { resolveCoupon, type ResolvedCoupon } from "./helpers/couponPricing";
+import { requireRateLimit } from "./helpers/rateLimit";
 
 /**
  * References to `internal.referrals.*`, built by hand.
@@ -97,6 +98,7 @@ export const createPendingPurchase = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     if (!user) throw new Error("User record not found");
+    await requireRateLimit(ctx, `purchase:${user._id}`, 5, 60 * 60 * 1000);
 
     const course = await ctx.db.get(args.courseId);
     if (!course || !course.published) throw new Error("Course not found");

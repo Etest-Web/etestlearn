@@ -380,19 +380,27 @@ describe("certificate access control", () => {
         userId: ids.studentId,
         courseId: ids.articleCourseId,
       }),
-    ).rejects.toThrow(/Not authorized/);
+    ).rejects.toThrow(/Not authorized|Instructors cannot issue certificates manually/);
   });
 
-  test("the owning instructor can issue manually, revoke, and reinstate", async () => {
+  test("the owning instructor cannot issue manually, but can revoke, and reinstate", async () => {
     const t = convexTest(testSchema, modules);
     const ids = await seedWorld(t);
 
     const instructor = as(t, "clerk_instructor");
+    const admin = as(t, "clerk_admin");
     await as(t, "clerk_student").mutation(api.enrollments.enrollInCourse, {
       courseId: ids.articleCourseId,
     });
 
-    await instructor.mutation(api.certificates.issueCertificateForLearner, {
+    await expect(
+      instructor.mutation(api.certificates.issueCertificateForLearner, {
+        userId: ids.studentId,
+        courseId: ids.articleCourseId,
+      }),
+    ).rejects.toThrow(/Instructors cannot issue certificates manually/);
+
+    await admin.mutation(api.certificates.issueCertificateForLearner, {
       userId: ids.studentId,
       courseId: ids.articleCourseId,
     });
@@ -438,7 +446,7 @@ describe("certificate access control", () => {
     const ids = await seedWorld(t);
 
     await expect(
-      as(t, "clerk_instructor").mutation(
+      as(t, "clerk_admin").mutation(
         api.certificates.issueCertificateForLearner,
         { userId: ids.studentId, courseId: ids.articleCourseId },
       ),
@@ -544,11 +552,12 @@ describe("privileged certificate actions are audited", () => {
     const ids = await seedWorld(t);
 
     const instructor = as(t, "clerk_instructor");
+    const admin = as(t, "clerk_admin");
     await as(t, "clerk_student").mutation(api.enrollments.enrollInCourse, {
       courseId: ids.articleCourseId,
     });
 
-    await instructor.mutation(api.certificates.issueCertificateForLearner, {
+    await admin.mutation(api.certificates.issueCertificateForLearner, {
       userId: ids.studentId,
       courseId: ids.articleCourseId,
     });
@@ -571,7 +580,10 @@ describe("privileged certificate actions are audited", () => {
         "certificate.reinstate",
       ]),
     );
-    expect(rows.every((row) => row.actorId === ids.instructorId)).toBe(true);
+    const issueRow = rows.find((r) => r.action === "certificate.issue_override");
+    expect(issueRow?.actorId).toBe(ids.adminId);
+    const otherRows = rows.filter((r) => r.action !== "certificate.issue_override");
+    expect(otherRows.every((row) => row.actorId === ids.instructorId)).toBe(true);
     expect(rows.every((row) => row.targetId === cert._id)).toBe(true);
     expect(rows.every((row) => row.targetType === "certificate")).toBe(true);
 

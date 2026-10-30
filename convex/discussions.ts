@@ -40,7 +40,7 @@ export const listMessagesForThread = query({
         const author = await ctx.db.get(m.userId);
         return {
           ...m,
-          authorName: author?.name ?? author?.email ?? null,
+          authorName: author?.name?.trim() || "Learner",
         };
       }),
     );

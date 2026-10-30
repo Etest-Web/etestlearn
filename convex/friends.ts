@@ -13,6 +13,7 @@ import {
   type WriteCtx,
 } from "./helpers/auth";
 import {
+  EMAIL_MATCH_RANK,
   clampCount,
   compareSearchResults,
   displayName,
@@ -465,23 +466,24 @@ export const searchUsers = query({
       candidate: UserDoc;
     }> = [];
     for (const candidate of scanned) {
+      if (candidate.suspendedAt !== undefined) continue;
       if (excluded.has(candidate._id)) continue;
       const rank = searchMatchRank(candidate, term);
       if (rank === null) continue;
       matches.push({
         rank,
         name: displayName(candidate),
-        email: candidate.email ?? null,
+        email: rank >= EMAIL_MATCH_RANK ? candidate.email ?? null : null,
         candidate,
       });
     }
 
     matches.sort(compareSearchResults);
 
-    return matches.slice(0, limit).map(({ candidate }) => ({
+    return matches.slice(0, limit).map(({ candidate, rank }) => ({
       _id: candidate._id,
       name: displayName(candidate),
-      email: candidate.email ?? null,
+      email: rank >= EMAIL_MATCH_RANK ? candidate.email ?? null : null,
       imageUrl: candidate.imageUrl ?? null,
       role: candidate.role,
     }));

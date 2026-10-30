@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { computeProgress } from "../lib/progress";
 import { createNotification } from "./helpers/notifications";
 import { getCurrentUser, requireUser } from "./helpers/auth";
+import { requireRateLimit } from "./helpers/rateLimit";
 
 // Called by hand rather than through `internal` from `_generated/api`, which
 // does not list the email modules until codegen has run. The wire names are the
@@ -27,6 +28,7 @@ export const enrollInCourse = mutation({
     }
 
     const user = await requireUser(ctx);
+    await requireRateLimit(ctx, `enroll:${user._id}`, 10, 60 * 60 * 1000);
 
     const existing = await ctx.db
       .query("enrollments")

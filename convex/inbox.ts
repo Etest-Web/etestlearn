@@ -855,6 +855,7 @@ export const searchPeople = query({
     for (const candidate of candidates) {
       // Talking to yourself is rejected by `startThread`; do not offer it.
       if (candidate._id === user._id) continue;
+      if (candidate.suspendedAt !== undefined) continue;
       if (!(candidate.name ?? "").toLowerCase().includes(term)) continue;
       matches.push({
         ...toPersonSummary(candidate),
@@ -887,7 +888,9 @@ export const startThread = mutation({
     }
 
     const recipient = await ctx.db.get(args.recipientId);
-    if (!recipient) throw new Error("That person is no longer on this platform");
+    if (!recipient || recipient.suspendedAt !== undefined) {
+      throw new Error("That person is no longer on this platform");
+    }
 
     // `dmThreads` has no index on the (userA, userB) pair, so an existing thread
     // is found by scanning the caller's own side of the index — which the picker

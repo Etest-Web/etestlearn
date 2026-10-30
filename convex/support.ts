@@ -171,6 +171,16 @@ export const createTicket = mutation({
       throw new Error("All fields are required");
     }
 
+    if (trimmedName.length > 100) {
+      throw new Error("Name must be 100 characters or less");
+    }
+    if (trimmedSubject.length > 200) {
+      throw new Error("Subject must be 200 characters or less");
+    }
+    if (trimmedMessage.length > 10000) {
+      throw new Error("Message must be 10000 characters or less");
+    }
+
     if (isDisposableEmail(trimmedEmail)) {
       throw new Error("Please use a permanent email address");
     }
@@ -383,6 +393,14 @@ export const replyTicket = mutation({
 
     const trimmedBody = args.body.trim();
     if (!trimmedBody) throw new Error("Reply cannot be empty");
+    if (trimmedBody.length > 5000) {
+      throw new Error("Reply must be 5000 characters or less");
+    }
+
+    const rateLimitKey = user
+      ? `support:replyTicket:${user._id}`
+      : `support:replyTicket:${ticket.email.toLowerCase()}`;
+    await requireRateLimit(ctx, rateLimitKey, 15, 60 * 60 * 1000);
 
     let senderName = "User";
     if (user) {

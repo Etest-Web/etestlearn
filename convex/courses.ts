@@ -239,6 +239,19 @@ export const getCourseById = query({
   },
 });
 
+function validatePriceAndCurrency(price?: number, currency?: string): void {
+  if (price !== undefined) {
+    if (!Number.isFinite(price) || !Number.isInteger(price) || price < 0 || price > 500_000_000) {
+      throw new Error("Price must be a non-negative whole number of kobo up to ₦5,000,000");
+    }
+  }
+  if (currency !== undefined && currency.trim() !== "") {
+    if (!/^[A-Z]{3}$/.test(currency.trim())) {
+      throw new Error("Currency must be a valid 3-letter uppercase code (e.g. NGN)");
+    }
+  }
+}
+
 export const createCourse = mutation({
   args: {
     title: v.string(),
@@ -259,6 +272,8 @@ export const createCourse = mutation({
     if (user.role !== "instructor" && user.role !== "admin") {
       throw new Error("Not authorized to create courses");
     }
+
+    validatePriceAndCurrency(args.price, args.currency);
 
     const slug = await requireAvailableSlug(ctx, args.slug);
 
@@ -323,6 +338,8 @@ export const updateCourse = mutation({
     if (course.instructorId !== user._id && user.role !== "admin") {
       throw new Error("Not authorized to update this course");
     }
+
+    validatePriceAndCurrency(args.price, args.currency);
 
     const updates: any = {};
     if (args.title !== undefined) updates.title = args.title;

@@ -137,15 +137,26 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const { user, course } = await requireCourseManager(ctx, args.courseId);
 
-    // Instructors are limited to a maximum of 30% off on percentage coupons.
+    // Instructors are limited to a maximum of 30% off (percent or fixed amount).
     // Admins may create larger discounts.
-    if (user.role === "instructor" && args.kind === "percent") {
-      if (
-        typeof args.percentOff !== "number" ||
-        !Number.isFinite(args.percentOff) ||
-        args.percentOff > 30
-      ) {
-        throw new Error("Instructors may only create coupons for up to 30% off.");
+    if (user.role === "instructor") {
+      if (args.kind === "percent") {
+        if (
+          typeof args.percentOff !== "number" ||
+          !Number.isFinite(args.percentOff) ||
+          args.percentOff > 30
+        ) {
+          throw new Error("Instructors may only create coupons for up to 30% off.");
+        }
+      } else if (args.kind === "amount" && course.price && course.price > 0) {
+        const maxAmountOff = Math.floor(course.price * 0.3);
+        if (
+          typeof args.amountOffKobo !== "number" ||
+          !Number.isFinite(args.amountOffKobo) ||
+          args.amountOffKobo > maxAmountOff
+        ) {
+          throw new Error("Instructors may only create coupons for up to 30% off the course price.");
+        }
       }
     }
 

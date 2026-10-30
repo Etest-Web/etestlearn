@@ -53,6 +53,7 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  keywords: siteConfig.keywords,
   // The application name and the author are two more places a search engine
   // can read the site's name from. `application-name` in particular is one of
   // the few machine-readable statements of "what is this site called" that
@@ -61,6 +62,35 @@ export const metadata: Metadata = {
   authors: [{ name: siteConfig.name, url: siteConfig.url }],
   creator: siteConfig.name,
   publisher: siteConfig.name,
+  category: "education",
+  classification: "Online Learning Platform",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/SmallLogo.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/SmallLogo.svg" }],
+  },
+  verification: {
+    google: "wFwCJGycYcPHfP8xZ3zVFS9bCobqpYTcgpJH4tS2Q_s",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   openGraph: {
     type: "website",
     siteName: siteConfig.name,
@@ -87,6 +117,7 @@ export const metadata: Metadata = {
     // back to `opengraph-image.tsx` for the twitter card when none exists.
     // Site handle — lets Twitter/X know who owns the account.
     site: "@glypha_learn",
+    creator: "@glypha_learn",
   },
 };
 

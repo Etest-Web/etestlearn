@@ -6,7 +6,10 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { siteConfig } from "@/lib/site";
 import { isConvexId } from "@/lib/instructors";
 import JsonLd from "@/components/seo/jsonld";
-import { buildInstructorProfileSchema } from "@/components/seo/schemas";
+import {
+  buildBreadcrumbsSchema,
+  buildInstructorProfileSchema,
+} from "@/components/seo/schemas";
 
 /**
  * Metadata for a public instructor profile.
@@ -98,15 +101,25 @@ export default async function InstructorProfileLayout({
     <>
       {instructor && (
         <JsonLd
-          schema={buildInstructorProfileSchema({
-            instructorId,
-            name: instructor.name,
-            bio: instructor.bio,
-            imageUrl: instructor.imageUrl,
-            website: instructor.website,
-            ratingSum: instructor.instructorRatingSum,
-            ratingCount: instructor.instructorRatingCount,
-          })}
+          schema={[
+            buildInstructorProfileSchema({
+              instructorId,
+              name: instructor.name,
+              bio: instructor.bio,
+              imageUrl: instructor.imageUrl,
+              website: instructor.website,
+              ratingSum: instructor.instructorRatingSum,
+              ratingCount: instructor.instructorRatingCount,
+            }),
+            buildBreadcrumbsSchema(
+              [
+                { name: "Home", url: "/" },
+                { name: "Instructors", url: "/courses" },
+                { name: instructor.name, url: `/instructors/${instructorId}` },
+              ],
+              `${siteConfig.url}/instructors/${instructorId}#breadcrumb`
+            ),
+          ]}
           id="instructor-schema"
         />
       )}

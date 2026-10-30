@@ -18,4 +18,20 @@ export const siteConfig = {
     // product: an actual Glypha certificate, which is also what the hero
     // shows.
     ogImage: "/certf.jpeg",
+    keywords: [
+        "online courses",
+        "online learning Nigeria",
+        "e-learning platform",
+        "tech skills",
+        "programming courses",
+        "business courses",
+        "verified certificates",
+        "digital skills training",
+        "quizzes and assessments",
+        "Glypha Learn",
+    ],
+    links: {
+        twitter: "https://twitter.com/glypha_learn",
+        linkedin: "https://linkedin.com/company/glypha-learn",
+    },
 };

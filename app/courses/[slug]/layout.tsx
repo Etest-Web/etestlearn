@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { siteConfig } from "@/lib/site";
 import JsonLd from "@/components/seo/jsonld";
 import {
@@ -35,8 +35,17 @@ async function loadCourse(slug: string): Promise<Doc<"courses">> {
   return course;
 }
 
+async function loadInstructorName(instructorId: Id<"users">): Promise<string | undefined> {
+  try {
+    const card = await client.query(api.instructors.getInstructorCard, { instructorId });
+    return card?.name || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The shape the schema builders take, from the document the query returned. */
-function toCourseMeta(course: Doc<"courses">): CourseMeta {
+function toCourseMeta(course: Doc<"courses">, instructorName?: string): CourseMeta {
   return {
     title: course.title,
     description: course.description,
@@ -50,6 +59,8 @@ function toCourseMeta(course: Doc<"courses">): CourseMeta {
       : undefined,
     ratingSum: course.ratingSum,
     ratingCount: course.ratingCount,
+    instructorName,
+    instructorId: course.instructorId,
   };
 }
 
@@ -105,7 +116,8 @@ export default async function CourseDetailLayout({
 }) {
   const { slug } = await params;
   const course = await loadCourse(slug);
-  const courseMeta = toCourseMeta(course);
+  const instructorName = await loadInstructorName(course.instructorId);
+  const courseMeta = toCourseMeta(course, instructorName);
 
   return (
     <>

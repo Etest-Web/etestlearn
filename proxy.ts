@@ -252,6 +252,7 @@ const isPublicRoute = createRouteMatcher([
   '/robots.txt',
   '/sitemap.xml',
   '/manifest.json',
+  '/manifest.webmanifest',
   '/llms.txt',
   // Public form endpoint — see the route-map above. Without this entry
   // auth.protect() would 401 it for signed-out applicants.

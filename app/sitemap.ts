@@ -6,10 +6,32 @@ import { siteConfig } from "@/lib/site";
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date();
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: siteConfig.url, changeFrequency: "weekly", priority: 1 },
-    { url: `${siteConfig.url}/courses`, changeFrequency: "daily", priority: 0.9 },
-    { url: `${siteConfig.url}/become-instructor`, changeFrequency: "monthly", priority: 0.5 },
+    {
+      url: siteConfig.url,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 1.0,
+    },
+    {
+      url: `${siteConfig.url}/courses`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${siteConfig.url}/become-instructor`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${siteConfig.url}/support`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
   ];
 
   try {
@@ -26,11 +48,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...staticRoutes,
       ...courses.map((course) => ({
         url: `${siteConfig.url}/courses/${course.slug}`,
+        lastModified: new Date(course.updatedAt ?? course.createdAt ?? Date.now()),
         changeFrequency: "weekly" as const,
         priority: 0.8,
       })),
       ...instructorIds.map((instructorId) => ({
         url: `${siteConfig.url}/instructors/${instructorId}`,
+        lastModified: now,
         changeFrequency: "weekly" as const,
         priority: 0.6,
       })),

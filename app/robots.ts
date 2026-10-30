@@ -7,9 +7,21 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard/", "/sign-in", "/sign-up"],
+        disallow: [
+          "/dashboard",
+          "/dashboard/",
+          "/api/",
+          "/sign-in",
+          "/sign-in/",
+          "/sign-up",
+          "/sign-up/",
+          "/sso-callback",
+          "/courses/paid/",
+          "/maintenance",
+        ],
       },
     ],
     sitemap: `${siteConfig.url}/sitemap.xml`,
+    host: siteConfig.url,
   };
 }

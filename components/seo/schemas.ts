@@ -29,6 +29,13 @@ export interface CourseMeta {
   publishedDate?: string;
   ratingSum?: number;
   ratingCount?: number;
+  instructorName?: string;
+  instructorId?: string;
+}
+
+export interface BreadcrumbItem {
+  name: string;
+  url: string;
 }
 
 export interface InstructorMeta {
@@ -181,7 +188,23 @@ export function buildCourseSchema(course: CourseMeta): SchemaOrg {
       ? new URL(course.thumbnailUrl, siteConfig.url).href
       : `${siteConfig.url}${siteConfig.ogImage}`,
     inLanguage: "en",
-    courseMode: "recorded",
+    courseMode: "Online",
+    hasCourseInstance: {
+      "@type": "CourseInstance",
+      courseMode: "Online",
+      ...(course.level ? { courseWorkload: `Level: ${course.level}` } : {}),
+    },
+    ...(course.instructorName
+      ? {
+          instructor: {
+            "@type": "Person",
+            name: course.instructorName,
+            ...(course.instructorId
+              ? { url: `${siteConfig.url}/instructors/${course.instructorId}` }
+              : {}),
+          },
+        }
+      : {}),
     ...(course.category ? { category: course.category, subject: course.category } : {}),
     ...(course.level
       ? {
@@ -219,31 +242,81 @@ export function buildCourseSchema(course: CourseMeta): SchemaOrg {
   };
 }
 
-export function buildBreadcrumbSchema(course: CourseMeta): SchemaOrg {
+export function buildBreadcrumbsSchema(
+  items: readonly BreadcrumbItem[],
+  id?: string
+): SchemaOrg {
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    "@id": `${siteConfig.url}/courses/${course.slug}#breadcrumb`,
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: siteConfig.url,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Courses",
-        item: `${siteConfig.url}/courses`,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: course.title,
-        item: `${siteConfig.url}/courses/${course.slug}`,
-      },
+    ...(id ? { "@id": id } : {}),
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url.startsWith("http")
+        ? item.url
+        : `${siteConfig.url}${item.url.startsWith("/") ? item.url : `/${item.url}`}`,
+    })),
+  };
+}
+
+export function buildBreadcrumbSchema(course: CourseMeta): SchemaOrg {
+  return buildBreadcrumbsSchema(
+    [
+      { name: "Home", url: "/" },
+      { name: "Courses", url: "/courses" },
+      { name: course.title, url: `/courses/${course.slug}` },
     ],
+    `${siteConfig.url}/courses/${course.slug}#breadcrumb`
+  );
+}
+
+export function buildCourseCatalogSchema(
+  courses: readonly { title: string; slug: string; description?: string }[]
+): SchemaOrg {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${siteConfig.url}/courses#catalog`,
+    name: `Courses on ${siteConfig.name}`,
+    description: "Explore our full catalog of expert-led online courses with quizzes and certificates.",
+    url: `${siteConfig.url}/courses`,
+    numberOfItems: courses.length,
+    itemListElement: courses.slice(0, 50).map((c, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: c.title,
+      url: `${siteConfig.url}/courses/${c.slug}`,
+    })),
+  };
+}
+
+export function buildSupportPageSchema(): SchemaOrg {
+  const url = `${siteConfig.url}/support`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    "@id": `${url}#contactpage`,
+    url,
+    name: `Help & Support — ${siteConfig.name}`,
+    description: "Contact Glypha Learn support team or track your existing support ticket.",
+    isPartOf: { "@id": WEBSITE_ID },
+    about: { "@id": ORGANIZATION_ID },
+  };
+}
+
+export function buildTeachPageSchema(): SchemaOrg {
+  const url = `${siteConfig.url}/become-instructor`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: `Teach on ${siteConfig.name} — Become an Instructor`,
+    description: "Join Glypha Learn as an instructor. Create online courses, reach thousands of learners, and earn revenue.",
+    isPartOf: { "@id": WEBSITE_ID },
+    about: { "@id": ORGANIZATION_ID },
   };
 }
 

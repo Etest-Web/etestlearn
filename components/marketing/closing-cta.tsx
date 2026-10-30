@@ -70,6 +70,9 @@ export function ClosingCta() {
             <Link href="/become-instructor" className="link-quiet">
               Teach
             </Link>
+            <Link href="/support" className="link-quiet">
+              Support
+            </Link>
             <Link href="/sign-in" className="link-quiet">
               Sign in
             </Link>

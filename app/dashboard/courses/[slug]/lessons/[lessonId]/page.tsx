@@ -38,12 +38,14 @@ function LessonContent({
   lessonId,
   isCompleted,
   onWatchedEnough,
+  contentFormat,
 }: {
   contentType: string;
   content?: string;
   lessonId: Id<"lessons">;
   isCompleted: boolean;
   onWatchedEnough: () => void;
+  contentFormat?: "markdown" | "html";
 }) {
   const assetState = useQuery(
     api.videoAssets.getAssetStatus,
@@ -121,7 +123,14 @@ function LessonContent({
     // `overflow-x-auto` keeps a wide GFM table or a long code line inside
     // it, which the typography plugin does not do on its own.
     <div className="overflow-x-auto prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      {contentFormat === "html" ? (
+        <div
+          className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      ) : (
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      )}
     </div>
   );
 }
@@ -223,10 +232,11 @@ export default function LessonPage() {
     setIsMarking(true);
     try {
       await completeLesson({ courseId: course._id, lessonId: activeLesson._id });
+      toast.success("Congratulations!");
       if (next) {
         router.push(lessonHref(next));
       } else {
-        toast.success("You've reached the end of this course 🎉");
+        toast.success("Congratulations! You've reached the end of this course 🎉");
         router.push(`/dashboard/courses/${course.slug}`);
       }
     } catch (err) {
@@ -307,7 +317,7 @@ export default function LessonPage() {
               onWatchedEnough={() => {
                 // 90% watched counts as done — no navigation, the toast + progress.
                 completeLesson({ courseId: course._id, lessonId: lesson._id }).then(
-                  () => toast.success("Lesson completed"),
+                  () => toast.success("Congratulations!"),
                   (err) => toast.error(getErrorMessage(err, "Failed to update progress")),
                 );
               }}

@@ -68,7 +68,7 @@ export function buildOrganizationSchema(): SchemaOrg {
     "@type": ["Organization", "EducationalOrganization"],
     "@id": ORGANIZATION_ID,
     name: siteConfig.name,
-    alternateName: "Glypha",
+    alternateName: ["Glypha", "learn.glypha.com.ng"],
     description: siteConfig.description,
     url: siteConfig.url,
     logo: {
@@ -104,7 +104,7 @@ export function buildWebSiteSchema(): SchemaOrg {
     "@type": "WebSite",
     "@id": WEBSITE_ID,
     name: siteConfig.name,
-    alternateName: "Glypha",
+    alternateName: ["Glypha", "learn.glypha.com.ng"],
     url: siteConfig.url,
     description: siteConfig.description,
     inLanguage: "en",

@@ -260,6 +260,8 @@ export default defineSchema({
     // `videoAssetId` is set the lesson plays from the encrypted HLS ladder
     // served through `videoAssets` and `content` is ignored by the player.
     videoAssetId: v.optional(v.id("videoAssets")),
+    // Content format for article lessons: "markdown" | "html". Default "markdown".
+    contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
     createdAt: v.number(),
   }).index("by_course_order", ["courseId", "order"])
     .index("by_video_asset", ["videoAssetId"]),

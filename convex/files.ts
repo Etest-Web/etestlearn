@@ -14,6 +14,47 @@ export const generateUploadUrl = mutation({
   },
 });
 
+export const generateArticleImageUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    await requireRateLimit(ctx, `article-image-upload:${identity.subject}`, 20, 60_000);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+const ARTICLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export const validateArticleImageUpload = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const meta = await ctx.db.system.get(args.storageId);
+    if (!meta) {
+      throw new Error("Uploaded file not found");
+    }
+
+    if (meta.size > ARTICLE_IMAGE_MAX_BYTES) {
+      throw new Error(
+        `Image is too large (${Math.round(meta.size / 1024)} KB). Maximum is ${Math.round(ARTICLE_IMAGE_MAX_BYTES / (1024 * 1024))} MB.`,
+      );
+    }
+
+    if (!meta.contentType?.startsWith("image/")) {
+      throw new Error("Only image files are allowed");
+    }
+
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
 const DEFAULT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 // Validates an uploaded file against its stored metadata (real size + MIME

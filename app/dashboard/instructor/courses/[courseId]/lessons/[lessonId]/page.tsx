@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui";
 import { Input } from "@/components/ui";
 import { Textarea } from "@/components/ui";
@@ -26,8 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useRef } from "react";
-import { ArrowLeft, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { VideoUpload } from "@/components/video-upload";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +60,8 @@ export default function LessonEditPage() {
   const createQuiz = useMutation(api.quizzes.createQuiz);
   const deleteQuizQuestion = useMutation(api.quizzes.deleteQuizQuestion);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const generateArticleImageUploadUrl = useMutation(api.files.generateArticleImageUploadUrl);
+  const validateArticleImageUpload = useMutation(api.files.validateArticleImageUpload);
   const registerLessonAttachment = useMutation(api.lessonAttachments.registerLessonAttachment);
   const deleteLessonAttachment = useMutation(api.lessonAttachments.deleteLessonAttachment);
   const listLessonAttachments = useQuery(
@@ -124,6 +125,7 @@ export default function LessonEditPage() {
     contentType: "video" as "video" | "article" | "quiz",
     durationMinutes: "",
     content: "", // For article/video url
+    contentFormat: "markdown" as "markdown" | "html",
   });
 
   const lesson = courseData?.lessons?.find((l) => l._id === lessonId);
@@ -135,6 +137,7 @@ export default function LessonEditPage() {
         contentType: lesson.contentType as "video" | "article" | "quiz",
         durationMinutes: lesson.durationMinutes?.toString() || "",
         content: lesson.content || "",
+        contentFormat: (lesson.contentFormat as "markdown" | "html") || "markdown",
       });
     }
   }, [lesson]);
@@ -155,6 +158,7 @@ export default function LessonEditPage() {
         durationMinutes: formData.durationMinutes ? parseInt(formData.durationMinutes) : undefined,
         content: formData.content,
         videoStorageId: uploadedVideoStorageId ? (uploadedVideoStorageId as Id<"_storage">) : undefined,
+        contentFormat: formData.contentFormat,
       });
       toast.success("Lesson updated successfully");
     } catch (error) {
@@ -361,43 +365,140 @@ export default function LessonEditPage() {
             )}
 
             {formData.contentType === "article" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="content">Article Content (Markdown)</Label>
-                {/* Write and Preview are two views of the same text, so they get
-                    the `segmented` variant rather than a section rule. */}
-                <Tabs defaultValue="write">
-                  <TabsList variant="segmented" className="touch-target">
-                    <TabsTrigger value="write">Write</TabsTrigger>
-                    <TabsTrigger value="preview">Preview</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="write">
-                    <Textarea
-                      id="content"
-                      name="content"
-                      rows={15}
-                      placeholder="# Hello World&#10;&#10;Write your article here using markdown."
-                      value={formData.content}
-                      onChange={handleChange}
-                      className="font-mono text-sm"
-                    />
-                  </TabsContent>
-                  <TabsContent value="preview">
-                    {/* The preview box scrolls rather than pushing the card
-                        sideways: `overflow-x-auto` keeps a wide GFM table or a
-                        long code line inside it. */}
-                    {formData.content.trim() ? (
-                      <div className="min-h-[240px] overflow-x-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {formData.content}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <div className="flex min-h-[240px] items-center justify-center border border-rule text-sm text-muted-foreground">
-                        Nothing to preview yet — start writing in the Write tab.
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="contentFormat">Content Format</Label>
+                  <RadioGroup
+                    value={formData.contentFormat}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, contentFormat: value as "markdown" | "html" }))}
+                    className="flex items-center gap-4"
+                  >
+                    <RadioGroupItem value="markdown" className="flex items-center gap-1.5">
+                      <Code2 className="h-4 w-4" />
+                      Markdown
+                    </RadioGroupItem>
+                    <RadioGroupItem value="html" className="flex items-center gap-1.5">
+                      <LayoutDashboard className="h-4 w-4" />
+                      HTML
+                    </RadioGroupItem>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="content">
+                    Article Content ({formData.contentFormat === "html" ? "HTML" : "Markdown"})
+                  </Label>
+                  {/* Write and Preview are two views of the same text, so they get
+                      the `segmented` variant rather than a section rule. */}
+                  <Tabs defaultValue="write">
+                    <TabsList variant="segmented" className="touch-target">
+                      <TabsTrigger value="write">Write</TabsTrigger>
+                      <TabsTrigger value="preview">Preview</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="write">
+                      {formData.contentFormat === "markdown" ? (
+                        <Textarea
+                          id="content"
+                          name="content"
+                          rows={15}
+                          placeholder="# Hello World&#10;&#10;Write your article here using markdown."
+                          value={formData.content}
+                          onChange={handleChange}
+                          className="font-mono text-sm"
+                        />
+                      ) : (
+                        <div className="space-y-2">
+                          <Textarea
+                            id="content"
+                            name="content"
+                            rows={15}
+                            placeholder="&lt;h1&gt;Hello World&lt;/h1&gt;&#10;&#10;Write your article here using HTML."
+                            value={formData.content}
+                            onChange={handleChange}
+                            className="font-mono text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                const postUrl = await generateArticleImageUploadUrl({});
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "image/*";
+                                input.onchange = async (e) => {
+                                  const file = (e.target as HTMLInputElement).files?.[0];
+                                  if (!file) return;
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    return toast.error("Image must be under 5 MB");
+                                  }
+                                  if (!file.type.startsWith("image/")) {
+                                    return toast.error("Only image files are allowed");
+                                  }
+                                  setIsUploadingVideo(true);
+                                  try {
+                                    const res = await fetch(postUrl, {
+                                      method: "POST",
+                                      headers: { "Content-Type": file.type },
+                                      body: file,
+                                    });
+                                    if (!res.ok) throw new Error("Upload failed");
+                                    const { storageId } = (await res.json()) as { storageId: string };
+                                    const imageUrl = await validateArticleImageUpload({
+                                      storageId: storageId as Id<"_storage">,
+                                    });
+                                    // Insert image tag at cursor position
+                                    const textarea = document.getElementById("content") as HTMLTextAreaElement;
+                                    const imgTag = `<img src="${imageUrl}" alt="" style="max-width: 100%; height: auto;" />`;
+                                    const start = textarea.selectionStart;
+                                    const end = textarea.selectionEnd;
+                                    const newContent = formData.content.slice(0, start) + imgTag + formData.content.slice(end);
+                                    setFormData((prev) => ({ ...prev, content: newContent }));
+                                    toast.success("Image inserted");
+                                  } catch {
+                                    toast.error("Image upload failed");
+                                  } finally {
+                                    setIsUploadingVideo(false);
+                                  }
+                                };
+                                input.click();
+                              }}
+                              disabled={isUploadingVideo}
+                            >
+                              <Image className="h-3.5 w-3.5" />
+                              Insert Image
+                            </Button>
+                            {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
+                          </div>
+                        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="preview">
+                      {/* The preview box scrolls rather than pushing the card
+                          sideways: `overflow-x-auto` keeps a wide GFM table or a
+                          long code line inside it. */}
+                      {formData.content.trim() ? (
+                        <div className="min-h-[240px] overflow-x-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
+                          {formData.contentFormat === "markdown" ? (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {formData.content}
+                            </ReactMarkdown>
+                          ) : (
+                            <div
+                              className="prose prose-sm dark:prose-invert max-w-none"
+                              dangerouslySetInnerHTML={{ __html: formData.content }}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex min-h-[240px] items-center justify-center border border-rule text-sm text-muted-foreground">
+                          Nothing to preview yet — start writing in the Write tab.
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
               </div>
             )}
 
@@ -500,41 +601,7 @@ export default function LessonEditPage() {
           {/* Lesson attachments — instructors upload files students can download. */}
           <Card variant="sunken" size="sm" className="gap-3 space-y-2">
             <h2 className="eyebrow">Attachments</h2>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const input = e.target.elements.namedItem("attachment") as HTMLInputElement | null;
-                const file = input?.files?.[0];
-                if (!file) return;
-                if (file.size > 25 * 1024 * 1024) {
-                  return toast.error("File must be under 25 MB");
-                }
-                setIsUploadingVideo(true);
-                try {
-                  const postUrl = await generateUploadUrl({});
-                  const res = await fetch(postUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": file.type },
-                    body: file,
-                  });
-                  if (!res.ok) throw new Error("Upload failed");
-                  const { storageId } = (await res.json()) as { storageId: string };
-                  await registerLessonAttachment({
-                    lessonId: lessonId as Id<"lessons">,
-                    storageId: storageId as Id<"_storage">,
-                    fileName: file.name,
-                    mimeType: file.type,
-                    sizeBytes: file.size,
-                  });
-                } catch {
-                  toast.error("Attachment upload failed");
-                } finally {
-                  setIsUploadingVideo(false);
-                  if (input) input.value = "";
-                }
-              }}
-              className="flex items-center gap-2"
-            >
+            <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 rounded border border-rule bg-surface-raised px-2 py-1 text-sm cursor-pointer hover:bg-surface-raised/80">
                 <Upload className="h-3.5 w-3.5" />
                 Upload attachment
@@ -543,11 +610,41 @@ export default function LessonEditPage() {
                   type="file"
                   accept="*/*"
                   className="sr-only"
-                  onChange={(e) => e.target.files?.length && e.target.form?.requestSubmit()}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 25 * 1024 * 1024) {
+                      return toast.error("File must be under 25 MB");
+                    }
+                    setIsUploadingVideo(true);
+                    try {
+                      const postUrl = await generateUploadUrl({});
+                      const res = await fetch(postUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": file.type },
+                        body: file,
+                      });
+                      if (!res.ok) throw new Error("Upload failed");
+                      const { storageId } = (await res.json()) as { storageId: string };
+                      await registerLessonAttachment({
+                        lessonId: lessonId as Id<"lessons">,
+                        storageId: storageId as Id<"_storage">,
+                        fileName: file.name,
+                        mimeType: file.type,
+                        sizeBytes: file.size,
+                      });
+                      toast.success("Attachment uploaded");
+                    } catch {
+                      toast.error("Attachment upload failed");
+                    } finally {
+                      setIsUploadingVideo(false);
+                      if (e.target instanceof HTMLInputElement) e.target.value = "";
+                    }
+                  }}
                 />
               </label>
               {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
-            </form>
+            </div>
 
             {(listLessonAttachments ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">No attachments yet.</p>

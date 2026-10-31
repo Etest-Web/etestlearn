@@ -417,6 +417,7 @@ export const updateLesson = mutation({
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
     videoStorageId: v.optional(v.id("_storage")),
+    contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -448,6 +449,9 @@ export const updateLesson = mutation({
       if (args.content && lesson.videoAssetId) {
         updates.videoAssetId = undefined;
       }
+    }
+    if (args.contentFormat !== undefined) {
+      updates.contentFormat = args.contentFormat;
     }
 
     await ctx.db.patch(args.lessonId, updates);

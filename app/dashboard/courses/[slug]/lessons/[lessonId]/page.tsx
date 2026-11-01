@@ -29,6 +29,7 @@ import {
   HelpCircle,
   Loader2,
   Lock,
+  Presentation,
   Video as VideoIcon,
 } from "lucide-react";
 
@@ -39,6 +40,8 @@ function LessonContent({
   isCompleted,
   onWatchedEnough,
   contentFormat,
+  presentationStorageId,
+  presentationFileName,
 }: {
   contentType: string;
   content?: string;
@@ -46,11 +49,14 @@ function LessonContent({
   isCompleted: boolean;
   onWatchedEnough: () => void;
   contentFormat?: "markdown" | "html";
+  presentationStorageId?: Id<"_storage"> | null;
+  presentationFileName?: string | null;
 }) {
   const assetState = useQuery(
     api.videoAssets.getAssetStatus,
     contentType === "video" ? { lessonId } : "skip",
   );
+  const getFileUrl = useQuery(api.files.getFileUrl, presentationStorageId ? { storageId: presentationStorageId } : "skip");
 
   if (contentType === "quiz") {
     return null;
@@ -105,6 +111,43 @@ function LessonContent({
       );
     }
     return <VideoPlayer src={content} title="Lesson video" />;
+  }
+
+  // presentation
+  if (contentType === "presentation") {
+    if (!presentationStorageId) {
+      return (
+        <EmptyState
+          icon={Presentation}
+          title="No presentation yet"
+          description="The presentation for this lesson hasn't been uploaded yet."
+        />
+      );
+    }
+    return (
+      <Card variant="sunken" size="sm" className="gap-3">
+        <div className="flex items-center gap-2">
+          <Presentation className="h-4 w-4 shrink-0" />
+          <span className="text-sm truncate min-w-0">
+            {presentationFileName ?? "Presentation"}
+          </span>
+        </div>
+        <Button
+          onClick={async () => {
+            try {
+              const url = getFileUrl as string | null | undefined;
+              if (!url) return toast.error("Could not prepare download");
+              window.open(url, "_blank", "noopener,noreferrer");
+            } catch {
+              toast.error("Could not prepare download");
+            }
+          }}
+          disabled={getFileUrl === undefined}
+        >
+          <Download className="h-4 w-4" /> Download presentation
+        </Button>
+      </Card>
+    );
   }
 
   // article
@@ -265,6 +308,7 @@ export default function LessonPage() {
           <Badge variant="secondary" className="capitalize gap-1">
             {lesson.contentType === "video" && <VideoIcon className="h-3 w-3" />}
             {lesson.contentType === "article" && <FileText className="h-3 w-3" />}
+            {lesson.contentType === "presentation" && <Presentation className="h-3 w-3" />}
             {lesson.contentType === "quiz" && <HelpCircle className="h-3 w-3" />}
             {lesson.contentType}
           </Badge>
@@ -321,6 +365,8 @@ export default function LessonPage() {
                   (err) => toast.error(getErrorMessage(err, "Failed to update progress")),
                 );
               }}
+              presentationStorageId={(lesson as any).presentationStorageId ?? undefined}
+              presentationFileName={(lesson as any).presentationFileName ?? undefined}
             />
           )}
 

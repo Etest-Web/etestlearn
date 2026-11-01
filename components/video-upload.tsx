@@ -123,6 +123,7 @@ export function VideoUpload({ lessonId }: { lessonId: Id<"lessons"> }) {
         lessonId,
         content: streamUrl,
         contentType: "video",
+        videoFileName: file.name,
       });
 
       setProgressPercent(100);

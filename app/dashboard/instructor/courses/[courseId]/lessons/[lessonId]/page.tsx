@@ -119,14 +119,47 @@ export default function LessonEditPage() {
       if (videoInputRef.current) videoInputRef.current.value = "";
     }
   }
+
+  async function handlePresentationUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const MAX = 50 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error("Presentation must be under 50 MB");
+      return;
+    }
+    setIsUploadingVideo(true);
+    try {
+      const postUrl = await generateUploadUrl({});
+      const res = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = (await res.json()) as { storageId: string };
+      setUploadedPresentationStorageId(storageId);
+      setFormData((prev) => ({ ...prev, presentationFileName: file.name }));
+      toast.success("Presentation uploaded — save to attach it to the lesson");
+    } catch {
+      toast.error("Presentation upload failed. Please try again.");
+    } finally {
+      setIsUploadingVideo(false);
+      if (presentationInputRef.current) presentationInputRef.current.value = "";
+    }
+  }
   
   const [formData, setFormData] = useState({
     title: "",
-    contentType: "video" as "video" | "article" | "quiz",
+    contentType: "video" as "video" | "article" | "quiz" | "presentation",
     durationMinutes: "",
     content: "", // For article/video url
     contentFormat: "markdown" as "markdown" | "html",
+    videoFileName: "",
+    presentationFileName: "",
   });
+  const [uploadedPresentationStorageId, setUploadedPresentationStorageId] = useState<string | null>(null);
+  const presentationInputRef = useRef<HTMLInputElement>(null);
 
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
 
@@ -136,10 +169,12 @@ export default function LessonEditPage() {
     if (lesson) {
       setFormData({
         title: lesson.title,
-        contentType: lesson.contentType as "video" | "article" | "quiz",
+        contentType: lesson.contentType as "video" | "article" | "quiz" | "presentation",
         durationMinutes: lesson.durationMinutes?.toString() || "",
         content: lesson.content || "",
         contentFormat: (lesson.contentFormat as "markdown" | "html") || "markdown",
+        videoFileName: lesson.videoFileName || "",
+        presentationFileName: (lesson as any).presentationFileName || "",
       });
     }
   }, [lesson]);
@@ -160,7 +195,10 @@ export default function LessonEditPage() {
         durationMinutes: formData.durationMinutes ? parseInt(formData.durationMinutes) : undefined,
         content: formData.content,
         videoStorageId: uploadedVideoStorageId ? (uploadedVideoStorageId as Id<"_storage">) : undefined,
+        videoFileName: formData.videoFileName,
         contentFormat: formData.contentFormat,
+        presentationStorageId: uploadedPresentationStorageId ? (uploadedPresentationStorageId as Id<"_storage">) : undefined,
+        presentationFileName: formData.presentationFileName || undefined,
       });
       toast.success("Lesson updated successfully");
     } catch (error) {
@@ -321,7 +359,7 @@ export default function LessonEditPage() {
               <Label htmlFor="contentType">Content Type</Label>
               <Select
                 value={formData.contentType}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" }))}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" | "presentation" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -345,6 +383,12 @@ export default function LessonEditPage() {
                       <span>Quiz</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="presentation">
+                    <div className="flex items-center gap-2">
+                      <File className="h-4 w-4" />
+                      <span>Presentation</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -361,7 +405,53 @@ export default function LessonEditPage() {
                     value={formData.content}
                     onChange={handleChange}
                   />
+                  {formData.videoFileName && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
+                      <File className="h-4 w-4" />
+                      <span className="font-medium">Uploaded file:</span>
+                      <span className="truncate max-w-xs font-mono text-xs" title={formData.videoFileName}>
+                        {formData.videoFileName}
+                      </span>
+                    </div>
+                  )}
                   <p className="text-xs leading-[1.5] text-muted-foreground">Automatically filled when uploading above, or paste an external video link.</p>
+                </div>
+              </div>
+            )}
+
+            {formData.contentType === "presentation" && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Presentation File</Label>
+                  <input
+                    type="file"
+                    accept=".ppt,.pptx,.pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf"
+                    className="hidden"
+                    ref={presentationInputRef}
+                    onChange={handlePresentationUpload}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => presentationInputRef.current?.click()}
+                      disabled={isUploadingVideo}
+                    >
+                      {isUploadingVideo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                      Upload Presentation
+                    </Button>
+                    {uploadedPresentationStorageId && <span className="text-xs text-muted-foreground">Ready to save</span>}
+                  </div>
+                  {(formData.presentationFileName || (lesson as any).presentationFileName) && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
+                      <File className="h-4 w-4" />
+                      <span className="font-medium">Attached:</span>
+                      <span className="truncate max-w-xs font-mono text-xs" title={formData.presentationFileName || (lesson as any).presentationFileName}>
+                        {formData.presentationFileName || (lesson as any).presentationFileName}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-xs leading-[1.5] text-muted-foreground">Upload PPT, PPTX, or PDF. Students can download it from the lesson page.</p>
                 </div>
               </div>
             )}

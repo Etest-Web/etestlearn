@@ -86,7 +86,7 @@ export default function CourseEditPage() {
   
   const [newLessonData, setNewLessonData] = useState({
     title: "",
-    contentType: "video" as "video" | "article" | "quiz",
+    contentType: "video" as "video" | "article" | "quiz" | "presentation",
   });
 
   const [formData, setFormData] = useState({
@@ -278,6 +278,7 @@ export default function CourseEditPage() {
       case "video": return <Video className="h-4 w-4" />;
       case "article": return <FileText className="h-4 w-4" />;
       case "quiz": return <HelpCircle className="h-4 w-4" />;
+      case "presentation": return <FileText className="h-4 w-4" />;
       default: return <FileText className="h-4 w-4" />;
     }
   };
@@ -634,7 +635,7 @@ export default function CourseEditPage() {
                           <Label htmlFor="lesson-type">Content Type</Label>
                           <Select
                             value={newLessonData.contentType}
-                            onValueChange={(value) => setNewLessonData({ ...newLessonData, contentType: value as "video" | "article" | "quiz" })}
+                            onValueChange={(value) => setNewLessonData({ ...newLessonData, contentType: value as "video" | "article" | "quiz" | "presentation" })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select type" />
@@ -656,6 +657,12 @@ export default function CourseEditPage() {
                                 <div className="flex items-center gap-2">
                                   <HelpCircle className="h-4 w-4" />
                                   <span>Quiz</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="presentation">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4" />
+                                  <span>Presentation</span>
                                 </div>
                               </SelectItem>
                             </SelectContent>

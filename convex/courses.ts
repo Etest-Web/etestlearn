@@ -380,7 +380,7 @@ export const createLesson = mutation({
   args: {
     courseId: v.id("courses"),
     title: v.string(),
-    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz")),
+    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation")),
     order: v.number(),
   },
   handler: async (ctx, args) => {
@@ -412,11 +412,14 @@ export const updateLesson = mutation({
   args: {
     lessonId: v.id("lessons"),
     title: v.optional(v.string()),
-    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"))),
+    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"))),
     order: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
     videoStorageId: v.optional(v.id("_storage")),
+    presentationStorageId: v.optional(v.id("_storage")),
+    presentationFileName: v.optional(v.string()),
+    videoFileName: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
   },
   handler: async (ctx, args) => {
@@ -452,6 +455,15 @@ export const updateLesson = mutation({
     }
     if (args.contentFormat !== undefined) {
       updates.contentFormat = args.contentFormat;
+    }
+    if (args.presentationStorageId !== undefined) {
+      updates.presentationStorageId = args.presentationStorageId;
+    }
+    if (args.presentationFileName !== undefined) {
+      updates.presentationFileName = args.presentationFileName;
+    }
+    if (args.videoFileName !== undefined) {
+      updates.videoFileName = args.videoFileName;
     }
 
     await ctx.db.patch(args.lessonId, updates);

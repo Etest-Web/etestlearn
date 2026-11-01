@@ -250,7 +250,8 @@ export default defineSchema({
     contentType: v.union(
       v.literal("video"),
       v.literal("article"),
-      v.literal("quiz")
+      v.literal("quiz"),
+      v.literal("presentation")
     ),
     order: v.number(),
     durationMinutes: v.optional(v.number()),
@@ -260,8 +261,13 @@ export default defineSchema({
     // `videoAssetId` is set the lesson plays from the encrypted HLS ladder
     // served through `videoAssets` and `content` is ignored by the player.
     videoAssetId: v.optional(v.id("videoAssets")),
+    // Optional presentation file stored in Convex storage.
+    presentationStorageId: v.optional(v.id("_storage")),
+    presentationFileName: v.optional(v.string()),
     // Content format for article lessons: "markdown" | "html". Default "markdown".
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
+    // Original video filename when uploaded via Publit.io, preserved for display
+    videoFileName: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_course_order", ["courseId", "order"])
     .index("by_video_asset", ["videoAssetId"]),

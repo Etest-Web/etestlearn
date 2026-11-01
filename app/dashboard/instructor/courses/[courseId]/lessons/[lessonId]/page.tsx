@@ -396,26 +396,28 @@ export default function LessonEditPage() {
             {formData.contentType === "video" && (
               <div className="space-y-4">
                 <VideoUpload lessonId={lessonId as Id<"lessons">} />
-                <div className="space-y-1.5">
-                  <Label htmlFor="content">Video URL</Label>
-                  <Input
-                    id="content"
-                    name="content"
-                    placeholder="https://... (or YouTube, Vimeo, direct MP4)"
-                    value={formData.content}
-                    onChange={handleChange}
-                  />
-                  {formData.videoFileName && (
-                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
-                      <File className="h-4 w-4" />
-                      <span className="font-medium">Uploaded file:</span>
-                      <span className="truncate max-w-xs font-mono text-xs" title={formData.videoFileName}>
-                        {formData.videoFileName}
-                      </span>
-                    </div>
-                  )}
-                  <p className="text-xs leading-[1.5] text-muted-foreground">Automatically filled when uploading above, or paste an external video link.</p>
-                </div>
+                {!formData.videoFileName && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="content">Video URL</Label>
+                    <Input
+                      id="content"
+                      name="content"
+                      placeholder="https://... (or YouTube, Vimeo, direct MP4)"
+                      value={formData.content}
+                      onChange={handleChange}
+                    />
+                    <p className="text-xs leading-[1.5] text-muted-foreground">Paste an external video link.</p>
+                  </div>
+                )}
+                {formData.videoFileName && (
+                  <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
+                    <File className="h-4 w-4" />
+                    <span className="font-medium">Uploaded file:</span>
+                    <span className="truncate max-w-xs font-mono text-xs" title={formData.videoFileName}>
+                      {formData.videoFileName}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

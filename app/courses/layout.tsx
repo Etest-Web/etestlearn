@@ -9,14 +9,14 @@ import {
 } from "@/components/seo/schemas";
 
 export const metadata: Metadata = {
-  title: "Explore Courses",
+  title: "Explore Design & Creative Courses",
   description:
-    "Browse published courses across tech, business, and creative skills — free and paid, with quizzes and certificates.",
+    "Browse graphic design, UI/UX, motion graphics, and branding courses — free and paid, with quizzes, certificates, and prices in naira. Built for students in Nigeria and West Africa.",
   alternates: { canonical: "/courses" },
   openGraph: {
-    title: "Explore Courses | Glypha Learn",
+    title: "Explore Design & Creative Courses | Glypha Learn",
     description:
-      "Browse published courses across tech, business, and creative skills — free and paid, with quizzes and certificates.",
+      "Browse graphic design, UI/UX, motion graphics, and branding courses — free and paid, with quizzes, certificates, and prices in naira. Built for students in Nigeria and West Africa.",
     url: `${siteConfig.url}/courses`,
     type: "website",
     siteName: siteConfig.name,
@@ -24,9 +24,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Explore Courses | Glypha Learn",
+    title: "Explore Design & Creative Courses | Glypha Learn",
     description:
-      "Browse published courses across tech, business, and creative skills — free and paid, with quizzes and certificates.",
+      "Browse graphic design, UI/UX, motion graphics, and branding courses — free and paid, with quizzes, certificates, and prices in naira. Built for students in Nigeria and West Africa.",
     site: "@glypha_learn",
     creator: "@glypha_learn",
   },

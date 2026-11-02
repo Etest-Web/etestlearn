@@ -2,7 +2,7 @@ export const siteConfig = {
     name: "Glypha Learn",
     tagline: "Learn skills that move you forward",
     description:
-        "Glypha Learn is an online learning platform offering expert-led courses with quizzes, certificates, and verified completion — built for learners across Nigeria and beyond.",
+        "Glypha Learn is an online learning platform offering expert-led design and creative courses — graphic design, UI/UX, motion graphics, branding — with quizzes, certificates, and verified completion. Built for students across Nigeria and West Africa.",
     url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://learn.glypha.com.ng",
     // The static fallback image, for structured data only —
     // `buildCourseSchema` uses it when a course has no thumbnail. It is NOT
@@ -19,15 +19,22 @@ export const siteConfig = {
     // shows.
     ogImage: "/certf.jpeg",
     keywords: [
-        "online courses",
-        "online learning Nigeria",
-        "e-learning platform",
-        "tech skills",
-        "programming courses",
-        "business courses",
-        "verified certificates",
-        "digital skills training",
-        "quizzes and assessments",
+        "graphic design course Nigeria",
+        "UI/UX design course",
+        "online design courses Africa",
+        "learn graphic design from scratch",
+        "motion graphics course",
+        "brand identity design course",
+        "Figma course for beginners",
+        "digital illustration course",
+        "design course for students Nigeria",
+        "online design school Africa",
+        "design courses in naira",
+        "verified design certificate",
+        "affordable design courses Nigeria",
+        "how to become a graphic designer Nigeria",
+        "best design tools for beginners",
+        "design portfolio for students",
         "Glypha Learn",
     ],
     links: {

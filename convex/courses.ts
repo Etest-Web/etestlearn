@@ -382,6 +382,7 @@ export const createLesson = mutation({
     title: v.string(),
     contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation")),
     order: v.number(),
+    section: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -403,8 +404,143 @@ export const createLesson = mutation({
       title: args.title,
       contentType: args.contentType,
       order: args.order,
+      ...(args.section ? { section: args.section.trim() } : {}),
       createdAt: Date.now(),
     });
+  },
+});
+
+export const bulkCreateLessons = mutation({
+  args: {
+    courseId: v.id("courses"),
+    lessons: v.array(
+      v.object({
+        title: v.string(),
+        contentType: v.union(
+          v.literal("video"),
+          v.literal("article"),
+          v.literal("quiz"),
+          v.literal("presentation"),
+        ),
+        order: v.number(),
+        content: v.optional(v.string()),
+        section: v.optional(v.string()),
+        videoStorageId: v.optional(v.id("_storage")),
+        presentationStorageId: v.optional(v.id("_storage")),
+        presentationFileName: v.optional(v.string()),
+        quiz: v.optional(
+          v.object({
+            title: v.string(),
+            passingScore: v.number(),
+            questions: v.array(
+              v.object({
+                prompt: v.string(),
+                options: v.array(
+                  v.object({ text: v.string(), isCorrect: v.boolean() }),
+                ),
+              }),
+            ),
+          }),
+        ),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    if (user.role !== "instructor" && user.role !== "admin") {
+      throw new Error("Not authorized");
+    }
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course || (course.instructorId !== user._id && user.role !== "admin")) {
+      throw new Error("Not authorized to add lessons to this course");
+    }
+
+    if (args.lessons.length === 0) return [];
+    if (args.lessons.length > 200) {
+      throw new Error("Too many lessons in one batch (max 200)");
+    }
+
+    const created: Id<"lessons">[] = [];
+
+    for (const l of args.lessons) {
+      const title = l.title.trim();
+      if (!title) throw new Error("Lesson title is required");
+
+      // Resolve an uploaded video blob to a playable URL server-side, so the
+      // client never needs a second query per file.
+      let resolvedContent = l.content;
+      if (l.videoStorageId) {
+        const url = await ctx.storage.getUrl(l.videoStorageId);
+        if (url) resolvedContent = url;
+      }
+
+      const lessonId = await ctx.db.insert("lessons", {
+        courseId: args.courseId,
+        title,
+        contentType: l.contentType,
+        order: l.order,
+        ...(resolvedContent ? { content: resolvedContent } : {}),
+        ...(l.section ? { section: l.section.trim() } : {}),
+        ...(l.presentationStorageId
+          ? { presentationStorageId: l.presentationStorageId }
+          : {}),
+        ...(l.presentationFileName
+          ? { presentationFileName: l.presentationFileName }
+          : {}),
+        createdAt: Date.now(),
+      });
+      created.push(lessonId);
+
+      if (l.contentType === "quiz" && l.quiz) {
+        const q = l.quiz;
+        if (
+          !Number.isFinite(q.passingScore) ||
+          q.passingScore < 0 ||
+          q.passingScore > 100
+        ) {
+          throw new Error("passingScore must be a number between 0 and 100");
+        }
+        const quizId = await ctx.db.insert("quizzes", {
+          lessonId,
+          title: q.title.trim() || title,
+          passingScore: q.passingScore,
+          createdAt: Date.now(),
+        });
+        for (const question of q.questions) {
+          const prompt = question.prompt.trim();
+          if (!prompt) continue;
+          const opts = question.options
+            .map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
+            .filter((o) => o.text.length > 0);
+          if (opts.length < 2) continue;
+          const texts = opts.map((o) => o.text.toLowerCase());
+          if (new Set(texts).size !== texts.length) continue;
+          if (!opts.some((o) => o.isCorrect)) opts[0].isCorrect = true;
+
+          const questionId = await ctx.db.insert("quizQuestions", {
+            quizId,
+            prompt,
+            order: (
+              await ctx.db
+                .query("quizQuestions")
+                .withIndex("by_quiz_order", (q2) => q2.eq("quizId", quizId))
+                .collect()
+            ).length,
+          });
+          for (const o of opts) {
+            await ctx.db.insert("quizOptions", {
+              questionId,
+              text: o.text,
+              isCorrect: o.isCorrect,
+            });
+          }
+        }
+      }
+    }
+
+    return created;
   },
 });
 
@@ -421,6 +557,7 @@ export const updateLesson = mutation({
     presentationFileName: v.optional(v.string()),
     videoFileName: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
+    section: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -455,6 +592,10 @@ export const updateLesson = mutation({
     }
     if (args.contentFormat !== undefined) {
       updates.contentFormat = args.contentFormat;
+    }
+    if (args.section !== undefined) {
+      const s = args.section.trim();
+      updates.section = s.length > 0 ? s : undefined;
     }
     if (args.presentationStorageId !== undefined) {
       updates.presentationStorageId = args.presentationStorageId;

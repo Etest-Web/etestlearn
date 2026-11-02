@@ -26,6 +26,7 @@ import { CourseAnnouncementsManager } from "@/components/course-announcements-ma
 import { CourseCouponsManager } from "@/components/course-coupons-manager";
 import { CourseProjectsManager } from "@/components/course-projects-manager";
 import { BulkLessonImport } from "@/components/bulk-lesson-import";
+import { ZipCourseImport } from "@/components/zip-course-import";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -87,6 +88,7 @@ export default function CourseEditPage() {
   const [newLessonData, setNewLessonData] = useState({
     title: "",
     contentType: "video" as "video" | "article" | "quiz" | "presentation",
+    section: "",
   });
 
   const [formData, setFormData] = useState({
@@ -261,10 +263,11 @@ export default function CourseEditPage() {
         title: newLessonData.title,
         contentType: newLessonData.contentType,
         order,
+        ...(newLessonData.section.trim() ? { section: newLessonData.section.trim() } : {}),
       });
       toast.success("Lesson created");
       setIsLessonDialogOpen(false);
-      setNewLessonData({ title: "", contentType: "video" });
+      setNewLessonData({ title: "", contentType: "video", section: "" });
     } catch (error) {
       console.error(error);
       toast.error("Failed to create lesson");
@@ -606,6 +609,7 @@ export default function CourseEditPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <BulkLessonImport courseId={courseData.course._id as Id<"courses">} />
+                  <ZipCourseImport courseId={courseData.course._id as Id<"courses">} />
                 <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
                   <DialogTrigger render={
                     <Button size="sm" type="button">
@@ -629,6 +633,15 @@ export default function CourseEditPage() {
                             value={newLessonData.title}
                             onChange={(e) => setNewLessonData({ ...newLessonData, title: e.target.value })}
                             required
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="lesson-section">Section (optional)</Label>
+                          <Input
+                            id="lesson-section"
+                            value={newLessonData.section}
+                            onChange={(e) => setNewLessonData({ ...newLessonData, section: e.target.value })}
+                            placeholder="e.g. Module 1"
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -698,38 +711,50 @@ export default function CourseEditPage() {
                   }
                 />
               ) : (
-                /* Lessons are a numbered list, so they read as rows separated by
-                   hairlines rather than as a stack of floating cards. */
-                <ol className="list-none divide-y divide-rule border-y border-rule">
-                  {courseData.lessons
-                    .sort((a, b) => a.order - b.order)
-                    .map((lesson, index) => (
-                      <li
-                        key={lesson._id}
-                        className="group flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-surface-sunken"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="tabular w-6 shrink-0 text-sm text-muted-foreground">
-                            {index + 1}.
-                          </span>
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="shrink-0 text-muted-foreground">{getIconForType(lesson.contentType)}</span>
-                            <span className="truncate text-sm font-medium">{lesson.title}</span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <Badge variant="secondary">{lesson.contentType}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/dashboard/instructor/courses/${courseData.course._id}/lessons/${lesson._id}`)}
-                          >
-                            Edit
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                </ol>
+                <div className="space-y-4">
+                  {(() => {
+                    const sorted = [...courseData.lessons].sort((a, b) => a.order - b.order);
+                    const bySection = new Map<string | undefined, typeof sorted>();
+                    for (const l of sorted) {
+                      const key = l.section;
+                      if (!bySection.has(key)) bySection.set(key, []);
+                      bySection.get(key)!.push(l);
+                    }
+                    return [...bySection.entries()].map(([sec, items]) => (
+                      <div key={sec ?? "__none__"}>
+                        {sec && (
+                          <h4 className="mb-2 text-sm font-semibold text-muted-foreground">{sec}</h4>
+                        )}
+                        <ol className="list-none divide-y divide-rule border-y border-rule">
+                          {items.map((lesson) => (
+                            <li
+                              key={lesson._id}
+                              className="group flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-surface-sunken"
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="shrink-0 text-muted-foreground">{getIconForType(lesson.contentType)}</span>
+                                <span className="truncate text-sm font-medium">{lesson.title}</span>
+                                {lesson.section && (
+                                  <Badge variant="outline" className="text-xs">{lesson.section}</Badge>
+                                )}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <Badge variant="secondary">{lesson.contentType}</Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => router.push(`/dashboard/instructor/courses/${courseData.course._id}/lessons/${lesson._id}`)}
+                                >
+                                  Edit
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ));
+                  })()}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -157,6 +157,7 @@ export default function LessonEditPage() {
     contentFormat: "markdown" as "markdown" | "html",
     videoFileName: "",
     presentationFileName: "",
+    section: "",
   });
   const [uploadedPresentationStorageId, setUploadedPresentationStorageId] = useState<string | null>(null);
   const presentationInputRef = useRef<HTMLInputElement>(null);
@@ -175,6 +176,7 @@ export default function LessonEditPage() {
         contentFormat: (lesson.contentFormat as "markdown" | "html") || "markdown",
         videoFileName: lesson.videoFileName || "",
         presentationFileName: (lesson as any).presentationFileName || "",
+        section: (lesson as any).section || "",
       });
     }
   }, [lesson]);
@@ -199,6 +201,7 @@ export default function LessonEditPage() {
         contentFormat: formData.contentFormat,
         presentationStorageId: uploadedPresentationStorageId ? (uploadedPresentationStorageId as Id<"_storage">) : undefined,
         presentationFileName: formData.presentationFileName || undefined,
+        section: formData.section,
       });
       toast.success("Lesson updated successfully");
     } catch (error) {
@@ -338,6 +341,16 @@ export default function LessonEditPage() {
                   value={formData.title}
                   onChange={handleChange}
                   required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="section">Section (optional)</Label>
+                <Input
+                  id="section"
+                  name="section"
+                  value={formData.section}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, section: e.target.value }))}
+                  placeholder="e.g. Module 1"
                 />
               </div>
               <div className="space-y-1.5">

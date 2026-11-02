@@ -266,6 +266,8 @@ export default defineSchema({
     presentationFileName: v.optional(v.string()),
     // Content format for article lessons: "markdown" | "html". Default "markdown".
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
+    // Optional section/group label for curriculum organization.
+    section: v.optional(v.string()),
     // Original video filename when uploaded via Publit.io, preserved for display
     videoFileName: v.optional(v.string()),
     createdAt: v.number(),

@@ -104,7 +104,7 @@ export function buildWebSiteSchema(): SchemaOrg {
     "@type": "WebSite",
     "@id": WEBSITE_ID,
     name: siteConfig.name,
-    alternateName: ["Glypha", "learn.glypha.com.ng"],
+    alternateName: ["Glypha", "Glypha Learn"],
     url: siteConfig.url,
     description: siteConfig.description,
     inLanguage: "en",

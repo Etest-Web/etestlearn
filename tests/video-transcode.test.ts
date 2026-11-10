@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
 import { internal } from "../convex/_generated/api";
-import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import type {
   DataModelFromSchemaDefinition,
@@ -11,6 +10,8 @@ import type {
 } from "convex/server";
 import {
   DEFAULT_TRANSCODE_EVENT_TYPE,
+  MAX_TRANSCODE_ATTEMPTS,
+  canRetryTranscode,
   githubDispatchConfig,
   hlsPrefixOf,
   isAuthorizedTranscodeCall,
@@ -24,6 +25,7 @@ import {
   variantPlaylistKeyOf,
   type TranscodeReport,
 } from "../lib/video-transcode-job";
+import { RAW_SOURCE_RETENTION_MS, rawSourceRetentionCutoff } from "../lib/videos";
 
 /**
  * Phase 3 job invariants.
@@ -258,11 +260,49 @@ describe("transcode job state machine", () => {
     );
   });
 
-  test("claim refuses a failed asset", async () => {
+  test("a failed asset with its raw source can be claimed again", async () => {
+    const t = convexTest(testSchema, modules);
+    const { assetId } = await seedAsset(t, { status: "failed", attempts: 1 });
+
+    const job = await t.mutation(internal.videoTranscodeJobs.claim, { assetId });
+
+    expect(job.attempts).toBe(2);
+    expect(job.rawKey).toBe("raw/asset/source");
+    const asset = await t.run((ctx: TestCtx) => ctx.db.get(assetId));
+    expect(asset?.status).toBe("processing");
+    expect(asset?.errorMessage).toBeUndefined();
+  });
+
+  test("claim refuses a failed asset once the attempt budget is spent", async () => {
+    const t = convexTest(testSchema, modules);
+    const { assetId } = await seedAsset(t, {
+      status: "failed",
+      attempts: MAX_TRANSCODE_ATTEMPTS,
+    });
+    await expect(t.mutation(internal.videoTranscodeJobs.claim, { assetId })).rejects.toThrow(
+      /retry is exhausted/i,
+    );
+  });
+
+  test("claim refuses a failed asset whose raw source is gone", async () => {
     const t = convexTest(testSchema, modules);
     const { assetId } = await seedAsset(t, { status: "failed" });
+    await t.run((ctx: TestCtx) =>
+      ctx.db.patch(assetId, { rawKey: undefined }),
+    );
     await expect(t.mutation(internal.videoTranscodeJobs.claim, { assetId })).rejects.toThrow(
-      /not queued/i,
+      /retry is exhausted|verified raw source/i,
+    );
+  });
+
+  test("claim refuses a failed asset that already published a ladder", async () => {
+    const t = convexTest(testSchema, modules);
+    const { assetId } = await seedAsset(t, { status: "failed" });
+    await t.run((ctx: TestCtx) =>
+      ctx.db.patch(assetId, { masterPlaylistKey: masterPlaylistKeyOf(assetId) }),
+    );
+    await expect(t.mutation(internal.videoTranscodeJobs.claim, { assetId })).rejects.toThrow(
+      /retry is exhausted/i,
     );
   });
 
@@ -302,6 +342,10 @@ describe("transcode job state machine", () => {
     const lesson = await t.run((ctx: TestCtx) => ctx.db.get(lessonId));
     expect(lesson?.videoAssetId).toBe(assetId);
     expect(lesson?.contentType).toBe("video");
+
+    // Retention: the raw source stays so a broken ladder can be rebuilt
+    // without another upload; the daily reaper owns its deletion.
+    expect(asset?.rawKey).toBe("raw/asset/source");
   });
 
   test("complete is idempotent on a ready asset", async () => {
@@ -394,10 +438,58 @@ describe("transcode job state machine", () => {
     const t = convexTest(testSchema, modules);
     const queued = await seedAsset(t, { status: "queued" });
     const ready = await seedAsset(t, { status: "ready" });
+    const retryable = await seedAsset(t, { status: "failed", attempts: 1 });
+    const exhausted = await seedAsset(t, {
+      status: "failed",
+      attempts: MAX_TRANSCODE_ATTEMPTS,
+    });
 
     expect(await t.query(internal.videoTranscodeJobs.jobStatus, { assetId: queued.assetId })).toBe(
       "queued",
     );
     expect(await t.query(internal.videoTranscodeJobs.jobStatus, { assetId: ready.assetId })).toBeNull();
+    expect(
+      await t.query(internal.videoTranscodeJobs.jobStatus, { assetId: retryable.assetId }),
+    ).toBe("failed");
+    expect(
+      await t.query(internal.videoTranscodeJobs.jobStatus, { assetId: exhausted.assetId }),
+    ).toBeNull();
+  });
+});
+
+describe("raw source retention", () => {
+  test("only a failed job with a source and attempts left is retryable", () => {
+    const base = { status: "failed", rawKey: "raw/asset/source", attempts: 1 };
+    expect(canRetryTranscode(base)).toBe(true);
+    expect(canRetryTranscode({ ...base, status: "ready" })).toBe(false);
+    expect(canRetryTranscode({ ...base, rawKey: undefined })).toBe(false);
+    expect(canRetryTranscode({ ...base, masterPlaylistKey: "hls/asset/master.m3u8" })).toBe(false);
+    expect(canRetryTranscode({ ...base, attempts: MAX_TRANSCODE_ATTEMPTS })).toBe(false);
+  });
+
+  test("the retention cutoff is one month behind now", () => {
+    expect(RAW_SOURCE_RETENTION_MS).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(rawSourceRetentionCutoff(1_000_000_000)).toBe(1_000_000_000 - RAW_SOURCE_RETENTION_MS);
+  });
+
+  test("the reaper query lists ready and failed assets past retention", async () => {
+    const t = convexTest(testSchema, modules);
+    const now = Date.now();
+    const expired = await seedAsset(t, { status: "ready" });
+    const fresh = await seedAsset(t, { status: "ready" });
+    const failedOld = await seedAsset(t, { status: "failed" });
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(expired.assetId, { updatedAt: now - RAW_SOURCE_RETENTION_MS - 1 });
+      await ctx.db.patch(failedOld.assetId, { updatedAt: now - RAW_SOURCE_RETENTION_MS - 1 });
+    });
+
+    const rows = await t.query(internal.videoAssets.listExpiredRawSources, {
+      cutoff: rawSourceRetentionCutoff(now),
+    });
+    expect(rows.map((row) => row.assetId).sort()).toEqual(
+      [expired.assetId, failedOld.assetId].sort(),
+    );
+    expect(rows.every((row) => row.rawKey === "raw/asset/source")).toBe(true);
+    expect(rows.some((row) => row.assetId === fresh.assetId)).toBe(false);
   });
 });

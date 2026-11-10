@@ -29,6 +29,35 @@ export const DEFAULT_TRANSCODE_EVENT_TYPE = "video-transcode";
 export const MAX_TRANSCODE_DURATION_SECONDS = 12 * 60 * 60;
 
 /**
+ * How many times a failed job may be claimed. A retry is the same asset with
+ * the same key and IV, so the cap exists to stop a broken runner from burning
+ * storage forever — not to protect the ladder, which was never served.
+ */
+export const MAX_TRANSCODE_ATTEMPTS = 3;
+
+/** The fields the retry decision reads; a subset of a `videoAssets` row. */
+export type TranscodeRetryCandidate = {
+  status: string;
+  masterPlaylistKey?: string;
+  rawKey?: string;
+  attempts?: number;
+};
+
+/**
+ * A `failed` asset is retryable while it still has its raw source, never
+ * produced a ladder, and has attempts left. A served (`ready`) asset is not
+ * covered here: rebuilding one would change the ciphertext the CDN caches.
+ */
+export function canRetryTranscode(asset: TranscodeRetryCandidate): boolean {
+  return (
+    asset.status === "failed" &&
+    asset.masterPlaylistKey === undefined &&
+    asset.rawKey !== undefined &&
+    (asset.attempts ?? 0) < MAX_TRANSCODE_ATTEMPTS
+  );
+}
+
+/**
  * The B2 ladder. Variant numbers are folder names under the asset prefix, so
  * they are part of the Worker contract and must stay 0 and 1.
  */

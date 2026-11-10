@@ -4,6 +4,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
+  canRetryTranscode,
   hlsPrefixOf,
   isIvHex,
   randomIvHex,
@@ -21,7 +22,8 @@ import type { TranscodeReport } from "../lib/video-transcode-job";
  * completion or failure. Three rules keep a re-run from corrupting a served
  * video:
  *
- *   · `claim` accepts `queued` and an idempotent `processing` retry, and
+ *   · `claim` accepts `queued`, an idempotent `processing` retry, and a
+ *     `failed` asset that still has its raw source and attempts left, and
  *     refuses `ready` outright. A ladder that players already received must
  *     never be rebuilt: the AES key is already in the playlists.
  *   · The IV is minted once, at the first claim, and reused by every retry.
@@ -33,7 +35,7 @@ import type { TranscodeReport } from "../lib/video-transcode-job";
 const jobStatusRef = makeFunctionReference<
   "query",
   { assetId: Id<"videoAssets"> },
-  "queued" | "processing" | null
+  "queued" | "processing" | "failed" | null
 >("videoTranscodeJobs:jobStatus");
 
 /** The asset fields a worker needs, read in the same transaction as the claim. */
@@ -53,8 +55,16 @@ export const claim = internalMutation({
     if (asset.status === "ready") {
       throw new Error("Video is already transcoded; refusing to rebuild a served ladder");
     }
-    if (asset.status !== "queued" && asset.status !== "processing") {
-      throw new Error("Video is not queued for transcoding");
+    if (
+      asset.status !== "queued" &&
+      asset.status !== "processing" &&
+      !canRetryTranscode(asset)
+    ) {
+      throw new Error(
+        asset.status === "failed"
+          ? "Video retry is exhausted or its raw source is gone"
+          : "Video is not queued for transcoding",
+      );
     }
     if (asset.rawKey === undefined || asset.sizeBytes === undefined) {
       throw new Error("Video has no verified raw source");
@@ -131,7 +141,6 @@ export const complete = internalMutation({
       throw new Error("Video is not being transcoded");
     }
     const replacedAssetId = asset.replacesAssetId;
-    const rawKey = asset.rawKey;
 
     const report: TranscodeReport = {
       durationSeconds: args.durationSeconds,
@@ -163,9 +172,9 @@ export const complete = internalMutation({
       variantPlaylistKeys: args.variantPlaylistKeys,
       errorMessage: undefined,
       transcodeProgress: 100,
-      // Raw source is deleted by the Phase 5 cleanup action scheduled below;
-      // clearing the reference here keeps a retry from re-fetching it.
-      rawKey: undefined,
+      // The raw source is deliberately kept (see `RAW_SOURCE_RETENTION_MS`):
+      // it is the only way to rebuild this ladder without another upload, so
+      // `reapRawSources` deletes it a month from now, not here.
       uploadId: undefined,
       updatedAt: now,
     });
@@ -174,14 +183,8 @@ export const complete = internalMutation({
       contentType: "video",
     });
 
-    // Phase 5: delete the raw source now that the ladder is served, and sweep
-    // the HLS objects + row of the asset this one replaced.
-    if (rawKey) {
-      await ctx.scheduler.runAfter(0, internal.videoStorage.deleteRawSource, {
-        assetId: args.assetId.toString(),
-        rawKey,
-      });
-    }
+    // Phase 5: sweep the HLS objects + row of the asset this one replaced. The
+    // new asset's own raw source stays until retention expires.
     if (replacedAssetId) {
       const old = await ctx.db.get(replacedAssetId);
       if (old) {
@@ -210,8 +213,8 @@ export const complete = internalMutation({
 /**
  * Record a dead job. `ready` is refused rather than tolerated: marking a
  * served ladder failed would hide a working video from learners over a
- * retryable runner error. Re-running a failed job is not supported — the
- * instructor uploads again and the new asset gets a fresh key and IV.
+ * retryable runner error. A failure is not final — `claim` accepts the row
+ * again while the raw source and attempt budget remain.
  */
 export const fail = internalMutation({
   args: {
@@ -266,17 +269,24 @@ export const setProgress = internalMutation({
 });
 
 /**
- * The dispatch guard: only a queued or in-flight job is worth sending to
- * GitHub. Reads the row directly so the action does not need the full claim
- * payload.
+ * The dispatch guard: only work worth sending to GitHub. Reads the row
+ * directly so the action does not need the full claim payload. A `failed`
+ * asset is reported while it is retryable, so re-dispatching the workflow is
+ * a genuine retry rather than a no-op.
  */
 export const jobStatus = internalQuery({
   args: { assetId: v.id("videoAssets") },
-  returns: v.union(v.literal("queued"), v.literal("processing"), v.null()),
+  returns: v.union(
+    v.literal("queued"),
+    v.literal("processing"),
+    v.literal("failed"),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
     const asset = await ctx.db.get(args.assetId);
     if (!asset) return null;
     if (asset.status === "queued" || asset.status === "processing") return asset.status;
+    if (canRetryTranscode(asset)) return "failed" as const;
     return null;
   },
 });

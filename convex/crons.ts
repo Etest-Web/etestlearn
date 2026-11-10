@@ -18,4 +18,13 @@ crons.interval(
   {},
 );
 
+// Daily retention sweep: a ready asset's raw source is kept for 30 days so
+// its ladder can be rebuilt without another upload, then deleted.
+crons.daily(
+  "reap-video-raw-sources",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.videoStorage.reapRawSources,
+  {},
+);
+
 export default crons;

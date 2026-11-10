@@ -238,6 +238,19 @@ export function rawKeyOf(assetId: string): string {
   return `raw/${assetId}/source`;
 }
 
+/**
+ * How long a ready asset keeps its raw source. The ladder is what learners
+ * stream, but the raw object is the only way to rebuild it without asking the
+ * instructor for another upload — so it outlives completion by a month and the
+ * daily reaper in `convex/videoStorage.ts` owns the deletion.
+ */
+export const RAW_SOURCE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Assets whose `updatedAt` is older than this are past retention. */
+export function rawSourceRetentionCutoff(now = Date.now()): number {
+  return now - RAW_SOURCE_RETENTION_MS;
+}
+
 /** Every status the B2 flow (plus its legacy ladder) can hold. */
 export type RawUploadStatus =
   | "pending"

@@ -686,6 +686,36 @@ export const listStaleAwaitingUploads = internalQuery({
 });
 
 /**
+ * Internal: list assets whose raw source is past retention. `ready` rows keep
+ * theirs for a month so a broken ladder can be rebuilt; `failed` rows keep
+ * theirs for the same window so a retry is possible, then both are swept.
+ * Read-only, so a test can assert the cutoff without touching B2.
+ */
+export const listExpiredRawSources = internalQuery({
+  args: { cutoff: v.number() },
+  returns: v.array(
+    v.object({
+      assetId: v.id("videoAssets"),
+      rawKey: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const expired: Array<{ assetId: Id<"videoAssets">; rawKey: string }> = [];
+    for (const status of ["ready", "failed"] as const) {
+      const rows = await ctx.db
+        .query("videoAssets")
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .collect();
+      for (const row of rows) {
+        if (row.rawKey === undefined || row.updatedAt >= args.cutoff) continue;
+        expired.push({ assetId: row._id, rawKey: row.rawKey });
+      }
+    }
+    return expired;
+  },
+});
+
+/**
  * Internal: DB-only reconciliation of stale `awaiting_upload` rows. Marks any
  * row older than the cutoff as failed. B2-side abort is the action's job; this
  * exists so a mutation-only caller (or a test) can drive the state machine.

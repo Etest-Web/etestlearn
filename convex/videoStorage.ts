@@ -46,6 +46,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
+  RAW_SOURCE_RETENTION_MS,
   RAW_UPLOAD_PART_SIZE_BYTES,
   SIGN_URL_TTL_SECONDS,
   fingerprintError,
@@ -695,6 +696,37 @@ export const sweepHlsPrefix = internalAction({
       } while (continuationToken);
     } catch {
       // Best effort: a failed sweep leaves unreferenced objects for the next run.
+    }
+    return { deleted };
+  },
+});
+
+/**
+ * Retention reaper: delete raw sources once `RAW_SOURCE_RETENTION_MS` has
+ * passed since completion or failure. The ladder is what learners stream; the
+ * source is only kept long enough to rebuild or retry it, so this runs daily
+ * rather than at completion. Reuses `deleteRawSource` so the B2 delete and the
+ * `rawKey` clear stay in one place; a failure leaves the row for tomorrow.
+ */
+export const reapRawSources = internalAction({
+  args: { olderThanMs: v.optional(v.number()) },
+  returns: v.object({ deleted: v.number() }),
+  handler: async (ctx, args): Promise<{ deleted: number }> => {
+    const cutoff = Date.now() - (args.olderThanMs ?? RAW_SOURCE_RETENTION_MS);
+    const expired = await ctx.runQuery(internal.videoAssets.listExpiredRawSources, {
+      cutoff,
+    });
+    let deleted = 0;
+    for (const row of expired) {
+      try {
+        const result = await ctx.runAction(internal.videoStorage.deleteRawSource, {
+          assetId: row.assetId.toString(),
+          rawKey: row.rawKey,
+        });
+        if (result.deleted) deleted += 1;
+      } catch {
+        // Best effort; the next run retries the same row.
+      }
     }
     return { deleted };
   },

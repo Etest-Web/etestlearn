@@ -396,14 +396,6 @@ async function removeUploadedObjects(client, bucket, assetId, files) {
 }
 
 
-async function deleteRawSource(client, bucket, rawKey) {
-  if (!rawKey) return;
-  await client
-    .send(new DeleteObjectCommand({ Bucket: bucket, Key: rawKey }))
-    .catch(() => {});
-}
-
-
 async function main() {
   const assetId = assetIdFromArgs();
   const siteUrl = requireSiteUrl();
@@ -413,6 +405,10 @@ async function main() {
   const client = s3Client();
   const workDir = await mkdtemp(join(tmpdir(), "glypha-transcode-"));
   let uploaded = [];
+  // `/transcode/complete` is the point of no return: from there the ladder is
+  // referenced by Convex, so this worker may neither delete it nor report the
+  // job as failed. Anything after that call is best-effort.
+  let completed = false;
 
   try {
     const job = await postConvex(siteUrl, token, "/transcode/claim", { assetId });
@@ -498,8 +494,10 @@ async function main() {
       })),
     });
 
-    // Phase 5: raw source is no longer needed once the ladder is served.
-    await deleteRawSource(client, bucket, job.rawKey);
+    // The raw source is deleted by `videoTranscodeJobs.complete`, which
+    // schedules `videoStorage.deleteRawSource`; the worker owns no cleanup
+    // after a successful report.
+    completed = true;
 
     // Visible in the Actions log; contains no key material or credentials.
     console.log(
@@ -507,18 +505,24 @@ async function main() {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Transcode failed";
-    await removeUploadedObjects(client, bucket, assetId, uploaded);
-    try {
-      await postConvex(siteUrl, token, "/transcode/fail", {
-        assetId,
-        errorMessage: message.slice(0, 500),
-      });
-    } catch (reportError) {
-      console.error(
-        `Could not report transcode failure: ${
-          reportError instanceof Error ? reportError.message : "unknown error"
-        }`,
-      );
+    if (!completed) {
+      try {
+        await postConvex(siteUrl, token, "/transcode/fail", {
+          assetId,
+          errorMessage: message.slice(0, 500),
+        });
+        // Only now is Convex's record of this job terminal, so nothing
+        // references the uploaded objects and deleting them is safe. A report
+        // that is refused (already `ready`) must leave the ladder alone; any
+        // genuinely orphaned objects are swept by the Phase 5 cleanup.
+        await removeUploadedObjects(client, bucket, assetId, uploaded);
+      } catch (reportError) {
+        console.error(
+          `Could not report transcode failure: ${
+            reportError instanceof Error ? reportError.message : "unknown error"
+          }`,
+        );
+      }
     }
     throw error;
   } finally {

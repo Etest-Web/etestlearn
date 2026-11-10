@@ -56,6 +56,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ubuntu-latest does not ship FFmpeg; the runner image's apt cache makes
+      # this a few seconds rather than a download of the whole toolchain.
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Verify FFmpeg
         run: |
           ffmpeg -version

@@ -99,26 +99,42 @@ export default function DashboardCoursePage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {course.category && <Badge variant="secondary">{course.category}</Badge>}
-            {course.level && (
-              <Badge variant="outline">
-                {course.level}
-              </Badge>
-            )}
-          </div>
-          {/* The header sits in a narrow column, so its action slot is pinned
-              back to the start rather than pushed to the far edge. */}
-          <PageHeader
-            title={course.title}
-            description={course.description}
-            className="[&_[data-slot=page-header-actions]]:justify-start"
-            actions={
-            <div className="flex flex-wrap items-center gap-3">
-              {enrollment ? (
-                <>
+      {/*
+        Two columns: the course itself on the left, the summary card on the
+        right. Three things here are deliberate.
+
+        · Both tracks are `minmax(0, …)`, never a bare `fr`. A `fr` track has an
+          automatic minimum of min-content, so one wide child widens the track
+          past the viewport — the same reason AGENTS.md rule 13 insists on a
+          named base column count.
+        · The split starts at `lg`. Below it the sidebar is gone but the
+          content column is still narrow enough that two columns would crush
+          the title.
+        · `items-start` keeps the short info card hugging its content instead
+          of stretching to the height of the outline beside it.
+      */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-6">
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {course.category && <Badge variant="secondary">{course.category}</Badge>}
+              {course.level && (
+                <Badge variant="outline">
+                  {course.level}
+                </Badge>
+              )}
+            </div>
+
+            {/* The enrolment controls are *not* passed as `actions`: that slot
+                sits beside the title, and a button + progress meter +
+                certificate action is wide enough to squeeze the heading into
+                one word per line. They get their own wrapping row underneath,
+                which is also where a reader looks for them. */}
+            <PageHeader title={course.title} description={course.description} />
+
+            {enrollment ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   {continueHref() ? (
                     <Button size="sm" render={<Link href={continueHref()!} />}>
                       Continue learning
@@ -148,24 +164,77 @@ export default function DashboardCoursePage() {
                     >
                       {isIssuing ? "Generating..." : "Get certificate"}
                     </Button>
-                  ) : certStatus?.completion ? (
-                    <p className="text-xs text-muted-foreground">
-                      To earn your certificate:{" "}
-                      {certStatus.completion.blockers.join(" ")}
-                    </p>
                   ) : null}
-                </>
-              ) : (
+                </div>
+                {/* Its own line rather than a fourth item in the row: it is a
+                    sentence, and a sentence that wraps mid-button-row reads as
+                    a broken control. */}
+                {certStatus?.completion && !certStatus.completion.eligible && !certStatus.certificate ? (
+                  <p className="text-xs text-muted-foreground">
+                    To earn your certificate:{" "}
+                    {certStatus.completion.blockers.join(" ")}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div>
                 <Button size="sm" onClick={handleEnroll} disabled={isEnrolling}>
                   {isEnrolling ? "Enrolling..." : "Enroll in this course"}
                 </Button>
-              )}
-            </div>
-            }
-          />
+              </div>
+            )}
+          </div>
+
+          {/* Gated on enrollment: the query requires course access, and a
+              visitor deciding whether to enroll should not be shown a notice
+              meant for the cohort. */}
+          {enrollment ? <CourseAnnouncementsList courseId={course._id} /> : null}
+
+          <section className="space-y-3">
+            <h2 className="rule-heading eyebrow">Lesson outline</h2>
+            {lessons.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No lessons yet"
+                description="Lessons for this course haven't been added yet."
+              />
+            ) : (
+              <Card>
+                <CardContent className="divide-y divide-rule px-0">
+                  {lessons.map((lesson: any, index: number) => {
+                    const href =
+                      lesson.contentType === "quiz"
+                        ? `/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`
+                        : `/dashboard/courses/${course.slug}/lessons/${lesson._id}`;
+                    return (
+                      <div
+                        key={lesson._id}
+                        className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium">
+                            <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
+                            <Link href={href} className="text-primary hover:underline">
+                              {lesson.title}
+                            </Link>
+                          </p>
+                          <p className="eyebrow">{lesson.contentType}</p>
+                        </div>
+                        {lesson.durationMinutes && (
+                          <span className="tabular shrink-0 text-xs text-muted-foreground">
+                            {lesson.durationMinutes} min
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </section>
         </div>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>
               Course info
@@ -191,55 +260,7 @@ export default function DashboardCoursePage() {
             </p>
           </CardContent>
         </Card>
-      </section>
-
-      {/* Gated on enrollment: the query requires course access, and a visitor
-          deciding whether to enroll should not be shown a notice meant for the
-          cohort. */}
-      {enrollment ? <CourseAnnouncementsList courseId={course._id} /> : null}
-
-      <section className="space-y-3">
-        <h2 className="rule-heading eyebrow">Lesson outline</h2>
-        {lessons.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="No lessons yet"
-            description="Lessons for this course haven't been added yet."
-          />
-        ) : (
-          <Card>
-            <CardContent className="divide-y divide-rule px-0">
-              {lessons.map((lesson: any, index: number) => {
-                const href =
-                  lesson.contentType === "quiz"
-                    ? `/dashboard/courses/${course.slug}/lessons/${lesson._id}/quiz`
-                    : `/dashboard/courses/${course.slug}/lessons/${lesson._id}`;
-                return (
-                  <div
-                    key={lesson._id}
-                    className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
-                        <Link href={href} className="text-primary hover:underline">
-                          {lesson.title}
-                        </Link>
-                      </p>
-                      <p className="eyebrow">{lesson.contentType}</p>
-                    </div>
-                    {lesson.durationMinutes && (
-                      <span className="tabular text-xs text-muted-foreground">
-                        {lesson.durationMinutes} min
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-      </section>
+      </div>
     </div>
   );
 }

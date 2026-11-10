@@ -51,7 +51,15 @@ function PageHeader({
       )}
       {...props}
     >
-      <div className="flex min-w-0 flex-col gap-2.5">
+      {/*
+        `flex-1` is load-bearing, not decoration. The header is a row on `sm+`
+        and the actions slot is `shrink-0`, so without a growing title column
+        the title is the *only* shrinkable item — a wide action row (a button
+        plus a progress meter plus a certificate action) then squeezes it down
+        to its min-content width, which for a heading is its longest word. That
+        is how a page title ends up stacked one word per line.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         {eyebrow ? (
           <p
             data-slot="page-header-eyebrow"
@@ -89,7 +97,11 @@ function PageHeader({
       {actions ? (
         <div
           data-slot="page-header-actions"
-          className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end"
+          // Capped rather than free to grow: an uncapped `shrink-0` action row
+          // takes whatever width it likes and leaves the title whatever is
+          // left. At 55% the title always keeps at least a comfortable column
+          // to wrap in, and the actions wrap among themselves instead.
+          className="flex min-w-0 flex-wrap items-center gap-2 sm:max-w-[55%] sm:justify-end"
         >
           {actions}
         </div>

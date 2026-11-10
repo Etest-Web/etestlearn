@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PageShell } from "@/components/dashboard-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { ArrowLeft, Loader2, Save, LayoutList, PlusCircle, Video, FileText, HelpCircle, ExternalLink, Upload, Globe, EyeOff, ShieldAlert, Send, Undo2, Clock, SearchX } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import { CourseCouponsManager } from "@/components/course-coupons-manager";
 import { CourseProjectsManager } from "@/components/course-projects-manager";
 import { BulkLessonImport } from "@/components/bulk-lesson-import";
 import { ZipCourseImport } from "@/components/zip-course-import";
+import { CourseSectionPicker, courseSections } from "@/components/course-section-picker";
 
 export default function CourseEditPage() {
   const router = useRouter();
@@ -251,6 +252,13 @@ export default function CourseEditPage() {
     }
   };
 
+  // Opening the dialog from a module preselects it, so "Add lesson" inside a
+  // module creates a lesson in that module rather than an ungrouped one.
+  const openLessonDialog = (section = "") => {
+    setNewLessonData({ title: "", contentType: "video", section });
+    setIsLessonDialogOpen(true);
+  };
+
   const handleCreateLesson = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLessonData.title) return;
@@ -328,6 +336,11 @@ export default function CourseEditPage() {
       </div>
     );
   }
+
+  // Module labels already used in this course, in curriculum order. Passed to
+  // the section picker so instructors copy an existing module instead of
+  // retyping it (and silently creating a second spelling of the same module).
+  const moduleOptions = courseSections(courseData.lessons);
 
   return (
     <PageShell className="gap-6 pb-20">
@@ -611,12 +624,10 @@ export default function CourseEditPage() {
                   <BulkLessonImport courseId={courseData.course._id as Id<"courses">} />
                   <ZipCourseImport courseId={courseData.course._id as Id<"courses">} />
                 <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
-                  <DialogTrigger render={
-                    <Button size="sm" type="button">
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Add Lesson
-                    </Button>
-                  } />
+                  <Button size="sm" type="button" onClick={() => openLessonDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Lesson
+                  </Button>
                   <DialogContent>
                     <form onSubmit={handleCreateLesson}>
                       <DialogHeader>
@@ -636,12 +647,12 @@ export default function CourseEditPage() {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="lesson-section">Section (optional)</Label>
-                          <Input
+                          <Label htmlFor="lesson-section">Module (optional)</Label>
+                          <CourseSectionPicker
                             id="lesson-section"
                             value={newLessonData.section}
-                            onChange={(e) => setNewLessonData({ ...newLessonData, section: e.target.value })}
-                            placeholder="e.g. Module 1"
+                            sections={moduleOptions}
+                            onChange={(section) => setNewLessonData({ ...newLessonData, section })}
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -722,9 +733,20 @@ export default function CourseEditPage() {
                     }
                     return [...bySection.entries()].map(([sec, items]) => (
                       <div key={sec ?? "__none__"}>
-                        {sec && (
-                          <h4 className="mb-2 text-sm font-semibold text-muted-foreground">{sec}</h4>
-                        )}
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <h4 className="text-sm font-semibold text-muted-foreground">
+                            {sec ?? "No module"}
+                          </h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7"
+                            onClick={() => openLessonDialog(sec ?? "")}
+                          >
+                            <PlusCircle className="mr-1 h-3.5 w-3.5" />
+                            Add lesson
+                          </Button>
+                        </div>
                         <ol className="list-none divide-y divide-rule border-y border-rule">
                           {items.map((lesson) => (
                             <li

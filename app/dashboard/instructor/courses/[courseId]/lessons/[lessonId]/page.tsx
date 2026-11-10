@@ -32,6 +32,7 @@ import { VideoUpload } from "@/components/video-upload";
 import { VideoUploader } from "@/components/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { CourseSectionPicker, courseSections } from "@/components/course-section-picker";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -166,6 +167,9 @@ export default function LessonEditPage() {
   const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
 
   const lesson = courseData?.lessons?.find((l) => l._id === lessonId);
+  // Existing module labels, so moving a lesson into a module is a pick rather
+  // than a retype that could create a near-duplicate group.
+  const moduleOptions = courseSections(courseData?.lessons ?? []);
 
   useEffect(() => {
     if (lesson) {
@@ -345,13 +349,12 @@ export default function LessonEditPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="section">Section (optional)</Label>
-                <Input
+                <Label htmlFor="section">Module (optional)</Label>
+                <CourseSectionPicker
                   id="section"
-                  name="section"
                   value={formData.section}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, section: e.target.value }))}
-                  placeholder="e.g. Module 1"
+                  sections={moduleOptions}
+                  onChange={(section) => setFormData((prev) => ({ ...prev, section }))}
                 />
               </div>
               <div className="space-y-1.5">

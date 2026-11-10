@@ -251,6 +251,14 @@ export function rawSourceRetentionCutoff(now = Date.now()): number {
   return now - RAW_SOURCE_RETENTION_MS;
 }
 
+/**
+ * Missing-media strikes: a ready B2 ladder whose CDN objects 404 is retired
+ * only after this many misses spread over the grace window. Two hits separated
+ * in time rule out a transient edge failure taking a working video down.
+ */
+export const MISSING_MEDIA_STRIKE_COUNT = 2;
+export const MISSING_MEDIA_GRACE_MS = 5 * 60 * 1000;
+
 /** Every status the B2 flow (plus its legacy ladder) can hold. */
 export type RawUploadStatus =
   | "pending"

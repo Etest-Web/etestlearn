@@ -386,6 +386,11 @@ export default defineSchema({
     ),
     // 0–100 while processing; reported by the GitHub Actions runner.
     transcodeProgress: v.optional(v.number()),
+    // CDN 404 strikes recorded by the playback gate. A ready B2 ladder whose
+    // objects have gone missing is retired only after enough misses spread over
+    // a grace window, so a transient edge failure cannot bury a working video.
+    mediaMissingCount: v.optional(v.number()),
+    mediaMissingAt: v.optional(v.number()),
   })
     .index("by_lesson", ["lessonId"])
     .index("by_status", ["status"])

@@ -462,6 +462,11 @@ http.route({
           return new Response("Media service unavailable", { status: 502, headers: cors });
         }
         if (!res.ok) {
+          if (res.status === 404) {
+            await ctx.scheduler.runAfter(0, internal.videoAssets.noteMissingMedia, {
+              assetId: assetId as never,
+            });
+          }
           return new Response(res.status === 404 ? "Not found" : "Media service unavailable", {
             status: res.status === 404 ? 404 : 502,
             headers: cors,
@@ -491,6 +496,11 @@ http.route({
           return new Response("Media service unavailable", { status: 502, headers: cors });
         }
         if (!res.ok) {
+          if (res.status === 404) {
+            await ctx.scheduler.runAfter(0, internal.videoAssets.noteMissingMedia, {
+              assetId: assetId as never,
+            });
+          }
           return new Response(res.status === 404 ? "Not found" : "Media service unavailable", {
             status: res.status === 404 ? 404 : 502,
             headers: cors,

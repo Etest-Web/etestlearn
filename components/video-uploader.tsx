@@ -16,11 +16,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui";
 import { Progress } from "@/components/ui";
+import { canRetryTranscode } from "@/lib/video-transcode-job";
 import {
   RAW_UPLOAD_PART_SIZE_BYTES,
   fingerprintError,
@@ -135,6 +136,7 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
   const completeUpload = useAction(api.videoStorage.completeUpload);
   const abortUpload = useAction(api.videoStorage.abortUpload);
   const listUploadedParts = useAction(api.videoStorage.listUploadedParts);
+  const retryTranscode = useMutation(api.videoAssets.retryTranscode);
   const draft = useQuery(api.videoAssets.getUploadDraft, { lessonId });
   const assetStatus = useQuery(api.videoAssets.getAssetStatus, { lessonId });
 
@@ -143,6 +145,7 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
   const [message, setMessage] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<Id<"videoAssets"> | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [isRetrying, setIsRetrying] = useState(false);
   const cancelledRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -151,11 +154,15 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
   const managerAsset =
     assetStatus?.role === "manager"
       ? (assetStatus.asset as {
+          _id: Id<"videoAssets">;
           status: string;
           transcodeProgress?: number;
           processingStartedAt?: number;
           updatedAt?: number;
           errorMessage?: string;
+          rawKey?: string;
+          masterPlaylistKey?: string;
+          attempts?: number;
         })
       : null;
   const transcodeStatus = managerAsset?.status;
@@ -171,6 +178,9 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
   const isTranscoding = transcodeStatus === "queued" || transcodeStatus === "processing";
   const isTranscodeReady = transcodeStatus === "ready";
   const isTranscodeFailed = transcodeStatus === "failed";
+  const failedAssetRetryable = Boolean(
+    managerAsset && isTranscodeFailed && canRetryTranscode(managerAsset),
+  );
 
   useEffect(() => {
     if (!isTranscoding) return;
@@ -331,6 +341,20 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
     }
   }, [draft, abortUpload]);
 
+  const handleRetryTranscode = useCallback(async () => {
+    if (!managerAsset || !failedAssetRetryable) return;
+    setIsRetrying(true);
+    setMessage(null);
+    try {
+      await retryTranscode({ assetId: managerAsset._id });
+      setNow(Date.now());
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not retry transcoding");
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [failedAssetRetryable, managerAsset, retryTranscode]);
+
   const showTranscodePanel =
     isTranscoding ||
     (isTranscodeReady && (phase === "queued" || phase === "idle")) ||
@@ -421,15 +445,33 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
       {showTranscodePanel ? (
         <div className="space-y-2">
           <Progress value={barValue} />
-          <div className="flex items-center justify-between gap-2">
-            <p className={`text-xs ${isTranscodeFailed ? "text-red-600" : isTranscodeReady ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p
+              className={`text-xs ${isTranscodeFailed ? "text-red-600" : isTranscodeReady ? "text-green-700 dark:text-green-400" : "text-muted-foreground"}`}
+            >
               {transcodeLabel}
               {isTranscoding ? ` ${barValue}%` : ""}
               {isTranscoding && elapsedMs > 0 ? ` · ${formatElapsed(elapsedMs)} elapsed` : ""}
             </p>
+            {isTranscodeFailed && failedAssetRetryable ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleRetryTranscode}
+                disabled={isRetrying}
+              >
+                {isRetrying ? "Retrying…" : "Retry transcode"}
+              </Button>
+            ) : null}
           </div>
           {isTranscodeFailed ? (
             <p className="text-xs text-red-600">{transcodeError ?? "Transcode failed."}</p>
+          ) : null}
+          {isTranscodeFailed && !failedAssetRetryable ? (
+            <p className="text-xs text-muted-foreground">
+              The source file for this video is no longer available. Upload a new video to replace it.
+            </p>
           ) : null}
         </div>
       ) : null}

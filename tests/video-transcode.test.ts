@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { convexTest, type TestConvex } from "convex-test";
-import { internal } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import type {
   DataModelFromSchemaDefinition,
@@ -25,7 +25,12 @@ import {
   variantPlaylistKeyOf,
   type TranscodeReport,
 } from "../lib/video-transcode-job";
-import { RAW_SOURCE_RETENTION_MS, rawSourceRetentionCutoff } from "../lib/videos";
+import {
+  MISSING_MEDIA_GRACE_MS,
+  MISSING_MEDIA_STRIKE_COUNT,
+  RAW_SOURCE_RETENTION_MS,
+  rawSourceRetentionCutoff,
+} from "../lib/videos";
 
 /**
  * Phase 3 job invariants.
@@ -491,5 +496,208 @@ describe("raw source retention", () => {
     );
     expect(rows.every((row) => row.rawKey === "raw/asset/source")).toBe(true);
     expect(rows.some((row) => row.assetId === fresh.assetId)).toBe(false);
+  });
+});
+
+describe("asset retirement and missing-media detection", () => {
+  test("retiring a broken ready asset buries its ladder and clears the lesson pointer", async () => {
+    const t = convexTest(testSchema, modules);
+    const { assetId, lessonId } = await seedAsset(t, { status: "ready" });
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(assetId, {
+        hlsPrefix: hlsPrefixOf(assetId),
+        masterPlaylistKey: masterPlaylistKeyOf(assetId),
+        variantPlaylistKeys: [{ variant: 0, key: variantPlaylistKeyOf(assetId, 0) }],
+        variants: [{ label: "360p", height: 360, bitrate: 800_000, bandwidth: 900_000 }],
+        durationSeconds: 42,
+      });
+      await ctx.db.patch(lessonId, { videoAssetId: assetId, contentType: "video" });
+    });
+
+    const result = await t.mutation(internal.videoAssets.retireAssetInternal, {
+      assetId,
+      reason: "Video media is missing",
+    });
+    expect(result).toEqual({ retired: true });
+
+    const asset = await t.run((ctx: TestCtx) => ctx.db.get(assetId));
+    expect(asset?.status).toBe("failed");
+    expect(asset?.errorMessage).toBe("Video media is missing");
+    expect(asset?.masterPlaylistKey).toBeUndefined();
+    expect(asset?.hlsPrefix).toBeUndefined();
+    expect(asset?.variantPlaylistKeys).toBeUndefined();
+    expect(asset?.variants).toBeUndefined();
+    expect(asset?.durationSeconds).toBeUndefined();
+
+    const lesson = await t.run((ctx: TestCtx) => ctx.db.get(lessonId));
+    expect(lesson?.videoAssetId).toBeUndefined();
+  });
+
+  test("retirement is tolerant when the lesson already points elsewhere", async () => {
+    const t = convexTest(testSchema, modules);
+    const { assetId, lessonId } = await seedAsset(t, { status: "ready" });
+    const other = await seedAsset(t, { status: "ready" });
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(assetId, { masterPlaylistKey: masterPlaylistKeyOf(assetId) });
+      await ctx.db.patch(lessonId, { videoAssetId: other.assetId });
+    });
+
+    await t.mutation(internal.videoAssets.retireAssetInternal, { assetId });
+    const lesson = await t.run((ctx: TestCtx) => ctx.db.get(lessonId));
+    expect(lesson?.videoAssetId).toBe(other.assetId);
+  });
+
+  test("missing-media strikes retire a ready B2 asset only after the grace window", async () => {
+    const t = convexTest(testSchema, modules);
+    expect(MISSING_MEDIA_STRIKE_COUNT).toBe(2);
+    const { assetId, lessonId } = await seedAsset(t, { status: "ready" });
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(assetId, {
+        hlsPrefix: hlsPrefixOf(assetId),
+        masterPlaylistKey: masterPlaylistKeyOf(assetId),
+      });
+      await ctx.db.patch(lessonId, { videoAssetId: assetId });
+    });
+
+    await t.mutation(internal.videoAssets.noteMissingMedia, { assetId });
+    let asset = await t.run((ctx: TestCtx) => ctx.db.get(assetId));
+    expect(asset?.status).toBe("ready");
+    expect(asset?.mediaMissingCount).toBe(1);
+    expect(asset?.mediaMissingAt).toBeTypeOf("number");
+
+    // A second hit inside the grace window must not escalate.
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(assetId, { mediaMissingAt: Date.now() - MISSING_MEDIA_GRACE_MS + 1000 });
+    });
+    await t.mutation(internal.videoAssets.noteMissingMedia, { assetId });
+    asset = await t.run((ctx: TestCtx) => ctx.db.get(assetId));
+    expect(asset?.status).toBe("ready");
+    expect(asset?.mediaMissingCount).toBe(1);
+
+    // Once the grace has passed, the next strike retires the asset.
+    await t.run(async (ctx: TestCtx) => {
+      await ctx.db.patch(assetId, { mediaMissingAt: Date.now() - MISSING_MEDIA_GRACE_MS - 1 });
+    });
+    await t.mutation(internal.videoAssets.noteMissingMedia, { assetId });
+    asset = await t.run((ctx: TestCtx) => ctx.db.get(assetId));
+    expect(asset?.status).toBe("failed");
+    expect(asset?.errorMessage).toMatch(/missing/i);
+    expect(asset?.masterPlaylistKey).toBeUndefined();
+    const lesson = await t.run((ctx: TestCtx) => ctx.db.get(lessonId));
+    expect(lesson?.videoAssetId).toBeUndefined();
+  });
+
+  test("staff can request a retry for a failed asset with a raw source", async () => {
+    const t = convexTest(testSchema, modules);
+    const now = Date.now();
+    const instructorId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("users", {
+        clerkId: "clerk_retry_instructor",
+        email: "retry@test.com",
+        name: "Retry Instructor",
+        role: "instructor",
+        createdAt: now,
+      }),
+    );
+    const courseId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("courses", {
+        title: "Retry Course",
+        slug: `retry-course-${now}`,
+        description: "Test course",
+        instructorId,
+        published: true,
+        price: 0,
+        currency: "NGN",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const lessonId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("lessons", {
+        courseId,
+        title: "Lesson 1",
+        contentType: "video",
+        order: 1,
+        createdAt: now,
+      }),
+    );
+    const assetId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("videoAssets", {
+        lessonId,
+        status: "failed",
+        sourceFileUrl: "",
+        sourceFileKey: "",
+        rawKey: "raw/asset/source",
+        sizeBytes: 1024,
+        attempts: 1,
+        errorMessage: "ffmpeg failed",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const asInstructor = t.withIdentity({
+      subject: "clerk_retry_instructor",
+      tokenIdentifier: "clerk_retry_instructor",
+    });
+    await expect(asInstructor.mutation(api.videoAssets.retryTranscode, { assetId })).resolves.toEqual({
+      dispatched: true,
+    });
+  });
+
+  test("retry is refused when the raw source is gone", async () => {
+    const t = convexTest(testSchema, modules);
+    const now = Date.now();
+    const instructorId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("users", {
+        clerkId: "clerk_retry_instructor2",
+        email: "retry2@test.com",
+        name: "Retry Instructor",
+        role: "instructor",
+        createdAt: now,
+      }),
+    );
+    const courseId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("courses", {
+        title: "Retry Course",
+        slug: `retry-course-2-${now}`,
+        description: "Test course",
+        instructorId,
+        published: true,
+        price: 0,
+        currency: "NGN",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const lessonId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("lessons", {
+        courseId,
+        title: "Lesson 1",
+        contentType: "video",
+        order: 1,
+        createdAt: now,
+      }),
+    );
+    const assetId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("videoAssets", {
+        lessonId,
+        status: "failed",
+        sourceFileUrl: "",
+        sourceFileKey: "",
+        attempts: 1,
+        errorMessage: "media objects missing",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    const asInstructor = t.withIdentity({
+      subject: "clerk_retry_instructor2",
+      tokenIdentifier: "clerk_retry_instructor2",
+    });
+    await expect(asInstructor.mutation(api.videoAssets.retryTranscode, { assetId })).rejects.toThrow(
+      /cannot be retried/i,
+    );
   });
 });

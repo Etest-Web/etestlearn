@@ -11,9 +11,13 @@ import {
   isStaff,
   requireUser,
 } from "./helpers/auth";
+import { logAudit } from "./helpers/audit";
 import { signPlaybackToken } from "../lib/video-playback-token";
 import { assertUploadthingFileUrl } from "../lib/video-source";
+import { canRetryTranscode } from "../lib/video-transcode-job";
 import {
+  MISSING_MEDIA_GRACE_MS,
+  MISSING_MEDIA_STRIKE_COUNT,
   canVideoTransition,
   inFlightUploadError,
   presignBudget,
@@ -752,6 +756,169 @@ export const cleanupStaleUploads = internalMutation({
 export const reconcileStaleUploads = cleanupStaleUploads;
 export const reconcileStaleMultipartUploads = cleanupStaleUploads;
 
+/** A lesson points at a dead asset only when it was the active one. */
+async function detachLessonIfPointing(
+  ctx: GenericMutationCtx<DataModel>,
+  asset: { lessonId: Id<"lessons">; _id: Id<"videoAssets"> },
+) {
+  const lesson = await ctx.db.get(asset.lessonId);
+  if (!lesson || lesson.videoAssetId !== asset._id) return;
+  await ctx.db.patch(asset.lessonId, { videoAssetId: undefined });
+}
+
+/**
+ * Bury an asset whose media can no longer be served. Clears the HLS/B2 ladder
+ * fields and unlinks the lesson so the player never targets a missing object
+ * again; a re-upload can still replace it later because the row remains.
+ */
+async function applyMediaRetirement(
+  ctx: GenericMutationCtx<DataModel>,
+  assetId: Id<"videoAssets">,
+  reason: string,
+) {
+  const asset = await ctx.db.get(assetId);
+  if (!asset) return { retired: false as const };
+  if (asset.status === "failed" && asset.masterPlaylistKey === undefined) {
+    // Already buried; keep the first reason, but ensure the lesson is not stuck
+    // pointing at an unplayable row from an earlier partial state.
+    await detachLessonIfPointing(ctx, asset);
+    return { retired: false as const };
+  }
+
+  const hadB2Ladder = Boolean(asset.hlsPrefix || asset.masterPlaylistKey);
+  await detachLessonIfPointing(ctx, asset);
+  await ctx.db.patch(assetId, {
+    status: "failed",
+    errorMessage: reason.slice(0, 500),
+    masterPlaylistKey: undefined,
+    hlsPrefix: undefined,
+    variantPlaylistKeys: undefined,
+    variants: undefined,
+    durationSeconds: undefined,
+    masterManifestStorageId: undefined,
+    variantManifestStorageIds: undefined,
+    segments: undefined,
+    keyStorageId: undefined,
+    ivHex: undefined,
+    transcodeProgress: undefined,
+    mediaMissingCount: undefined,
+    mediaMissingAt: undefined,
+    updatedAt: Date.now(),
+  });
+  if (hadB2Ladder) {
+    await ctx.scheduler.runAfter(0, internal.videoStorage.sweepHlsPrefix, {
+      assetId: assetId.toString(),
+    });
+  }
+  return { retired: true as const };
+}
+
+/**
+ * Internal: retire a broken asset without a caller identity (CLI/ops). Staff
+ * UI should use the audited `retireAsset` mutation instead.
+ */
+export const retireAssetInternal = internalMutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({ retired: v.boolean() }),
+  handler: async (ctx, args) => {
+    return applyMediaRetirement(ctx, args.assetId, args.reason ?? "Video media is missing");
+  },
+});
+
+/**
+ * Staff/admin: bury a dead asset so the lesson stops advertising it and the
+ * instructor can re-upload. Used when the served ladder or raw source is gone.
+ */
+export const retireAsset = mutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({ retired: v.boolean() }),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Video asset not found");
+    const { user } = await requireManager(ctx, asset.lessonId);
+    const reason = args.reason ?? "Video media is missing";
+    const result = await applyMediaRetirement(ctx, args.assetId, reason);
+    if (result.retired) {
+      await logAudit(ctx, {
+        actorId: user._id,
+        action: "video_asset.retire",
+        targetType: "videoAsset",
+        targetId: args.assetId,
+        details: { lessonId: asset.lessonId, reason },
+      });
+    }
+    return result;
+  },
+});
+
+/**
+ * Staff/admin: retry a failed transcode while the raw source still exists.
+ * The runner re-claims the asset and rebuilds the ladder with the same key/IV.
+ */
+export const retryTranscode = mutation({
+  args: { assetId: v.id("videoAssets") },
+  returns: v.object({ dispatched: v.boolean() }),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Video asset not found");
+    await requireManager(ctx, asset.lessonId);
+    if (!canRetryTranscode(asset)) {
+      throw new Error("This video cannot be retried — upload a new file instead");
+    }
+    await ctx.scheduler.runAfter(0, internal.videoTranscodeJobs.dispatch, {
+      assetId: args.assetId,
+    });
+    return { dispatched: true };
+  },
+});
+
+/**
+ * Internal: a CDN 404 on a ready B2 ladder. Strikes are counted only when
+ * spread over a grace window so a transient edge miss cannot bury a live video;
+ * the second strike retires the asset.
+ */
+export const noteMissingMedia = internalMutation({
+  args: { assetId: v.id("videoAssets") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset || asset.status !== "ready") return null;
+    if (!asset.hlsPrefix && !asset.masterPlaylistKey) return null;
+
+    const now = Date.now();
+    const count = asset.mediaMissingCount ?? 0;
+    const firstAt = asset.mediaMissingAt;
+
+    if (count === 0 || firstAt === undefined) {
+      await ctx.db.patch(args.assetId, {
+        mediaMissingCount: 1,
+        mediaMissingAt: now,
+        updatedAt: now,
+      });
+      return null;
+    }
+
+    if (now - firstAt < MISSING_MEDIA_GRACE_MS) return null;
+
+    if (count + 1 >= MISSING_MEDIA_STRIKE_COUNT) {
+      await applyMediaRetirement(ctx, args.assetId, "Video media is missing");
+      return null;
+    }
+
+    await ctx.db.patch(args.assetId, {
+      mediaMissingCount: count + 1,
+      mediaMissingAt: firstAt,
+      updatedAt: now,
+    });
+    return null;
+  },
+});
 
 /**
  * Internal: writes the per-asset AES key exactly once. A retried completion

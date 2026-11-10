@@ -72,9 +72,30 @@ function fail(message) {
 }
 
 function requireEnv(name) {
-  const value = process.env[name];
+  // Secrets copied out of a `.env` file keep their surrounding quotes; every
+  // consumer here (URL parsing, S3 signing) rejects them, so strip them once.
+  const value = process.env[name]?.trim().replace(/^["']|["']$/g, "");
   if (!value) fail(`Missing required environment variable: ${name}`);
   return value;
+}
+
+/**
+ * A secret pasted from a `.env` file often arrives wrapped in quotes, which
+ * `new URL()` rejects with a bare "Invalid URL" that names no variable. Strip
+ * the wrapping and prove it is absolute here, so the failure is readable.
+ */
+function requireSiteUrl() {
+  const raw = requireEnv("CONVEX_SITE_URL").trim().replace(/^["']|["']$/g, "");
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    fail("CONVEX_SITE_URL must be an absolute http(s) URL");
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    fail("CONVEX_SITE_URL must be an absolute http(s) URL");
+  }
+  return raw;
 }
 
 function assetIdFromArgs() {
@@ -385,7 +406,7 @@ async function deleteRawSource(client, bucket, rawKey) {
 
 async function main() {
   const assetId = assetIdFromArgs();
-  const siteUrl = requireEnv("CONVEX_SITE_URL");
+  const siteUrl = requireSiteUrl();
   const token = requireEnv("VIDEO_TRANSCODE_TOKEN");
   const bucket = requireEnv("B2_RAW_BUCKET");
 

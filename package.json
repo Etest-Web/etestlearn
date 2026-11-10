@@ -13,6 +13,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "@aws-sdk/s3-request-presigner": "^3.1164.0",
     "@base-ui/react": "^1.9.0",
     "@clerk/nextjs": "^7.9.20",
     "@ffmpeg/ffmpeg": "^0.12.15",

@@ -10,4 +10,12 @@ crons.daily(
   internal.enrollments.checkAllInactivityReminders,
 );
 
+// Hourly reconciliation of stale multipart uploads (Phase 5).
+crons.interval(
+  "cleanup-stale-video-uploads",
+  { minutes: 60 },
+  internal.videoStorage.cleanupStaleUploads,
+  {},
+);
+
 export default crons;

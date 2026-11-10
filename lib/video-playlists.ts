@@ -49,7 +49,8 @@ export function decorateMediaPlaylist(manifestText: string, opts: DecorateOption
   let keyInserted = false;
   for (const line of lines) {
     if (!line.startsWith("#") && line.trim().endsWith(".ts")) {
-      out.push(`${line.trim()}?${opts.tokenParam}`);
+      const seg = line.trim();
+      out.push(opts.tokenParam ? `${seg}?${opts.tokenParam}` : seg);
     } else {
       out.push(line);
     }

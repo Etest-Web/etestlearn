@@ -29,6 +29,7 @@ import {
 import { ArrowLeft, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { VideoUpload } from "@/components/video-upload";
+import { VideoUploader } from "@/components/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import ReactMarkdown from "react-markdown";
@@ -409,6 +410,7 @@ export default function LessonEditPage() {
             {formData.contentType === "video" && (
               <div className="space-y-4">
                 <VideoUpload lessonId={lessonId as Id<"lessons">} />
+                <VideoUploader lessonId={lessonId as Id<"lessons">} />
                 {!formData.videoFileName && (
                   <div className="space-y-1.5">
                     <Label htmlFor="content">Video URL</Label>

@@ -1,11 +1,15 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  assertVideoCspEnv,
   buildContentSecurityPolicy,
   buildDegradedStaticContentSecurityPolicy,
   buildStaticContentSecurityPolicy,
+  connectSrcSources,
   extractInlineScriptHashes,
   generateNonce,
+  mediaSrcSources,
+  parseBareHttpsOrigin,
 } from "../lib/csp";
 
 /**
@@ -303,5 +307,110 @@ describe("extractInlineScriptHashes", () => {
 
   it("returns an empty list for a page with no scripts", async () => {
     expect(await extractInlineScriptHashes("<html><body>hi</body></html>")).toEqual([]);
+  });
+});
+
+describe("connectSrcSources (B2 upload origin)", () => {
+  it("appends a bare https origin as the final source", () => {
+    const uploadSources = connectSrcSources("https://s3.us-west-004.backblazeb2.com");
+
+    expect(uploadSources.at(-1)).toBe("https://s3.us-west-004.backblazeb2.com");
+  });
+
+  it("adds nothing when the origin is empty or whitespace", () => {
+    const base = connectSrcSources("");
+
+    expect(connectSrcSources("   ")).toEqual(base);
+    expect(base.some((source) => source.includes("backblazeb2"))).toBe(false);
+    // The default policy keeps the standing list and still carries no upload host.
+    expect(
+      sources(buildContentSecurityPolicy("nonce"), "connect-src").some((source) =>
+        source.includes("backblazeb2"),
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores values that are not a bare https origin", () => {
+    const base = connectSrcSources("");
+
+    for (const hostile of [
+      "https://evil.com/path",
+      "http://insecure.example",
+      "javascript:alert(1)",
+      "https://evil.com#frag",
+    ]) {
+      expect(connectSrcSources(hostile)).toEqual(base);
+    }
+  });
+
+  it("admits the media CDN origin in connect-src and media-src", () => {
+    const cdn = "https://cdn.glypha.com.ng";
+
+    expect(connectSrcSources("", cdn)).toContain(cdn);
+    expect(mediaSrcSources(cdn)).toContain(cdn);
+    expect(mediaSrcSources(cdn)).toContain("blob:");
+  });
+
+  it("keeps media-src without a CDN origin when none is configured", () => {
+    expect(mediaSrcSources("")).not.toContain("https://cdn.glypha.com.ng");
+    expect(mediaSrcSources("not-an-origin")).not.toContain("not-an-origin");
+  });
+});
+
+describe("parseBareHttpsOrigin", () => {
+  it("accepts a scheme, host and optional port", () => {
+    expect(parseBareHttpsOrigin("https://s3.us-west-004.backblazeb2.com")).toBe(
+      "https://s3.us-west-004.backblazeb2.com",
+    );
+    expect(parseBareHttpsOrigin("  https://cdn.glypha.com.ng:8443  ")).toBe(
+      "https://cdn.glypha.com.ng:8443",
+    );
+  });
+
+  it("rejects anything that is not a bare https origin", () => {
+    for (const value of [
+      "",
+      "  ",
+      "https://evil.com/path",
+      "https://evil.com?x=1",
+      "https://evil.com#frag",
+      "http://plain.example",
+      "https://user:pass@evil.com",
+      "javascript:alert(1)",
+    ]) {
+      expect(parseBareHttpsOrigin(value)).toBeNull();
+    }
+  });
+});
+
+describe("assertVideoCspEnv", () => {
+  it("fails a production build when the upload origin is missing", () => {
+    expect(() =>
+      assertVideoCspEnv({ NODE_ENV: "production", NEXT_PUBLIC_B2_UPLOAD_ORIGIN: "" }),
+    ).toThrow(/NEXT_PUBLIC_B2_UPLOAD_ORIGIN must be set/);
+  });
+
+  it("allows development without the upload origin", () => {
+    expect(() =>
+      assertVideoCspEnv({ NODE_ENV: "development", NEXT_PUBLIC_B2_UPLOAD_ORIGIN: "" }),
+    ).not.toThrow();
+  });
+
+  it("fails in every environment when an origin is malformed", () => {
+    for (const key of ["NEXT_PUBLIC_B2_UPLOAD_ORIGIN", "NEXT_PUBLIC_CDN_ORIGIN"] as const) {
+      expect(() =>
+        assertVideoCspEnv({ NODE_ENV: "development", [key]: "https://evil.com/path" }),
+      ).toThrow(new RegExp(`${key} must be a bare https origin`));
+    }
+  });
+
+  it("accepts valid upload and CDN origins", () => {
+    expect(() =>
+      assertVideoCspEnv({
+        NODE_ENV: "production",
+        NEXT_PUBLIC_B2_UPLOAD_ORIGIN: "https://s3.us-west-004.backblazeb2.com",
+        NEXT_PUBLIC_CDN_ORIGIN: "https://cdn.glypha.com.ng",
+      }),
+    ).not.toThrow();
   });
 });

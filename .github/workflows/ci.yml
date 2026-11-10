@@ -18,6 +18,10 @@ jobs:
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
       NEXT_PUBLIC_CONVEX_URL: https://placeholder.convex.cloud
       NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: pk_test_placeholder
+      # `next build` asserts these are bare https origins (NODE_ENV=production);
+      # without them the CSP/uploader configuration is refused at build time.
+      NEXT_PUBLIC_B2_UPLOAD_ORIGIN: https://s3.us-west-004.backblazeb2.com
+      NEXT_PUBLIC_CDN_ORIGIN: https://cdn.example.com
     steps:
       - uses: actions/checkout@v4
 

@@ -1,0 +1,65 @@
+name: Video transcode
+
+# Phase 3 of the video pipeline: Convex dispatches one asset at a time,
+# this workflow turns the raw B2 object into the 360p/720p HLS ladder and
+# reports back through the token-authenticated `/transcode/*` endpoints.
+#
+# `repository_dispatch` is the normal path. `workflow_dispatch` is the manual
+# fallback for an asset left `queued` because GitHub dispatch is unconfigured
+# or the dispatch API call failed.
+
+on:
+  repository_dispatch:
+    types: [video-transcode]
+  workflow_dispatch:
+    inputs:
+      asset_id:
+        description: Convex videoAssets document id
+        required: true
+        type: string
+
+concurrency:
+  # One run per asset; a retried dispatch must not race an in-flight transcode.
+  group: video-transcode-${{ github.event.client_payload.assetId || github.event.inputs.asset_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  transcode:
+    runs-on: ubuntu-latest
+    # A 2 GB source on a shared runner can take a while; the ceiling is a
+    # guard against a hung FFmpeg, not an expected duration.
+    timeout-minutes: 360
+    env:
+      ASSET_ID: ${{ github.event.client_payload.assetId || github.event.inputs.asset_id }}
+      CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+      VIDEO_TRANSCODE_TOKEN: ${{ secrets.VIDEO_TRANSCODE_TOKEN }}
+      B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+      B2_REGION: ${{ secrets.B2_REGION }}
+      B2_RAW_BUCKET: ${{ secrets.B2_RAW_BUCKET }}
+      B2_TRANSCODE_KEY_ID: ${{ secrets.B2_TRANSCODE_KEY_ID }}
+      B2_TRANSCODE_KEY: ${{ secrets.B2_TRANSCODE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify FFmpeg
+        run: |
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Transcode asset
+        run: node scripts/video-transcode.mjs

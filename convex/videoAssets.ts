@@ -13,6 +13,13 @@ import {
 } from "./helpers/auth";
 import { signPlaybackToken } from "../lib/video-playback-token";
 import { assertUploadthingFileUrl } from "../lib/video-source";
+import {
+  canVideoTransition,
+  inFlightUploadError,
+  presignBudget,
+  presignBudgetError,
+  rawPartCount,
+} from "../lib/videos";
 
 /** Raw instructor upload cap: 1 GB. The ladder output is what students stream. */
 const MAX_SOURCE_BYTES = 1024 * 1024 * 1024;
@@ -167,6 +174,18 @@ export const issuePlaybackToken = mutation({
     const userId = user ? user._id : "anonymous";
     const token = await signPlaybackToken({ a: asset._id, u: userId, exp });
     return { token, exp };
+  },
+});
+
+/** Internal: read the per-asset AES-128 key (base64). Used by the playback gate. */
+export const getVideoKey = internalQuery({
+  args: { assetId: v.id("videoAssets") },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("videoKeys")
+      .withIndex("by_asset", (q) => q.eq("assetId", args.assetId))
+      .first();
+    return row?.keyB64 ?? null;
   },
 });
 
@@ -350,5 +369,376 @@ export const checkPlaybackAccess = internalQuery({
     const course = await ctx.db.get(lesson.courseId);
     if (isStaff(user) && (await canManageCourse(ctx, user, course))) return true;
     return hasEnrollment(ctx, user._id, lesson.courseId);
+  },
+});
+
+/** Every `videoAssets.status` literal — shared by the staged-upload actions. */
+const videoStatusUnion = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("ready"),
+  v.literal("failed"),
+  v.literal("awaiting_upload"),
+  v.literal("queued"),
+);
+
+/**
+ * Query-side twin of `requireManager`: the staged-upload actions are user
+ * invoked, so their identity propagates through `ctx.runQuery` and the same
+ * owner-or-admin rule must be re-checked here — client role checks are UX only.
+ */
+async function requireManagerQuery(ctx: GenericQueryCtx<DataModel>, lessonId: Id<"lessons">) {
+  const user = await requireUser(ctx);
+  if (!isStaff(user)) throw new Error("Not authorized");
+  const lesson = await ctx.db.get(lessonId);
+  if (!lesson) throw new Error("Lesson not found");
+  const course = await ctx.db.get(lesson.courseId);
+  if (!(await canManageCourse(ctx, user, course))) {
+    throw new Error("Not authorized to manage this course");
+  }
+  return { user, lesson };
+}
+
+/**
+ * Internal: the authorization probe `initUpload` runs before it drafts a row.
+ * Returns only the caller's id — enough to prove the gate ran, nothing the
+ * action needs to echo back to the browser.
+ */
+export const resolveUploadInitiator = internalQuery({
+  args: { lessonId: v.id("lessons") },
+  returns: v.object({ userId: v.id("users") }),
+  handler: async (ctx, args) => {
+    const { user } = await requireManagerQuery(ctx, args.lessonId);
+    return { userId: user._id };
+  },
+});
+
+/**
+ * Internal: the action-side authorization plus payload read. Status and the
+ * multipart handle travel together so `signParts`/`completeUpload` can refuse
+ * early without a second round trip.
+ */
+export const resolveUploadAccess = internalQuery({
+  args: { assetId: v.id("videoAssets") },
+  returns: v.object({
+    lessonId: v.id("lessons"),
+    status: videoStatusUnion,
+    uploadId: v.optional(v.string()),
+    rawKey: v.optional(v.string()),
+    sizeBytes: v.optional(v.number()),
+    fingerprintLastModified: v.optional(v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Video asset not found");
+    await requireManagerQuery(ctx, asset.lessonId);
+    return {
+      lessonId: asset.lessonId,
+      status: asset.status,
+      uploadId: asset.uploadId,
+      rawKey: asset.rawKey,
+      sizeBytes: asset.sizeBytes,
+      fingerprintLastModified: asset.fingerprintLastModified,
+    };
+  },
+});
+
+/**
+ * The instructor-facing resume read: is there a multipart upload waiting for
+ * *this* lesson? It exposes the fingerprint so the uploader can refuse a
+ * different file before it re-signs anything, and nothing else about the row.
+ */
+export const getUploadDraft = query({
+  args: { lessonId: v.id("lessons") },
+  returns: v.union(
+    v.object({
+      assetId: v.id("videoAssets"),
+      sizeBytes: v.number(),
+      lastModified: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    await requireManagerQuery(ctx, args.lessonId);
+    const latest = await ctx.db
+      .query("videoAssets")
+      .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+      .order("desc")
+      .first();
+    if (
+      !latest ||
+      latest.status !== "awaiting_upload" ||
+      latest.uploadId === undefined ||
+      latest.rawKey === undefined ||
+      latest.sizeBytes === undefined ||
+      latest.fingerprintLastModified === undefined
+    ) {
+      return null;
+    }
+    return {
+      assetId: latest._id,
+      sizeBytes: latest.sizeBytes,
+      lastModified: latest.fingerprintLastModified,
+    };
+  },
+});
+
+/**
+ * Internal: drafts the `awaiting_upload` row. One in-flight upload per lesson
+ * is the rule — a second draft must not exist while the first is still
+ * landing, queued for transcode, or being replaced. Per-owner caps are
+ * enforced here too: this is the only place a draft is created, so a caller
+ * cannot open a third upload (or a fourth gigabyte in flight) by racing two
+ * browser tabs.
+ */
+export const createUploadDraft = internalMutation({
+  args: {
+    lessonId: v.id("lessons"),
+    sizeBytes: v.number(),
+    fingerprintLastModified: v.number(),
+  },
+  returns: v.object({ assetId: v.id("videoAssets") }),
+  handler: async (ctx, args) => {
+    const { user, lesson } = await requireManagerQuery(ctx, args.lessonId);
+    if (!Number.isSafeInteger(args.sizeBytes) || args.sizeBytes <= 0) {
+      throw new Error("Invalid upload size");
+    }
+    if (
+      !Number.isSafeInteger(args.fingerprintLastModified) ||
+      args.fingerprintLastModified <= 0
+    ) {
+      throw new Error("Invalid file fingerprint");
+    }
+
+    const latest = await ctx.db
+      .query("videoAssets")
+      .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+      .order("desc")
+      .first();
+    const inFlight: string[] = ["awaiting_upload", "queued", "processing", "pending"];
+    if (latest && inFlight.includes(latest.status)) {
+      throw new Error("This lesson already has a video upload in progress");
+    }
+
+    // Bounded read: the cap is small, so a handful of rows is the whole
+    // picture; `inFlightUploadError` decides from those totals.
+    const active = await ctx.db
+      .query("videoAssets")
+      .withIndex("by_owner_status", (q) =>
+        q.eq("ownerId", user._id).eq("status", "awaiting_upload"),
+      )
+      .take(20);
+    const activeBytes = active.reduce((sum, asset) => sum + (asset.sizeBytes ?? 0), 0);
+    const capError = inFlightUploadError(active.length, activeBytes, args.sizeBytes);
+    if (capError) throw new Error(capError);
+
+    const now = Date.now();
+    const assetId = await ctx.db.insert("videoAssets", {
+      lessonId: args.lessonId,
+      sourceFileUrl: "",
+      sourceFileKey: "",
+      status: "awaiting_upload",
+      sizeBytes: args.sizeBytes,
+      ownerId: user._id,
+      fingerprintLastModified: args.fingerprintLastModified,
+      replacesAssetId: lesson.videoAssetId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { assetId };
+  },
+});
+
+/**
+ * Internal: claims presign budget for one batch before a single URL is minted.
+ * Claiming first (rather than counting after) is what makes concurrent
+ * `signParts` calls unable to over-issue: the write is serializable, the
+ * presigning that follows is not.
+ */
+export const claimPresignBudget = internalMutation({
+  args: { assetId: v.id("videoAssets"), count: v.number() },
+  returns: v.object({ issued: v.number(), budget: v.number() }),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Video asset not found");
+    if (asset.sizeBytes === undefined) throw new Error("Upload is not in progress");
+    const parts = rawPartCount(asset.sizeBytes);
+    const alreadyIssued = asset.presignedUrlCount ?? 0;
+    const rejection = presignBudgetError(alreadyIssued, args.count, parts);
+    if (rejection) throw new Error(rejection);
+    const issued = alreadyIssued + args.count;
+    await ctx.db.patch(args.assetId, {
+      presignedUrlCount: issued,
+      updatedAt: Date.now(),
+    });
+    return { issued, budget: presignBudget(parts) };
+  },
+});
+
+/**
+ * Internal: records the B2 multipart handle on the draft. No inner auth check
+ * by design — the row was drafted by a caller that already passed
+ * `resolveUploadInitiator`, and phase 3's worker drives these helpers
+ * session-lessly.
+ */
+export const attachUploadId = internalMutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    uploadId: v.string(),
+    rawKey: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.assetId, {
+      uploadId: args.uploadId,
+      rawKey: args.rawKey,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * Internal: guarded status changes for the staged pipeline. Same-status is a
+ * no-op (idempotent retries); every other pair must be an edge in
+ * `canVideoTransition`. `queued` and `failed` clear the multipart handle —
+ * once the raw object is complete or the upload is dead it is meaningless.
+ */
+export const transitionUploadStatus = internalMutation({
+  args: {
+    assetId: v.id("videoAssets"),
+    to: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    errorMessage: v.optional(v.string()),
+  },
+  returns: v.object({ changed: v.boolean() }),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) throw new Error("Video asset not found");
+    if (asset.status === args.to) return { changed: false };
+    if (!canVideoTransition(asset.status, args.to)) {
+      throw new Error(`Invalid video status transition: ${asset.status} \u2192 ${args.to}`);
+    }
+    await ctx.db.patch(args.assetId, {
+      status: args.to,
+      updatedAt: Date.now(),
+      // Convex treats `undefined` in a patch as "delete this field".
+      ...(args.to === "queued" || args.to === "failed" ? { uploadId: undefined } : {}),
+      ...(args.to === "failed"
+        ? { errorMessage: (args.errorMessage ?? "Upload failed").slice(0, 500) }
+        : {}),
+      ...(args.to === "processing" ? { processingStartedAt: Date.now() } : {}),
+    });
+    return { changed: true };
+  },
+});
+
+/**
+ * Internal: clears the raw source reference after the raw object has been
+ * deleted from B2. Called by the Phase 5 cleanup action; best-effort, never
+ * throws on a missing row.
+ */
+export const clearRawSource = internalMutation({
+  args: { assetId: v.id("videoAssets") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const asset = await ctx.db.get(args.assetId);
+    if (!asset) return null;
+    await ctx.db.patch(args.assetId, {
+      rawKey: undefined,
+      uploadId: undefined,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * Internal: list `awaiting_upload` assets older than the cutoff, for the
+ * stale-multipart reconciler. Returns the handles the action needs to abort.
+ */
+export const listStaleAwaitingUploads = internalQuery({
+  args: { cutoff: v.number() },
+  returns: v.array(
+    v.object({
+      assetId: v.id("videoAssets"),
+      uploadId: v.optional(v.string()),
+      rawKey: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("videoAssets")
+      .withIndex("by_status", (q) => q.eq("status", "awaiting_upload"))
+      .collect();
+    return rows
+      .filter((row) => row.createdAt < args.cutoff)
+      .map((row) => ({
+        assetId: row._id,
+        uploadId: row.uploadId,
+        rawKey: row.rawKey,
+      }));
+  },
+});
+
+/**
+ * Internal: DB-only reconciliation of stale `awaiting_upload` rows. Marks any
+ * row older than the cutoff as failed. B2-side abort is the action's job; this
+ * exists so a mutation-only caller (or a test) can drive the state machine.
+ */
+export const cleanupStaleUploads = internalMutation({
+  args: { cutoff: v.optional(v.number()), olderThanMs: v.optional(v.number()) },
+  returns: v.object({ reconciled: v.number(), count: v.number(), cleaned: v.number() }),
+  handler: async (ctx, args) => {
+    const cutoff = args.cutoff ?? Date.now() - (args.olderThanMs ?? 24 * 60 * 60 * 1000);
+    const rows = await ctx.db
+      .query("videoAssets")
+      .withIndex("by_status", (q) => q.eq("status", "awaiting_upload"))
+      .collect();
+    let reconciled = 0;
+    for (const row of rows) {
+      if (row.createdAt >= cutoff) continue;
+      if (row.status !== "awaiting_upload") continue;
+      try {
+        if (!canVideoTransition(row.status, "failed")) continue;
+        await ctx.db.patch(row._id, {
+          status: "failed",
+          uploadId: undefined,
+          errorMessage: "Stale upload reconciled",
+          updatedAt: Date.now(),
+        });
+        reconciled += 1;
+      } catch {
+        // skip
+      }
+    }
+    return { reconciled, count: reconciled, cleaned: reconciled };
+  },
+});
+export const reconcileStaleUploads = cleanupStaleUploads;
+export const reconcileStaleMultipartUploads = cleanupStaleUploads;
+
+
+/**
+ * Internal: writes the per-asset AES key exactly once. A retried completion
+ * finds the row already present and returns — the key must never rotate after
+ * the worker has begun encrypting with it.
+ */
+export const storeVideoKey = internalMutation({
+  args: { assetId: v.id("videoAssets"), keyB64: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.keyB64.length !== 24) throw new Error("Invalid video key");
+    const existing = await ctx.db
+      .query("videoKeys")
+      .withIndex("by_asset", (q) => q.eq("assetId", args.assetId))
+      .first();
+    if (existing) return null;
+    await ctx.db.insert("videoKeys", { assetId: args.assetId, keyB64: args.keyB64 });
+    return null;
   },
 });

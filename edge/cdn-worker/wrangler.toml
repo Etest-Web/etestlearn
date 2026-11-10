@@ -1,0 +1,15 @@
+name = "glypha-media-cdn"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# The Worker is read-only and has no bindings besides vars/secrets.
+workers_dev = true
+routes = [{ pattern = "cdn.glypha.com.ng", custom_domain = true }]
+
+[vars]
+# Non-secret configuration. Keys are set with `wrangler secret put` (see README).
+B2_ENDPOINT = "https://s3.eu-central-003.backblazeb2.com"
+B2_REGION = "eu-central-003"
+B2_BUCKET = "glypha-media"
+# Bare origins only, comma-separated. Empty = no cross-origin reads at all.
+ALLOWED_ORIGINS = "https://glypha.com.ng,https://www.glypha.com.ng,https://learn.glypha.com.ng"

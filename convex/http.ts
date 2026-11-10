@@ -1,11 +1,20 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { Webhook } from "svix";
+import { z } from "zod";
 // The mismatch marker the settlement check throws (M-2) — see `payments.ts`.
 import { PAYMENT_MISMATCH } from "./payments";
 import { decodePlaybackToken, verifyPlaybackToken } from "../lib/video-playback-token";
 import { decorateMasterPlaylist, decorateMediaPlaylist } from "../lib/video-playlists";
+import {
+  isAuthorizedTranscodeCall,
+  transcodeClaimRequestSchema,
+  transcodeCompleteRequestSchema,
+  transcodeFailRequestSchema,
+  transcodeProgressRequestSchema,
+} from "../lib/video-transcode-job";
 
 type ClerkUserEvent = {
   type: "user.created" | "user.updated" | "user.deleted" | string;
@@ -60,6 +69,12 @@ function timingSafeEqualHex(a: string, b: string): boolean {
 const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 
 /**
+ * Transcode reports are tiny (an asset id, a ladder and a few keys). The
+ * runner never sends media through this endpoint — only metadata.
+ */
+const MAX_TRANSCODE_BODY_BYTES = 8 * 1024;
+
+/**
  * CORS is deliberately absent from both webhook routes — do not "fix" that.
  *
  * These are server-to-server endpoints. Paystack and Clerk/svix sign their
@@ -99,20 +114,84 @@ function refuseBrowserOrigin(request: Request): Response | null {
  */
 async function readBodyWithinLimit(
   request: Request,
+  limit = MAX_WEBHOOK_BODY_BYTES,
 ): Promise<ArrayBuffer | Response> {
   const declared = request.headers.get("content-length");
   if (declared !== null) {
     const size = Number.parseInt(declared, 10);
-    if (Number.isFinite(size) && size > MAX_WEBHOOK_BODY_BYTES) {
+    if (Number.isFinite(size) && size > limit) {
       return new Response("Payload Too Large", { status: 413 });
     }
   }
 
   const bytes = await request.arrayBuffer();
-  if (bytes.byteLength > MAX_WEBHOOK_BODY_BYTES) {
+  if (bytes.byteLength > limit) {
     return new Response("Payload Too Large", { status: 413 });
   }
   return bytes;
+}
+
+/* ── Transcode job endpoints ────────────────────────────────────────────────
+ * `POST /transcode/claim|complete|fail` are called by the GitHub Actions
+ * runner, never by a browser. They are session-less and authenticating with a
+ * bearer `VIDEO_TRANSCODE_TOKEN` compared in constant time; a missing token
+ * fails closed with 503, a wrong one with 401. No CORS headers anywhere — a
+ * request carrying a browser `Origin` is refused before the body is read.
+ */
+
+const TRANSCODE_JSON_HEADERS = {
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store",
+} as const;
+
+function transcodeJson(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: TRANSCODE_JSON_HEADERS,
+  });
+}
+
+function transcodeAuthFailure(request: Request): Response | null {
+  const secret = process.env.VIDEO_TRANSCODE_TOKEN;
+  if (!secret) {
+    // Fail closed: an unconfigured deployment must not run unauthenticated
+    // jobs just because the token is missing.
+    return transcodeJson({ error: "Transcode jobs are not configured" }, 503);
+  }
+  if (!isAuthorizedTranscodeCall(request.headers.get("authorization"), secret)) {
+    return transcodeJson({ error: "Unauthorized" }, 401);
+  }
+  return null;
+}
+
+async function readTranscodeJson<T>(
+  request: Request,
+  schema: z.ZodType<T>,
+): Promise<T | Response> {
+  const bytes = await readBodyWithinLimit(request, MAX_TRANSCODE_BODY_BYTES);
+  if (bytes instanceof Response) return bytes;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return transcodeJson({ error: "Invalid JSON" }, 400);
+  }
+
+  const result = schema.safeParse(parsed);
+  if (!result.success) return transcodeJson({ error: "Invalid request body" }, 400);
+  return result.data;
+}
+
+function transcodeError(error: unknown): Response {
+  // These endpoints are token-protected, so the operator (the runner) may see
+  // the reason. It is still capped and never includes key material.
+  const message = error instanceof Error ? error.message : "Transcode job failed";
+  return transcodeJson({ error: message.slice(0, 300) }, 409);
+}
+
+function asVideoAssetId(assetId: string): Id<"videoAssets"> {
+  return assetId as Id<"videoAssets">;
 }
 
 const http = httpRouter();
@@ -363,6 +442,102 @@ http.route({
     const noStore = { ...cors, "Cache-Control": "no-store" };
     const tokenParam = `t=${token}`;
 
+    const isB2 = Boolean(asset.hlsPrefix || asset.masterPlaylistKey);
+
+    if (isB2) {
+      const cdnOrigin = (process.env.CDN_ORIGIN ?? process.env.NEXT_PUBLIC_CDN_ORIGIN ?? "")
+        .replace(/\/+$/, "");
+      if (!cdnOrigin) {
+        return new Response("Playback not configured", { status: 500, headers: cors });
+      }
+
+      if (file === "master.m3u8") {
+        if (!asset.masterPlaylistKey) {
+          return new Response("Not found", { status: 404, headers: cors });
+        }
+        let res: Response;
+        try {
+          res = await fetch(`${cdnOrigin}/${asset.masterPlaylistKey}`);
+        } catch {
+          return new Response("Media service unavailable", { status: 502, headers: cors });
+        }
+        if (!res.ok) {
+          return new Response(res.status === 404 ? "Not found" : "Media service unavailable", {
+            status: res.status === 404 ? 404 : 502,
+            headers: cors,
+          });
+        }
+        const text = await res.text();
+        // B2 master references `${variant}/index.m3u8`; rewrite to the gate's
+        // `v{variant}.m3u8` naming so variant playlists are decorated per viewer.
+        const rewritten = text.replace(/(^|\n)(\d+)\/index\.m3u8/g, "$1v$2.m3u8");
+        const body = decorateMasterPlaylist(rewritten, tokenParam);
+        return new Response(body, {
+          headers: { ...noStore, "Content-Type": "application/x-mpegURL" },
+        });
+      }
+
+      const variantMatch = /^v(\d+)\.m3u8$/.exec(file);
+      if (variantMatch) {
+        const i = Number(variantMatch[1]);
+        const variantKey = asset.variantPlaylistKeys?.find((v) => v.variant === i)?.key;
+        if (!variantKey || !asset.ivHex) {
+          return new Response("Not found", { status: 404, headers: cors });
+        }
+        let res: Response;
+        try {
+          res = await fetch(`${cdnOrigin}/${variantKey}`);
+        } catch {
+          return new Response("Media service unavailable", { status: 502, headers: cors });
+        }
+        if (!res.ok) {
+          return new Response(res.status === 404 ? "Not found" : "Media service unavailable", {
+            status: res.status === 404 ? 404 : 502,
+            headers: cors,
+          });
+        }
+        const stored = await res.text();
+        // Segments are served straight from the CDN (encrypted, immutable), so
+        // rewrite relative names to absolute CDN URLs and drop the token query.
+        const lines = stored
+          .split("\n")
+          .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("#") && trimmed.endsWith(".ts")) {
+              return `${cdnOrigin}/${asset.hlsPrefix}/${i}/${trimmed}`;
+            }
+            return line;
+          })
+          .join("\n");
+        const body = decorateMediaPlaylist(lines, {
+          keyUri: `key?${tokenParam}`,
+          ivHex: asset.ivHex,
+          tokenParam: "",
+        });
+        return new Response(body, {
+          headers: { ...noStore, "Content-Type": "application/x-mpegURL" },
+        });
+      }
+
+      if (file === "key") {
+        const keyB64 = await ctx.runQuery(internal.videoAssets.getVideoKey, {
+          assetId: assetId as never,
+        });
+        if (!keyB64) return new Response("Not found", { status: 404, headers: cors });
+        let bytes: Uint8Array;
+        try {
+          bytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+        } catch {
+          return new Response("Not found", { status: 404, headers: cors });
+        }
+        return new Response(new Uint8Array(bytes).buffer, {
+          headers: { ...noStore, "Content-Type": "application/octet-stream" },
+        });
+      }
+
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+
     if (file === "master.m3u8") {
       if (!asset.masterManifestStorageId) return new Response("Not found", { status: 404, headers: cors });
       const blob = await ctx.storage.get(asset.masterManifestStorageId);
@@ -418,6 +593,110 @@ http.route({
     }
 
     return new Response("Not found", { status: 404, headers: cors });
+  }),
+});
+
+/* ── Transcode job routes ──────────────────────────────────────────────────
+ * The runner claims an asset, transcodes it, then reports completion or
+ * failure. These routes intentionally carry no CORS headers and refuse a
+ * browser `Origin`, same reasoning as the webhooks above.
+ */
+
+http.route({
+  path: "/transcode/claim",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+    const authFailure = transcodeAuthFailure(request);
+    if (authFailure) return authFailure;
+
+    const body = await readTranscodeJson(request, transcodeClaimRequestSchema);
+    if (body instanceof Response) return body;
+
+    try {
+      const job = await ctx.runMutation(internal.videoTranscodeJobs.claim, {
+        assetId: asVideoAssetId(body.assetId),
+      });
+      return transcodeJson(job);
+    } catch (error) {
+      return transcodeError(error);
+    }
+  }),
+});
+
+http.route({
+  path: "/transcode/complete",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+    const authFailure = transcodeAuthFailure(request);
+    if (authFailure) return authFailure;
+
+    const body = await readTranscodeJson(request, transcodeCompleteRequestSchema);
+    if (body instanceof Response) return body;
+
+    try {
+      const result = await ctx.runMutation(internal.videoTranscodeJobs.complete, {
+        assetId: asVideoAssetId(body.assetId),
+        durationSeconds: body.durationSeconds,
+        variants: body.variants,
+        masterPlaylistKey: body.masterPlaylistKey,
+        variantPlaylistKeys: body.variantPlaylistKeys,
+      });
+      return transcodeJson(result);
+    } catch (error) {
+      return transcodeError(error);
+    }
+  }),
+});
+
+http.route({
+  path: "/transcode/fail",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+    const authFailure = transcodeAuthFailure(request);
+    if (authFailure) return authFailure;
+
+    const body = await readTranscodeJson(request, transcodeFailRequestSchema);
+    if (body instanceof Response) return body;
+
+    try {
+      const result = await ctx.runMutation(internal.videoTranscodeJobs.fail, {
+        assetId: asVideoAssetId(body.assetId),
+        errorMessage: body.errorMessage,
+      });
+      return transcodeJson(result);
+    } catch (error) {
+      return transcodeError(error);
+    }
+  }),
+});
+
+http.route({
+  path: "/transcode/progress",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const refused = refuseBrowserOrigin(request);
+    if (refused) return refused;
+    const authFailure = transcodeAuthFailure(request);
+    if (authFailure) return authFailure;
+
+    const body = await readTranscodeJson(request, transcodeProgressRequestSchema);
+    if (body instanceof Response) return body;
+
+    try {
+      await ctx.runMutation(internal.videoTranscodeJobs.setProgress, {
+        assetId: asVideoAssetId(body.assetId),
+        progress: body.progress,
+      });
+      return transcodeJson({ ok: true });
+    } catch (error) {
+      return transcodeError(error);
+    }
   }),
 });
 

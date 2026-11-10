@@ -296,6 +296,11 @@ export default defineSchema({
       v.literal("processing"),
       v.literal("ready"),
       v.literal("failed"),
+      // B2 staged-upload pipeline (videoStorage.ts). `awaiting_upload` holds
+      // an in-flight multipart upload; `queued` means the raw object landed
+      // and is waiting on the transcode worker.
+      v.literal("awaiting_upload"),
+      v.literal("queued"),
     ),
     // Raw instructor upload on UploadThing. The ladder output stays in Convex
     // storage; only these capability URLs leave the platform, and only the
@@ -327,6 +332,9 @@ export default defineSchema({
         v.object({
           label: v.string(),
           height: v.number(),
+          // Source width when the B2 transcode worker knows it; legacy
+          // ladders follow height only and omit it.
+          width: v.optional(v.number()),
           bitrate: v.number(),
           bandwidth: v.number(),
         }),
@@ -344,9 +352,59 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // ── B2 staged upload (convex/videoStorage.ts) ───────────────────────────
+    // Only the new pipeline uses these. `uploadId` is the B2 multipart id
+    // while parts are still landing (cleared once the raw object is complete);
+    // `rawKey` is the object key — built from the asset id, never a filename.
+    // `sizeBytes` is the declared source size that `completeUpload` verifies
+    // against the stored object; `attempts` and `processingStartedAt` serve
+    // the dispatch retry logic and the staleness cron in later phases.
+    uploadId: v.optional(v.string()),
+    rawKey: v.optional(v.string()),
+    sizeBytes: v.optional(v.number()),
+    attempts: v.optional(v.number()),
+    processingStartedAt: v.optional(v.number()),
+    // Who opened the staged upload. Read through `by_owner_status` to cap one
+    // instructor's simultaneous uploads; legacy rows predate it.
+    ownerId: v.optional(v.id("users")),
+    // The browser `File.lastModified` of the source at initiate time. A resume
+    // must present the same value, so picking a different file cannot silently
+    // continue somebody else's part stream.
+    fingerprintLastModified: v.optional(v.number()),
+    // How many presigned part URLs this asset has been issued. Capped at
+    // `partCount + PRESIGN_URL_SLACK` so one account cannot mint links forever.
+    presignedUrlCount: v.optional(v.number()),
+    // ── B2 HLS output (Phase 3 transcode job) ───────────────────────────────
+    // Object keys in the private `glypha-media` bucket, not Convex storage ids:
+    // the ladder is produced on a GitHub runner and served by the Cloudflare
+    // Worker. All three are written once, by `videoTranscodeJobs.complete`,
+    // and only when the report matches the Worker's path allowlist.
+    hlsPrefix: v.optional(v.string()),
+    masterPlaylistKey: v.optional(v.string()),
+    variantPlaylistKeys: v.optional(
+      v.array(v.object({ variant: v.number(), key: v.string() })),
+    ),
+    // 0–100 while processing; reported by the GitHub Actions runner.
+    transcodeProgress: v.optional(v.number()),
   })
     .index("by_lesson", ["lessonId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_owner_status", ["ownerId", "status"]),
+
+  /**
+   * The per-asset AES-128 content key for the B2 pipeline, base64-encoded.
+   *
+   * Written once, by `videoStorage.completeUpload`, after the raw object has
+   * been verified; the GitHub Actions worker (later phase) reads it to encrypt
+   * segments, and the playback gate reads it to serve `#EXT-X-KEY`. It lives
+   * in its own table on purpose: it keeps key material out of every
+   * player-facing projection of `videoAssets`, so no query reshuffle can leak
+   * it by adding a field to the wrong projection.
+   */
+  videoKeys: defineTable({
+    assetId: v.id("videoAssets"),
+    keyB64: v.string(),
+  }).index("by_asset", ["assetId"]),
 
   enrollments: defineTable({
     userId: v.id("users"),

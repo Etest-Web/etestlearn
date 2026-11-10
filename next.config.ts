@@ -1,4 +1,12 @@
 import type { NextConfig } from "next";
+import { assertVideoCspEnv } from "./lib/csp";
+
+/**
+ * The video origins are load-bearing policy inputs, so a production build
+ * refuses to start without them. See `assertVideoCspEnv` for why this is a
+ * build-time assertion rather than a runtime fallback.
+ */
+assertVideoCspEnv();
 
 /**
  * Static security headers.

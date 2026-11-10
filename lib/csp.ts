@@ -135,6 +135,115 @@ export function buildContentSecurityPolicy(nonce: string, extraScriptHashes: str
 }
 
 /**
+ * A bare https origin — scheme, host and an optional port. No path, query,
+ * fragment or userinfo, and no non-https scheme. Anything else is rejected
+ * rather than "cleaned": a policy source this file has to repair is a value
+ * nobody can reason about.
+ */
+export function parseBareHttpsOrigin(value: string): string | null {
+  const trimmed = value.trim();
+  return /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(trimmed) ? trimmed : null;
+}
+
+/**
+ * Fail the production build when the video origins are missing or malformed.
+ *
+ * These values reach the browser through `NEXT_PUBLIC_*` and are read again by
+ * the CSP builder at request time; a production deploy without the upload
+ * origin would ship a policy that blocks every raw part PUT, and the failure
+ * would surface as a browser console error on an instructor's machine rather
+ * than in CI. Malformed values throw in every environment (a path smuggled into
+ * a host source is never acceptable); a missing upload origin is only fatal in
+ * production, so `next dev` can run without B2 credentials.
+ */
+export function assertVideoCspEnv(
+  env: Record<string, string | undefined> = process.env,
+): void {
+  const upload = env.NEXT_PUBLIC_B2_UPLOAD_ORIGIN ?? "";
+  const cdn = env.NEXT_PUBLIC_CDN_ORIGIN ?? "";
+
+  if (upload.trim().length === 0) {
+    if (env.NODE_ENV === "production") {
+      throw new Error(
+        "NEXT_PUBLIC_B2_UPLOAD_ORIGIN must be set to the bare https origin of the B2 S3 endpoint in production",
+      );
+    }
+  } else if (!parseBareHttpsOrigin(upload)) {
+    throw new Error(
+      "NEXT_PUBLIC_B2_UPLOAD_ORIGIN must be a bare https origin (no path, query or fragment)",
+    );
+  }
+
+  if (cdn.trim().length > 0 && !parseBareHttpsOrigin(cdn)) {
+    throw new Error(
+      "NEXT_PUBLIC_CDN_ORIGIN must be a bare https origin (no path, query or fragment)",
+    );
+  }
+}
+
+/**
+ * `connect-src` sources: the standing allow-list, plus the B2 upload origin and
+ * the Cloudflare media CDN when they are configured.
+ *
+ * The staged uploader PUTs every raw part straight to B2, and hls.js fetches
+ * the manifest and segments over XHR (connect-src, not media-src); both hosts
+ * must be admitted or the page's own policy refuses them. The proxy (edge
+ * runtime) cannot read Convex-side environment, so browsers see the values
+ * mirrored into `NEXT_PUBLIC_B2_UPLOAD_ORIGIN` / `NEXT_PUBLIC_CDN_ORIGIN`; an
+ * empty or malformed value contributes nothing — the policy must never widen
+ * by accident.
+ */
+export function connectSrcSources(uploadOrigin: string, cdnOrigin = ""): string[] {
+  const sources = [
+    "'self'",
+    "https://*.convex.cloud",
+    "https://*.convex.site",
+    "wss://*.convex.cloud",
+    "wss://*.convex.site",
+    "https://clerk.glypha.com.ng",
+    "https://*.clerk.accounts.dev",
+    "https://api.paystack.co",
+    // Localization provider (ipapi.co geo-IP lookup for currency detection).
+    "https://ipapi.co",
+    "https://*.uploadthing.com",
+    "https://uploadthing.com",
+    "https://unpkg.com",
+    "https://api.publit.io",
+    "https://*.publit.io",
+    "https://media.publit.io",
+    "https://va.vercel-scripts.com",
+    // Cloudflare Turnstile verification API calls.
+    "https://challenges.cloudflare.com",
+    // Clerk bot / abuse protection API calls (requires wildcard port per Clerk docs)
+    "https://*.protect.clerk.com:*",
+  ];
+  for (const candidate of [uploadOrigin, cdnOrigin]) {
+    const origin = parseBareHttpsOrigin(candidate);
+    if (origin && !sources.includes(origin)) sources.push(origin);
+  }
+  return sources;
+}
+
+/**
+ * `media-src` sources: native `<video src>` playback (Safari plays AES-128 HLS
+ * itself) plus `blob:` for the MSE object URL hls.js hands the element. The CDN
+ * origin is admitted when configured; the directive never gains a host that was
+ * not explicitly set.
+ */
+export function mediaSrcSources(cdnOrigin: string): string[] {
+  const sources = [
+    "'self'",
+    "blob:",
+    "https://*.convex.site",
+    "https://*.publit.io",
+    "https://media.publit.io",
+  ];
+  const origin = parseBareHttpsOrigin(cdnOrigin);
+  if (origin && !sources.includes(origin)) sources.push(origin);
+  return sources;
+}
+
+/**
  * Every directive the policies have in common.
  *
  * `script-src` is the only thing that differs between them (nonce vs hashes
@@ -153,33 +262,19 @@ function buildPolicy(scriptSrc: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
-    // Safari plays AES-128 HLS natively through <video src>, which is a
-    // media-src fetch (hls.js/MSE path uses connect-src instead).
-    "media-src 'self' https://*.convex.site https://*.publit.io https://media.publit.io",
-    // External APIs speak over connect-src.
+    // Native <video src> playback (Safari plays AES-128 HLS itself) and the
+    // `blob:` object URL hls.js hands the element through MSE — the two paths
+    // that are not XHR and therefore not covered by connect-src.
+    ["media-src", ...mediaSrcSources(process.env.NEXT_PUBLIC_CDN_ORIGIN ?? "")].join(" "),
+    // External APIs speak over connect-src, including the B2 upload origin
+    // (the staged uploader PUTs raw parts straight there from the browser) and
+    // the media CDN (hls.js fetches manifests/segments over XHR).
     [
       "connect-src",
-      "'self'",
-      "https://*.convex.cloud",
-      "https://*.convex.site",
-      "wss://*.convex.cloud",
-      "wss://*.convex.site",
-      "https://clerk.glypha.com.ng",
-      "https://*.clerk.accounts.dev",
-      "https://api.paystack.co",
-      // Localization provider (ipapi.co geo-IP lookup for currency detection).
-      "https://ipapi.co",
-      "https://*.uploadthing.com",
-      "https://uploadthing.com",
-      "https://unpkg.com",
-      "https://api.publit.io",
-      "https://*.publit.io",
-      "https://media.publit.io",
-      "https://va.vercel-scripts.com",
-      // Cloudflare Turnstile verification API calls.
-      "https://challenges.cloudflare.com",
-      // Clerk bot / abuse protection API calls (requires wildcard port per Clerk docs)
-      "https://*.protect.clerk.com:*",
+      ...connectSrcSources(
+        process.env.NEXT_PUBLIC_B2_UPLOAD_ORIGIN ?? "",
+        process.env.NEXT_PUBLIC_CDN_ORIGIN ?? "",
+      ),
     ].join(" "),
     [
       "frame-src",

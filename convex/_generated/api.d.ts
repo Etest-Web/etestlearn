@@ -68,7 +68,9 @@ import type * as tasks from "../tasks.js";
 import type * as tutorial from "../tutorial.js";
 import type * as users from "../users.js";
 import type * as videoAssets from "../videoAssets.js";
+import type * as videoStorage from "../videoStorage.js";
 import type * as videoTranscode from "../videoTranscode.js";
+import type * as videoTranscodeJobs from "../videoTranscodeJobs.js";
 
 import type {
   ApiFromModules,
@@ -137,7 +139,9 @@ declare const fullApi: ApiFromModules<{
   tutorial: typeof tutorial;
   users: typeof users;
   videoAssets: typeof videoAssets;
+  videoStorage: typeof videoStorage;
   videoTranscode: typeof videoTranscode;
+  videoTranscodeJobs: typeof videoTranscodeJobs;
 }>;
 
 /**

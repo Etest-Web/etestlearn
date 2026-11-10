@@ -148,8 +148,17 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
 
   const busy = phase === "initializing" || phase === "uploading" || phase === "assembling";
 
-  const managerAsset = assetStatus?.role === "manager" ? (assetStatus.asset as any) : null;
-  const transcodeStatus = managerAsset?.status as string | undefined;
+  const managerAsset =
+    assetStatus?.role === "manager"
+      ? (assetStatus.asset as {
+          status: string;
+          transcodeProgress?: number;
+          processingStartedAt?: number;
+          updatedAt?: number;
+          errorMessage?: string;
+        })
+      : null;
+  const transcodeStatus = managerAsset?.status;
   const transcodeProgress =
     typeof managerAsset?.transcodeProgress === "number" ? managerAsset.transcodeProgress : 0;
   const processingStartedAt =
@@ -168,12 +177,6 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [isTranscoding]);
-
-  useEffect(() => {
-    if (isTranscodeReady && (phase === "queued" || phase === "idle")) {
-      setProgressPercent(100);
-    }
-  }, [isTranscodeReady, phase]);
 
   const handleStart = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {

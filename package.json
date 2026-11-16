@@ -9,8 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "indexnow": "node scripts/indexnow-submit.mjs",
     "test": "vitest run",
+    "indexnow": "node scripts/indexnow-submit.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -35,7 +35,7 @@
     "lucide-react": "^0.577.0",
     "next": "^16.4.3",
     "next-themes": "^0.4.6",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.6.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
     "react": "19.2.3",
@@ -44,7 +44,6 @@
     "recharts": "2.15.4",
     "remark-gfm": "^4.0.1",
     "resend": "^6.34.1",
-    "shadcn": "^4.22.1",
     "sonner": "^2.0.8",
     "svix": "^2.9.0",
     "tailwind-merge": "^3.7.0",
@@ -65,6 +64,7 @@
     "convex-test": "^0.0.56",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.1.6",
+    "shadcn": "^4.23.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"

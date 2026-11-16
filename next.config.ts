@@ -81,6 +81,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Surface security-upgrade nudges to coding agents working in this app.
+    agentUpgrade: "security",
+  },
   /**
    * Fonts for the generated OpenGraph cards.
    *

@@ -57,3 +57,43 @@ export function getPublitioUploadUrl(apiKey: string, apiSecret: string): string 
   });
   return `https://api.publit.io/v1/files/create?${query.toString()}`;
 }
+
+/** Signed query params required by every Publit.io API v1 call. */
+export function publitioAuthParams(apiKey: string, apiSecret: string): URLSearchParams {
+  const { timestamp, nonce, signature } = buildPublitioSignature(apiSecret);
+  return new URLSearchParams({
+    api_key: apiKey,
+    api_timestamp: String(timestamp),
+    api_nonce: String(nonce),
+    api_signature: signature,
+  });
+}
+
+/** Build a signed GET URL for a Publit.io API v1 endpoint path (e.g. `/files/list`). */
+export function getPublitioApiUrl(
+  path: string,
+  apiKey: string,
+  apiSecret: string,
+  params?: Record<string, string | number | undefined>,
+): string {
+  const query = publitioAuthParams(apiKey, apiSecret);
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  return `https://api.publit.io/v1${normalized}?${query.toString()}`;
+}
+
+/** Extract a Publit.io file id from a stored lesson URL/content, or null. */
+export function publitioFileIdFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== "publit.io" && !host.endsWith(".publit.io")) return null;
+    // /file/<id>.mp4, /file/<id>.html, /file/<id>
+    const match = /^\/file\/([A-Za-z0-9_-]+)/.exec(parsed.pathname);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}

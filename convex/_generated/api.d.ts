@@ -55,6 +55,7 @@ import type * as maintenance from "../maintenance.js";
 import type * as payments from "../payments.js";
 import type * as payouts from "../payouts.js";
 import type * as paystack from "../paystack.js";
+import type * as publitioMigration from "../publitioMigration.js";
 import type * as quizzes from "../quizzes.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as referrals from "../referrals.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   payments: typeof payments;
   payouts: typeof payouts;
   paystack: typeof paystack;
+  publitioMigration: typeof publitioMigration;
   quizzes: typeof quizzes;
   rateLimit: typeof rateLimit;
   referrals: typeof referrals;

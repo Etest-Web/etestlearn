@@ -23,6 +23,7 @@ export type ZipLessonDraft = {
   section?: string;
   fileBlob?: Blob;
   textContent?: string;
+  contentFormat?: "markdown" | "html";
   quiz?: QuizDraft;
   needsInput: string[];
 };
@@ -233,6 +234,7 @@ export async function analyzeZip(file: Blob): Promise<ZipAnalysis> {
         sourcePath: r.path,
         section,
         textContent: text,
+        contentFormat: e === "html" || e === "htm" ? "html" : "markdown",
         needsInput: [],
       });
       idx++;

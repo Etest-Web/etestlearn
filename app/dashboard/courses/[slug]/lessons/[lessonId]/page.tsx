@@ -19,6 +19,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
+import { sanitizeArticleHtml } from "@/lib/sanitize-html";
 import {
   ArrowLeft,
   ArrowRight,
@@ -169,7 +170,7 @@ function LessonContent({
       {contentFormat === "html" ? (
         <div
           className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: content }}
+          dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(content) }}
         />
       ) : (
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>

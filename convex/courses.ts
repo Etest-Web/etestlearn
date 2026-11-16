@@ -383,6 +383,7 @@ export const createLesson = mutation({
     contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation")),
     order: v.number(),
     section: v.optional(v.string()),
+    contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -405,6 +406,7 @@ export const createLesson = mutation({
       contentType: args.contentType,
       order: args.order,
       ...(args.section ? { section: args.section.trim() } : {}),
+      ...(args.contentFormat ? { contentFormat: args.contentFormat } : {}),
       createdAt: Date.now(),
     });
   },
@@ -425,6 +427,7 @@ export const bulkCreateLessons = mutation({
         order: v.number(),
         content: v.optional(v.string()),
         section: v.optional(v.string()),
+        contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
         videoStorageId: v.optional(v.id("_storage")),
         presentationStorageId: v.optional(v.id("_storage")),
         presentationFileName: v.optional(v.string()),
@@ -483,6 +486,7 @@ export const bulkCreateLessons = mutation({
         order: l.order,
         ...(resolvedContent ? { content: resolvedContent } : {}),
         ...(l.section ? { section: l.section.trim() } : {}),
+        ...(l.contentFormat ? { contentFormat: l.contentFormat } : {}),
         ...(l.presentationStorageId
           ? { presentationStorageId: l.presentationStorageId }
           : {}),

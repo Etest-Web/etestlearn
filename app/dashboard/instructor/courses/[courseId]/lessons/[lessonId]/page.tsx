@@ -35,6 +35,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CourseSectionPicker, courseSections } from "@/components/course-section-picker";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { sanitizeArticleHtml } from "@/lib/sanitize-html";
 
 export default function LessonEditPage() {
   const router = useRouter();
@@ -164,7 +165,7 @@ export default function LessonEditPage() {
   const [uploadedPresentationStorageId, setUploadedPresentationStorageId] = useState<string | null>(null);
   const presentationInputRef = useRef<HTMLInputElement>(null);
 
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  const htmlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const lesson = courseData?.lessons?.find((l) => l._id === lessonId);
   // Existing module labels, so moving a lesson into a module is a pick rather
@@ -507,128 +508,126 @@ export default function LessonEditPage() {
                   </Select>
                 </div>
 
-{formData.contentFormat === "html" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="content">Article Content</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          HTML
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Image preview section */}
-                    <div className="space-y-4">
-                      {pendingImageUrl && (
-                        <div className="flex items-center gap-4 p-2 bg-surface-sunken rounded-md">
-                          <img src={pendingImageUrl} alt="preview" className="h-12 w-12 object-cover rounded-md" />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="content">Article Content</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {formData.contentFormat === "html" ? "HTML" : "Markdown"}
+                    </span>
+                  </div>
+                  <Tabs defaultValue="write">
+                    <TabsList variant="segmented" className="touch-target">
+                      <TabsTrigger value="write">Write</TabsTrigger>
+                      <TabsTrigger value="preview">Preview</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="write">
+                      {formData.contentFormat === "markdown" ? (
+                        <Textarea
+                          id="content"
+                          name="content"
+                          rows={24}
+                          placeholder={"# Hello World\n\nWrite your article here using markdown."}
+                          value={formData.content}
+                          onChange={handleChange}
+                          className="font-mono text-sm h-64 min-h-[400px] overflow-y-auto border border-rule rounded-md bg-surface-sunken dark:bg-surface-900 dark:border-surface-800"
+                        />
+                      ) : (
+                        <div className="space-y-2">
+                          <Textarea
+                            ref={htmlTextareaRef}
+                            id="content"
+                            name="content"
+                            rows={24}
+                            placeholder={"<h1>Hello World</h1>\n\nWrite your article here using HTML."}
+                            value={formData.content}
+                            onChange={handleChange}
+                            className="font-mono text-sm h-64 min-h-[400px] overflow-y-auto border border-rule rounded-md bg-surface-sunken dark:bg-surface-900 dark:border-surface-800"
+                          />
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium truncate max-w-[200px]">{pendingImageUrl}</span>
                             <Button
-                              variant="ghost"
+                              type="button"
+                              variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setPendingImageUrl(null);
-                                setFormData((prev) => ({ ...prev, content: prev.content.replace(pendingImageUrl, '') }));
+                              onClick={async () => {
+                                const postUrl = await generateArticleImageUploadUrl({});
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "image/*";
+                                input.onchange = async (e) => {
+                                  const file = (e.target as HTMLInputElement).files?.[0];
+                                  if (!file) return;
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    return toast.error("Image must be under 5 MB");
+                                  }
+                                  if (!file.type.startsWith("image/")) {
+                                    return toast.error("Only image files are allowed");
+                                  }
+                                  setIsUploadingVideo(true);
+                                  try {
+                                    const res = await fetch(postUrl, {
+                                      method: "POST",
+                                      headers: { "Content-Type": file.type },
+                                      body: file,
+                                    });
+                                    if (!res.ok) throw new Error("Upload failed");
+                                    const { storageId } = (await res.json()) as { storageId: string };
+                                    const imageUrl = await validateArticleImageUpload({
+                                      storageId: storageId as Id<"_storage">,
+                                    });
+                                    // Insert at the cursor when the textarea knows where it
+                                    // was, otherwise append — either way the tag lands in
+                                    // `content`, not in a side state.
+                                    const imgTag = `<img src="${imageUrl}" alt="" class="max-w-full h-auto" />`;
+                                    const el = htmlTextareaRef.current;
+                                    setFormData((prev) => {
+                                      const start = el?.selectionStart ?? prev.content.length;
+                                      const end = el?.selectionEnd ?? prev.content.length;
+                                      return {
+                                        ...prev,
+                                        content: prev.content.slice(0, start) + imgTag + prev.content.slice(end),
+                                      };
+                                    });
+                                    toast.success("Image inserted");
+                                  } catch {
+                                    toast.error("Image upload failed");
+                                  } finally {
+                                    setIsUploadingVideo(false);
+                                  }
+                                };
+                                input.click();
                               }}
-                              className="ml-2"
+                              disabled={isUploadingVideo}
                             >
-                              Remove
+                              <Image className="h-3.5 w-3.5" />
+                              Insert Image
                             </Button>
+                            {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
                           </div>
                         </div>
                       )}
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <Label htmlFor="content">
-                        Article Content (HTML)
-                      </Label>
-                      <Tabs defaultValue="write">
-                        <TabsList variant="segmented" className="touch-target">
-                          <TabsTrigger value="write">Write</TabsTrigger>
-                          <TabsTrigger value="preview">Preview</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="write">
-                          <div className="space-y-2">
-                            <Textarea
-                              id="content"
-                              name="content"
-                              rows={24}
-                              placeholder="&lt;h1&gt;Hello World&lt;/h1&gt;&#10;&#10;Write your article here using HTML."
-                              value={formData.content}
-                              onChange={handleChange}
-                              className="font-mono text-sm h-64 min-h-[400px] overflow-y-auto border border-rule rounded-md bg-surface-sunken dark:bg-surface-900 dark:border-surface-800"
+                    </TabsContent>
+                    <TabsContent value="preview">
+                      {formData.content.trim() ? (
+                        <div className="min-h-[400px] overflow-y-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
+                          {formData.contentFormat === "html" ? (
+                            <div
+                              className="prose prose-sm dark:prose-invert max-w-none"
+                              dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(formData.content) }}
                             />
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={async () => {
-                                  const postUrl = await generateArticleImageUploadUrl({});
-                                  const input = document.createElement("input");
-                                  input.type = "file";
-                                  input.accept = "image/*";
-                                  input.onchange = async (e) => {
-                                    const file = (e.target as HTMLInputElement).files?.[0];
-                                    if (!file) return;
-                                    if (file.size > 5 * 1024 * 1024) {
-                                      return toast.error("Image must be under 5 MB");
-                                    }
-                                    if (!file.type.startsWith("image/")) {
-                                      return toast.error("Only image files are allowed");
-                                    }
-                                    setIsUploadingVideo(true);
-                                    try {
-                                      const res = await fetch(postUrl, {
-                                        method: "POST",
-                                        headers: { "Content-Type": file.type },
-                                        body: file,
-                                      });
-                                      if (!res.ok) throw new Error("Upload failed");
-                                      const { storageId } = (await res.json()) as { storageId: string };
-                                      const imageUrl = await validateArticleImageUpload({
-                                        storageId: storageId as Id<"_storage">,
-                                      });
-                                      setPendingImageUrl(imageUrl);
-                                      toast.success("Image preview ready — insert below");
-                                    } catch {
-                                      toast.error("Image upload failed");
-                                    } finally {
-                                      setIsUploadingVideo(false);
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                                disabled={isUploadingVideo}
-                              >
-                                <Image className="h-3.5 w-3.5" />
-                                Insert Image
-                              </Button>
-                              {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
-                            </div>
-                          </div>
-                        </TabsContent>
-                        <TabsContent value="preview">
-                          {formData.content.trim() ? (
-                            <div className="min-h-[400px] overflow-y-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
-                              <div
-                                className="prose prose-sm dark:prose-invert max-w-none"
-                                dangerouslySetInnerHTML={{ __html: formData.content }}
-                              />
-                            </div>
                           ) : (
-                            <div className="flex min-h-[400px] items-center justify-center border border-rule text-sm text-muted-foreground">
-                              Nothing to preview yet — start writing in the Write tab.
-                            </div>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {formData.content}
+                            </ReactMarkdown>
                           )}
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  </div>
-                )}
+                        </div>
+                      ) : (
+                        <div className="flex min-h-[400px] items-center justify-center border border-rule text-sm text-muted-foreground">
+                          Nothing to preview yet — start writing in the Write tab.
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
               </div>
             )}
 

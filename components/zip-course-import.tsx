@@ -117,6 +117,7 @@ export function ZipCourseImport({ courseId }: { courseId: Id<"courses"> }) {
           order: l.order,
           section: l.section,
           content: l.textContent,
+          contentFormat: l.contentFormat,
           presentationStorageId: presentationStorageIds[i],
           presentationFileName:
             l.contentType === "presentation" ? l.sourcePath.split("/").pop() : undefined,

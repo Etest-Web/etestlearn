@@ -22,7 +22,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const KEY = "75772bf07949f71b9a57b8398bf053a2";
-const ENDPOINT = "https://api.indexnow.org/indexnow";
+// Both are official IndexNow endpoints and relay to every participating
+// engine; api.indexnow.org is intermittently unreachable from some networks
+// (connect timeout to 150.171.x), so we default to Bing's, which is the
+// primary consumer of IndexNow data anyway.
+const ENDPOINT = "https://www.bing.com/indexnow";
 const MAX_URLS_PER_REQUEST = 10_000;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/lib/slug";
+import { COURSE_STYLES } from "@/lib/course-styles";
 import { CertificatesPanel } from "@/components/course-certificates-panel";
 import { CourseAnnouncementsManager } from "@/components/course-announcements-manager";
 import { CourseCouponsManager } from "@/components/course-coupons-manager";
@@ -73,18 +74,7 @@ export default function CourseEditPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // When the uploaded file URL resolves, attach it to the form.
-  useEffect(() => {
-    if (
-      resolvedFileUrl &&
-      pendingStorageId.current &&
-      resolvedStorageId === pendingStorageId.current
-    ) {
-      setFormData((prev) => ({ ...prev, thumbnailUrl: resolvedFileUrl }));
-      toast.success("Image uploaded successfully");
-      pendingStorageId.current = null;
-    }
-  }, [resolvedFileUrl, resolvedStorageId]);
+
   
   const [newLessonData, setNewLessonData] = useState({
     title: "",
@@ -98,10 +88,48 @@ export default function CourseEditPage() {
     description: "",
     category: "",
     level: "",
+    style: "",
     thumbnailUrl: "",
     previewVideoUrl: "",
     priceNaira: "",
   });
+
+  const trailerInputRef = useRef<HTMLInputElement>(null);
+  const pendingTrailerStorageId = useRef<Id<"_storage"> | null>(null);
+  const [trailerStorageId, setTrailerStorageId] = useState<Id<"_storage"> | null>(null);
+  const [isUploadingTrailer, setIsUploadingTrailer] = useState(false);
+  const resolvedTrailerUrl = useQuery(
+    api.files.validateAndResolveUpload,
+    trailerStorageId
+      ? { storageId: trailerStorageId, kind: "video" as const, maxBytes: 500 * 1024 * 1024 }
+      : "skip",
+  );
+
+  // When the uploaded trailer resolves, attach it to the form.
+  useEffect(() => {
+    if (
+      resolvedTrailerUrl &&
+      pendingTrailerStorageId.current &&
+      trailerStorageId === pendingTrailerStorageId.current
+    ) {
+      setFormData((prev) => ({ ...prev, previewVideoUrl: resolvedTrailerUrl }));
+      toast.success("Trailer video uploaded successfully");
+      pendingTrailerStorageId.current = null;
+    }
+  }, [resolvedTrailerUrl, trailerStorageId]);
+
+  // When the uploaded image URL resolves, attach it to the form.
+  useEffect(() => {
+    if (
+      resolvedFileUrl &&
+      pendingStorageId.current &&
+      resolvedStorageId === pendingStorageId.current
+    ) {
+      setFormData((prev) => ({ ...prev, thumbnailUrl: resolvedFileUrl }));
+      toast.success("Image uploaded successfully");
+      pendingStorageId.current = null;
+    }
+  }, [resolvedFileUrl, resolvedStorageId]);
 
   useEffect(() => {
     if (courseData?.course) {
@@ -111,6 +139,7 @@ export default function CourseEditPage() {
         description: courseData.course.description,
         category: courseData.course.category || "",
         level: courseData.course.level || "",
+        style: courseData.course.style || "",
         thumbnailUrl: courseData.course.thumbnailUrl || "",
         previewVideoUrl: courseData.course.previewVideoUrl || "",
         priceNaira: courseData.course.price ? String(courseData.course.price / 100) : "",
@@ -139,13 +168,16 @@ export default function CourseEditPage() {
 
       await updateCourse({
         courseId: courseId as Id<"courses">,
-        title: formData.title,
-        slug: formData.slug,
-        description: formData.description,
-        category: formData.category || undefined,
-        level: formData.level || undefined,
-        thumbnailUrl: formData.thumbnailUrl || undefined,
-        previewVideoUrl: formData.previewVideoUrl.trim() || undefined,
+        title: formData.title.trim(),
+        slug: formData.slug.trim(),
+        description: formData.description.trim(),
+        category: formData.category.trim(),
+        level: formData.level.trim(),
+        style: formData.style || undefined,
+        // Empty strings clear the field server-side (the field was previously
+        // un-clearable because `undefined` means "leave unchanged").
+        thumbnailUrl: formData.thumbnailUrl.trim(),
+        previewVideoUrl: formData.previewVideoUrl.trim(),
         price,
         ...(price > 0 ? { currency: "NGN" } : {}),
       });
@@ -249,6 +281,39 @@ export default function CourseEditPage() {
       setIsUploadingThumbnail(false);
       // Clear the input so it can be used again for the same file if needed
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleTrailerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please choose a video file");
+      return;
+    }
+    const MAX = 500 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error("Trailer must be under 500 MB");
+      return;
+    }
+    setIsUploadingTrailer(true);
+    try {
+      const postUrl = await generateUploadUrl();
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!result.ok) throw new Error("Upload failed");
+      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+      pendingTrailerStorageId.current = storageId;
+      setTrailerStorageId(storageId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload trailer");
+    } finally {
+      setIsUploadingTrailer(false);
+      if (trailerInputRef.current) trailerInputRef.current.value = "";
     }
   };
 
@@ -559,16 +624,74 @@ export default function CourseEditPage() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="previewVideoUrl">Course Preview / Trailer Video URL</Label>
-                  <Input
-                    id="previewVideoUrl"
-                    name="previewVideoUrl"
-                    value={formData.previewVideoUrl}
-                    onChange={handleChange}
-                    placeholder="e.g. https://www.youtube.com/watch?v=... or Vimeo / MP4"
-                  />
+                  <Label htmlFor="style">Course style</Label>
+                  <Select
+                    value={formData.style}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, style: value ?? "" }))}
+                  >
+                    <SelectTrigger id="style">
+                      <SelectValue placeholder="Pick a style (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COURSE_STYLES.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs leading-[1.5] text-muted-foreground">
-                    Trailer or preview video shown to prospective learners in the course theater.
+                    A label for how this course is delivered. Does not restrict lesson types.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="trailerUpload">Course Trailer Video (Optional)</Label>
+                  <div className="flex flex-col gap-3">
+                    <input
+                      id="trailerUpload"
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      ref={trailerInputRef}
+                      onChange={handleTrailerUpload}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => trailerInputRef.current?.click()}
+                        disabled={isUploadingTrailer}
+                      >
+                        {isUploadingTrailer ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="mr-2 h-4 w-4" />
+                        )}
+                        {formData.previewVideoUrl ? "Replace trailer video" : "Upload trailer video"}
+                      </Button>
+                      {formData.previewVideoUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setFormData(prev => ({ ...prev, previewVideoUrl: "" }))}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    {formData.previewVideoUrl && (
+                      <video
+                        src={formData.previewVideoUrl}
+                        controls
+                        preload="metadata"
+                        className="w-full max-w-xs rounded-md border border-rule bg-black"
+                      />
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs leading-[1.5] text-muted-foreground">
+                    Trailer shown to prospective learners in the course theater. Upload a video file (max 500 MB); YouTube links are not supported.
                   </p>
                 </div>
                 <div className="max-w-xs space-y-1.5">

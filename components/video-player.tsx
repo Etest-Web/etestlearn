@@ -14,7 +14,7 @@ function extractYouTubeId(url: URL): string | null {
 }
 
 /**
- * Extracts a streamable embed URL for YouTube, Vimeo, or a Publit.io custom player.
+ * Extracts a streamable embed URL for YouTube or Vimeo.
  *
  * Exported so `tests/video-player-embed.test.ts` can pin the host allow-list;
  * it is a pure string→string map with no React in it.
@@ -46,33 +46,12 @@ export function getEmbedUrl(src: string): string | null {
     }
   }
 
-  // Publit.io custom player embed ("main")
-  // e.g. https://media.publit.io/file/8D4Nr5G1.mp4 or https://media.publit.io/file/8D4Nr5G1.html
-  //
-  // Parsed as a hostname, not a substring: `host.includes("publit.io")` also
-  // accepted `publit.io.attacker.com` and `evil.publit.io.example`, so any
-  // host containing the brand would be promoted to a Publitio embed. Only the
-  // domain itself and its subdomains qualify (M-6).
-  if (host === "publit.io" || host.endsWith(".publit.io")) {
-    // If it's already an embed link (ends with .html), ensure player param is attached
-    if (url.pathname.endsWith(".html")) {
-      url.searchParams.set("player", "main");
-      return url.toString();
-    }
-    // Convert file link (e.g. /file/ID.mp4) to embed link (/file/ID.html?player=main)
-    const match = url.pathname.match(/\/file\/([^/.]+)(?:\.[^/]+)?$/);
-    if (match?.[1]) {
-      return `https://${url.hostname}/file/${match[1]}.html?player=main`;
-    }
-  }
-
   return null;
 }
 
 /**
  * Renders a lesson video.
- * Uses the custom "main" player embed for cloud-hosted files,
- * embeds YouTube/Vimeo, or falls back to protected HTML5 video.
+ * Embeds YouTube/Vimeo, or falls back to protected HTML5 video.
  */
 export function VideoPlayer({ src, title }: { src: string; title: string }) {
   const embed = useMemo(() => getEmbedUrl(src), [src]);

@@ -29,6 +29,7 @@ import {
   rawPartCount,
   rawUploadError,
 } from "@/lib/videos";
+import { toast } from "sonner";
 
 const CONCURRENT_PART_PUTS = 3;
 const MAX_PART_ATTEMPTS = 4;
@@ -188,6 +189,17 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
     return () => window.clearInterval(id);
   }, [isTranscoding]);
 
+  // Remember the original file name for the lesson page badge.
+  const updateLesson = useMutation(api.courses.updateLesson);
+  const handleFilenameSaved = useCallback(
+    (name: string) =>
+      updateLesson({ lessonId, videoFileName: name }).catch(() => {
+        // Cosmetic badge only — the upload itself already succeeded.
+        toast.warning("Video uploaded, but the file name could not be saved");
+      }),
+    [lessonId, updateLesson],
+  );
+
   const handleStart = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -296,6 +308,7 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
 
         setPhase("assembling");
         await completeUpload({ assetId: activeAssetId });
+        void handleFilenameSaved(file.name);
         setPhase("queued");
         setProgressPercent(0);
         setNow(Date.now());
@@ -310,7 +323,7 @@ export function VideoUploader({ lessonId }: { lessonId: Id<"lessons"> }) {
         }
       }
     },
-    [lessonId, draft, initUpload, signParts, completeUpload, listUploadedParts],
+    [lessonId, draft, initUpload, signParts, completeUpload, listUploadedParts, handleFilenameSaved],
   );
 
   const handleCancel = useCallback(async () => {

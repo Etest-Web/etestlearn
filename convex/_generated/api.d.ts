@@ -62,6 +62,8 @@ import type * as reviews from "../reviews.js";
 import type * as scorm from "../scorm.js";
 import type * as scormPackageActions from "../scormPackageActions.js";
 import type * as search from "../search.js";
+import type * as seedCourses from "../seedCourses.js";
+import type * as seedCoursesData from "../seedCoursesData.js";
 import type * as skills from "../skills.js";
 import type * as statistics from "../statistics.js";
 import type * as support from "../support.js";
@@ -135,6 +137,8 @@ declare const fullApi: ApiFromModules<{
   scorm: typeof scorm;
   scormPackageActions: typeof scormPackageActions;
   search: typeof search;
+  seedCourses: typeof seedCourses;
+  seedCoursesData: typeof seedCoursesData;
   skills: typeof skills;
   statistics: typeof statistics;
   support: typeof support;

@@ -179,6 +179,7 @@ export default defineSchema({
     description: v.string(),
     instructorId: v.id("users"),
     category: v.optional(v.string()),
+    style: v.optional(v.string()),
     skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     published: v.boolean(),
@@ -217,6 +218,7 @@ export default defineSchema({
     .index("by_featured", ["featured"])
     // Enables fast filtering of published courses by category name.
     .index("by_category", ["category", "published"])
+    .index("by_style", ["style", "published"])
     .searchIndex("search", {
       searchField: "searchText",
       filterFields: ["published"],

@@ -264,6 +264,7 @@ export const createCourse = mutation({
     slug: v.string(),
     description: v.string(),
     category: v.optional(v.string()),
+    style: v.optional(v.string()),
     skillIds: v.optional(v.array(v.id("skills"))),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
@@ -284,6 +285,7 @@ export const createCourse = mutation({
     const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
     const description = sanitizeMultiline(args.description, TEXT_LIMITS.description);
     const category = args.category !== undefined ? sanitizeSingleLine(args.category, TEXT_LIMITS.category) : undefined;
+    const style = args.style !== undefined ? sanitizeSingleLine(args.style, TEXT_LIMITS.category) : undefined;
     const level = args.level !== undefined ? sanitizeSingleLine(args.level, TEXT_LIMITS.level) : undefined;
     if (!title) throw new Error("A course title is required");
     if (!description) throw new Error("A course description is required");
@@ -299,6 +301,7 @@ export const createCourse = mutation({
       instructorId: user._id,
       category: category || undefined,
       skillIds: args.skillIds,
+      style: style || undefined,
       level: level || undefined,
       published: false,
       thumbnailUrl: sanitizeStoredUrl(args.thumbnailUrl, "Thumbnail URL"),
@@ -328,6 +331,7 @@ export const updateCourse = mutation({
     description: v.optional(v.string()),
     category: v.optional(v.string()),
     skillIds: v.optional(v.array(v.id("skills"))),
+    style: v.optional(v.string()),
     level: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
     previewVideoUrl: v.optional(v.string()),
@@ -377,6 +381,9 @@ export const updateCourse = mutation({
       updates.category = sanitizeSingleLine(args.category, TEXT_LIMITS.category) || undefined;
     }
     if (args.skillIds !== undefined) updates.skillIds = args.skillIds;
+    if (args.style !== undefined) {
+      updates.style = sanitizeSingleLine(args.style, TEXT_LIMITS.category) || undefined;
+    }
     if (args.level !== undefined) {
       updates.level = sanitizeSingleLine(args.level, TEXT_LIMITS.level) || undefined;
     }

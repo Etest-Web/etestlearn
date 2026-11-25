@@ -269,10 +269,10 @@ export type RawUploadStatus =
   | "queued";
 
 /**
- * Guard map for B2-pipeline transitions. Legacy paths (UploadThing / Publitio)
- * write `pending/processing/ready/failed` unguarded by design; only this
- * module's consumers route new B2 assets through it. Terminal states have no
- * outgoing edges — a `ready` ladder or a `failed` asset is exactly that.
+ * Guard map for B2-pipeline transitions. Legacy rows written before the
+ * pipeline existed hold `pending/processing/ready/failed`; only this
+ * module's consumers route new B2 assets through the map. Terminal states
+ * have no outgoing edges — a `ready` ladder or a `failed` asset is exactly that.
  */
 const RAW_UPLOAD_TRANSITIONS: Readonly<Record<RawUploadStatus, readonly RawUploadStatus[]>> = {
   awaiting_upload: ["queued", "failed"],

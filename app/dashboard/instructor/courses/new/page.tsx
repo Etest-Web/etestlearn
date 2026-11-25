@@ -10,10 +10,12 @@ import { Textarea } from "@/components/ui";
 import { Label } from "@/components/ui";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui";
 import { PageHeader } from "@/components/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { PageShell } from "@/components/dashboard-shell";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { slugify } from "@/lib/slug";
+import { COURSE_STYLES } from "@/lib/course-styles";
 
 export default function CreateCoursePage() {
   const router = useRouter();
@@ -24,7 +26,7 @@ export default function CreateCoursePage() {
     title: "",
     slug: "",
     description: "",
-    previewVideoUrl: "",
+    style: "",
     priceNaira: "",
   });
 
@@ -52,12 +54,10 @@ export default function CreateCoursePage() {
       const price = Number.isFinite(naira) && naira > 0 ? Math.round(naira * 100) : undefined;
 
       const courseId = await createCourse({
-        title: formData.title,
-        slug: formData.slug,
-        description: formData.description,
-        ...(formData.previewVideoUrl.trim()
-          ? { previewVideoUrl: formData.previewVideoUrl.trim() }
-          : {}),
+        title: formData.title.trim(),
+        slug: formData.slug.trim(),
+        description: formData.description.trim(),
+        style: formData.style || undefined,
         ...(price !== undefined ? { price, currency: "NGN" } : {}),
       });
       toast.success("Course created successfully!");
@@ -90,7 +90,7 @@ export default function CreateCoursePage() {
           button that brought you here. */}
       <PageHeader
         title="New course"
-        description="Name it and save. Lessons, pricing and publishing come after."
+        description="Name it and save. Lessons, pricing, trailer video and publishing come after."
       />
 
       <Card>
@@ -142,16 +142,21 @@ export default function CreateCoursePage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="previewVideoUrl">Course Preview Video URL (Optional)</Label>
-              <Input
-                id="previewVideoUrl"
-                name="previewVideoUrl"
-                placeholder="e.g. https://www.youtube.com/watch?v=... or Vimeo / MP4"
-                value={formData.previewVideoUrl}
-                onChange={handleChange}
-              />
+              <Label htmlFor="style">Course style</Label>
+              <Select value={formData.style} onValueChange={(value) => setFormData((prev) => ({ ...prev, style: value ?? "" }))}>
+                <SelectTrigger id="style">
+                  <SelectValue placeholder="Pick a style (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COURSE_STYLES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-xs leading-[1.5] text-muted-foreground">
-                Trailer or preview video shown to prospective learners in the course theater.
+                A label for how this course is delivered. Does not restrict lesson types.
               </p>
             </div>
             <div className="space-y-1.5">

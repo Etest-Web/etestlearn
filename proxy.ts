@@ -231,6 +231,18 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/sso-callback(.*)',
   '/',
+  // Chat-first homepage design preview — must open signed out while it is
+  // being evaluated. Keep alongside noindex on the page so it never ranks.
+  '/home-concept',
+  // The Lottie files and the dotlottie-web engine that renders them — the
+  // one animated asset the concept page ships, in four variants picked at
+  // random per visitor. Exact files on purpose; future .lottie files must be
+  // listed here too.
+  '/assets/funny-brain.lottie',
+  '/assets/book-loading.lottie',
+  '/assets/learning.lottie',
+  '/assets/student.lottie',
+  '/assets/dotlottie-player.wasm',
   '/courses(.*)',
   // See the route-map above: a shared profile page has to open for the person
   // it was shared with, who by definition may have no account.

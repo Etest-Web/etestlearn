@@ -620,8 +620,14 @@ The seven
   **setup-only**: the read-only receipt is the `#payout-account` section on the Earnings page,
   and every deep link (both notifications, both emails) targets that anchor. There is no
   `/dashboard/instructor/bank` route — do not add one back.
-- **Video lessons are URL-based** (YouTube/Vimeo/MP4) — direct video upload is intentionally
-  unsupported.
+- **Video lessons are upload-only.** Instructors upload straight to B2 via the multipart
+  `components/video-uploader.tsx`; files are transcoded server-side to AES-128 HLS. The old
+  external-URL field and the Publit.io upload path are gone. Course trailers are uploaded to
+  Convex storage from the course edit page (max 500 MB) and stored in `courses.previewVideoUrl`
+  as a storage URL; `VideoPlayer` renders them through its `<video>` fallback. Emptying the
+  trailer/thumbnail fields clears the field server-side (`""` in `updateCourse` removes it).
+  Text inputs are sanitized server-side in `convex/courses.ts` (`lib/sanitize-text.ts`:
+  control chars stripped, trimmed, length-capped; URLs must be absolute http(s)).
 - **Lesson authoring uses Markdown** (`react-markdown` + `remark-gfm`), not a rich-text editor.
 - Naming: components kebab-case (`video-player.tsx`); Convex modules camelCase domain names
   (`certificateTemplates.ts`); internal functions camelCase verbs (`issueIfEligible`,

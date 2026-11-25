@@ -9,6 +9,7 @@ import {
   requireUser,
 } from "./helpers/auth";
 import { signScormToken } from "../lib/scorm/token";
+import { recordLessonCompletion } from "./enrollments";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Permissions & Auth Helpers
@@ -158,9 +159,232 @@ export const getPackageFile = internalQuery({
   },
 });
 
+/** Retrieve learner SCORM tracking state for a lesson. */
+export const getScormTracking = query({
+  args: { lessonId: v.id("lessons") },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+
+    const tracking = await ctx.db
+      .query("scormTracking")
+      .withIndex("by_user_lesson", (q) =>
+        q.eq("userId", user._id).eq("lessonId", args.lessonId)
+      )
+      .unique();
+
+    if (!tracking) return null;
+
+    return {
+      _id: tracking._id,
+      lessonId: tracking.lessonId,
+      courseId: tracking.courseId,
+      scormPackageId: tracking.scormPackageId,
+      lessonStatus: tracking.lessonStatus,
+      rawScore: tracking.rawScore,
+      minScore: tracking.minScore,
+      maxScore: tracking.maxScore,
+      scaledScore: tracking.scaledScore,
+      location: tracking.location,
+      suspendData: tracking.suspendData,
+      totalTimeSeconds: tracking.totalTimeSeconds,
+      cmiState: tracking.cmiState,
+      completedAt: tracking.completedAt,
+      lastAccessedAt: tracking.lastAccessedAt,
+    };
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Mutations
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Initialize a SCORM session for a learner.
+ *
+ * Called by the player when the SCO loads. Returns the current CMI state
+ * (lesson status, score, suspend data, location) so the player can resume
+ * where the learner left off.
+ *
+ * Auth: caller must be enrolled or be staff with canManageCourse.
+ */
+export const initializeSession = mutation({
+  args: {
+    lessonId: v.id("lessons"),
+    packageId: v.id("scormPackages"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson) throw new Error("Lesson not found");
+
+    const course = await ctx.db.get(lesson.courseId);
+    if (!course) throw new Error("Course not found");
+
+    const canManage = isStaff(user) && (await canManageCourse(ctx, user, course));
+    const enrolled = await hasEnrollment(ctx, user._id, lesson.courseId);
+
+    if (!canManage && !enrolled) {
+      throw new Error("Not enrolled in this course");
+    }
+
+    const now = Date.now();
+    let tracking = await ctx.db
+      .query("scormTracking")
+      .withIndex("by_user_lesson", (q) =>
+        q.eq("userId", user._id).eq("lessonId", args.lessonId)
+      )
+      .unique();
+
+    if (!tracking) {
+      const trackingId = await ctx.db.insert("scormTracking", {
+        userId: user._id,
+        courseId: lesson.courseId,
+        lessonId: args.lessonId,
+        scormPackageId: args.packageId,
+        lessonStatus: "not_attempted",
+        totalTimeSeconds: 0,
+        lastAccessedAt: now,
+        createdAt: now,
+      });
+      tracking = await ctx.db.get(trackingId);
+    } else {
+      await ctx.db.patch(tracking._id, { lastAccessedAt: now });
+    }
+
+    return {
+      lessonStatus: tracking?.lessonStatus ?? "not_attempted",
+      rawScore: tracking?.rawScore ?? null,
+      minScore: tracking?.minScore ?? null,
+      maxScore: tracking?.maxScore ?? null,
+      scaledScore: tracking?.scaledScore ?? null,
+      location: tracking?.location ?? null,
+      suspendData: tracking?.suspendData ?? null,
+      cmiState: tracking?.cmiState ?? null,
+      totalTimeSeconds: tracking?.totalTimeSeconds ?? 0,
+    };
+  },
+});
+
+/**
+ * Commit SCORM CMI state from the player.
+ *
+ * Called by the player on LMSCommit/LMSFinish or periodically. Updates
+ * tracking row and triggers lesson completion if the SCORM reports
+ * passed/completed.
+ */
+export const commitSession = mutation({
+  args: {
+    lessonId: v.id("lessons"),
+    lessonStatus: v.optional(
+      v.union(
+        v.literal("passed"),
+        v.literal("completed"),
+        v.literal("failed"),
+        v.literal("incomplete"),
+        v.literal("browsed"),
+        v.literal("not_attempted")
+      )
+    ),
+    rawScore: v.optional(v.number()),
+    minScore: v.optional(v.number()),
+    maxScore: v.optional(v.number()),
+    scaledScore: v.optional(v.number()),
+    location: v.optional(v.string()),
+    suspendData: v.optional(v.string()),
+    cmiState: v.optional(v.string()),
+    totalTimeSeconds: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson) throw new Error("Lesson not found");
+
+    const course = await ctx.db.get(lesson.courseId);
+    if (!course) throw new Error("Course not found");
+
+    const canManage = isStaff(user) && (await canManageCourse(ctx, user, course));
+    const enrolled = await hasEnrollment(ctx, user._id, lesson.courseId);
+
+    if (!canManage && !enrolled) {
+      throw new Error("Not enrolled in this course");
+    }
+
+    const now = Date.now();
+
+    let tracking = await ctx.db
+      .query("scormTracking")
+      .withIndex("by_user_lesson", (q) =>
+        q.eq("userId", user._id).eq("lessonId", args.lessonId)
+      )
+      .unique();
+
+    if (!tracking) {
+      if (!lesson.scormPackageId) {
+        throw new Error("Lesson has no associated SCORM package");
+      }
+      const trackingId = await ctx.db.insert("scormTracking", {
+        userId: user._id,
+        courseId: lesson.courseId,
+        lessonId: args.lessonId,
+        scormPackageId: lesson.scormPackageId,
+        lessonStatus: args.lessonStatus ?? "not_attempted",
+        rawScore: args.rawScore,
+        minScore: args.minScore,
+        maxScore: args.maxScore,
+        scaledScore: args.scaledScore,
+        location: args.location,
+        suspendData: args.suspendData,
+        cmiState: args.cmiState,
+        totalTimeSeconds: args.totalTimeSeconds ?? 0,
+        lastAccessedAt: now,
+        createdAt: now,
+        completedAt:
+          args.lessonStatus === "passed" || args.lessonStatus === "completed"
+            ? now
+            : undefined,
+      });
+      tracking = await ctx.db.get(trackingId);
+    } else {
+      const updates: Record<string, unknown> = {
+        lastAccessedAt: now,
+      };
+      if (args.lessonStatus !== undefined) updates.lessonStatus = args.lessonStatus;
+      if (args.rawScore !== undefined) updates.rawScore = args.rawScore;
+      if (args.minScore !== undefined) updates.minScore = args.minScore;
+      if (args.maxScore !== undefined) updates.maxScore = args.maxScore;
+      if (args.scaledScore !== undefined) updates.scaledScore = args.scaledScore;
+      if (args.location !== undefined) updates.location = args.location;
+      if (args.suspendData !== undefined) updates.suspendData = args.suspendData;
+      if (args.cmiState !== undefined) updates.cmiState = args.cmiState;
+      if (args.totalTimeSeconds !== undefined) updates.totalTimeSeconds = args.totalTimeSeconds;
+      if (args.lessonStatus === "passed" || args.lessonStatus === "completed") {
+        updates.completedAt = now;
+      }
+      await ctx.db.patch(tracking._id, updates);
+    }
+
+    // Trigger lesson completion if SCORM reports passed/completed
+    const isComplete = args.lessonStatus === "passed" || args.lessonStatus === "completed";
+    if (isComplete && enrolled) {
+      const durationMinutes = args.totalTimeSeconds
+        ? Math.max(1, Math.round(args.totalTimeSeconds / 60))
+        : lesson.durationMinutes ?? 0;
+
+      await recordLessonCompletion(
+        ctx,
+        user._id,
+        lesson.courseId,
+        args.lessonId,
+        durationMinutes
+      );
+    }
+
+    return { success: true };
+  },
+});
 
 /**
  * Issues a signed asset-playback token for loading the SCORM package in an iframe.

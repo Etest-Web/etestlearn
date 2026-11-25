@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { makeFunctionReference, type GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
@@ -139,6 +139,128 @@ export const getUserEnrollments = query({
   },
 });
 
+export async function recordLessonCompletion(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  courseId: Id<"courses">,
+  lessonId: Id<"lessons">,
+  durationMinutes?: number,
+): Promise<{ isNewCompletion: boolean; progressPercent: number }> {
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error("User not found");
+
+  const enrollment = await ctx.db
+    .query("enrollments")
+    .withIndex("by_user_course", (q) =>
+      q.eq("userId", userId).eq("courseId", courseId),
+    )
+    .unique();
+  if (!enrollment) throw new Error("Not enrolled in this course");
+
+  // Verify the lesson actually belongs to the claimed course — a caller
+  // enrolled in course A must not mark lessons from course B as complete
+  // and inflate their progress.
+  const lesson = await ctx.db.get(lessonId);
+  if (!lesson || lesson.courseId !== courseId) {
+    throw new Error("Lesson does not belong to this course");
+  }
+
+  const completed = new Set(enrollment.completedLessonIds ?? []);
+  const isNewCompletion = !completed.has(lessonId);
+  if (isNewCompletion) {
+    completed.add(lessonId);
+  }
+
+  const lessons = await ctx.db
+    .query("lessons")
+    .withIndex("by_course_order", (q) => q.eq("courseId", courseId))
+    .collect();
+
+  const progressPercent = computeProgress(completed.size, lessons.length);
+
+  const now = Date.now();
+  await ctx.db.patch(enrollment._id, {
+    completedLessonIds: [...completed],
+    progressPercent,
+    updatedAt: now,
+  });
+
+  if (isNewCompletion) {
+    // Log lesson completion activity
+    await ctx.db.insert("learningActivities", {
+      userId: user._id,
+      type: "lesson_completed",
+      courseId,
+      lessonId,
+      metadata: {
+        durationMinutes: durationMinutes ?? lesson?.durationMinutes ?? 0,
+        lessonTitle: lesson?.title,
+      },
+      createdAt: now,
+    });
+
+    // Increment lesson completion goals
+    await ctx.runMutation(internal.goals.incrementGoalProgress, {
+      userId: user._id,
+      type: "complete_lessons",
+      amount: 1,
+      date: now,
+    });
+
+    // Increment watch hours goals if duration provided
+    const duration = durationMinutes ?? lesson?.durationMinutes ?? 0;
+    if (duration > 0) {
+      await ctx.runMutation(internal.goals.incrementGoalProgress, {
+        userId: user._id,
+        type: "watch_hours",
+        amount: duration, // Goals module converts to hours
+        date: now,
+      });
+    }
+
+    // Check for study streak (daily activity)
+    await ctx.runMutation(internal.goals.incrementGoalProgress, {
+      userId: user._id,
+      type: "study_streak_days",
+      amount: 1,
+      date: now,
+    });
+  }
+
+  // Issues the certificate automatically if this was the last outstanding
+  // requirement. No-ops until the learner actually qualifies.
+  await ctx.runMutation(internal.certificates.issueIfEligible, {
+    userId: user._id,
+    courseId,
+  });
+
+  if (isNewCompletion && progressPercent === 100) {
+    const course = await ctx.db.get(courseId);
+    if (course) {
+      await createNotification(ctx, {
+        userId: user._id,
+        type: "course_completed",
+        title: `Course completed: ${course.title}`,
+        body: "Congratulations on finishing all lessons! Check your certificate.",
+        href: "/dashboard/certificates",
+      });
+
+      if (course.instructorId && course.instructorId !== user._id) {
+        await createNotification(ctx, {
+          userId: course.instructorId,
+          type: "course_completed",
+          title: `Student completed ${course.title}`,
+          body: `${user.name?.trim() || "A learner"} just finished all lessons.`,
+          href: "/dashboard/instructor/courses",
+          actorId: user._id,
+        });
+      }
+    }
+  }
+
+  return { isNewCompletion, progressPercent };
+}
+
 export const completeLesson = mutation({
   args: {
     courseId: v.id("courses"),
@@ -147,116 +269,13 @@ export const completeLesson = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-
-    const enrollment = await ctx.db
-      .query("enrollments")
-      .withIndex("by_user_course", (q) =>
-        q.eq("userId", user._id).eq("courseId", args.courseId),
-      )
-      .unique();
-    if (!enrollment) throw new Error("Not enrolled in this course");
-
-    // Verify the lesson actually belongs to the claimed course — a caller
-    // enrolled in course A must not mark lessons from course B as complete
-    // and inflate their progress.
-    const lesson = await ctx.db.get(args.lessonId);
-    if (!lesson || lesson.courseId !== args.courseId) {
-      throw new Error("Lesson does not belong to this course");
-    }
-
-    const completed = new Set(enrollment.completedLessonIds ?? []);
-    const isNewCompletion = !completed.has(args.lessonId);
-    if (isNewCompletion) {
-      completed.add(args.lessonId);
-    }
-
-    const lessons = await ctx.db
-      .query("lessons")
-      .withIndex("by_course_order", (q) => q.eq("courseId", args.courseId))
-      .collect();
-
-    const progressPercent = computeProgress(completed.size, lessons.length);
-
-    const now = Date.now();
-    await ctx.db.patch(enrollment._id, {
-      completedLessonIds: [...completed],
-      progressPercent,
-      updatedAt: now,
-    });
-
-    if (isNewCompletion) {
-      // Log lesson completion activity
-      await ctx.db.insert("learningActivities", {
-        userId: user._id,
-        type: "lesson_completed",
-        courseId: args.courseId,
-        lessonId: args.lessonId,
-        metadata: {
-          durationMinutes: args.durationMinutes ?? lesson?.durationMinutes ?? 0,
-          lessonTitle: lesson?.title,
-        },
-        createdAt: now,
-      });
-
-      // Increment lesson completion goals
-      await ctx.runMutation(internal.goals.incrementGoalProgress, {
-        userId: user._id,
-        type: "complete_lessons",
-        amount: 1,
-        date: now,
-      });
-
-      // Increment watch hours goals if duration provided
-      const durationMinutes = args.durationMinutes ?? lesson?.durationMinutes ?? 0;
-      if (durationMinutes > 0) {
-        await ctx.runMutation(internal.goals.incrementGoalProgress, {
-          userId: user._id,
-          type: "watch_hours",
-          amount: durationMinutes, // Goals module converts to hours
-          date: now,
-        });
-      }
-
-      // Check for study streak (daily activity)
-      await ctx.runMutation(internal.goals.incrementGoalProgress, {
-        userId: user._id,
-        type: "study_streak_days",
-        amount: 1,
-        date: now,
-      });
-    }
-
-    // Issues the certificate automatically if this was the last outstanding
-    // requirement. No-ops until the learner actually qualifies.
-    await ctx.runMutation(internal.certificates.issueIfEligible, {
-      userId: user._id,
-      courseId: args.courseId,
-    });
-
-    if (isNewCompletion && progressPercent === 100) {
-      const course = await ctx.db.get(args.courseId);
-      if (course) {
-        await createNotification(ctx, {
-          userId: user._id,
-          type: "course_completed",
-          title: `Course completed: ${course.title}`,
-          body: "Congratulations on finishing all lessons! Check your certificate.",
-          href: "/dashboard/certificates",
-        });
-
-        if (course.instructorId && course.instructorId !== user._id) {
-          await createNotification(ctx, {
-            userId: course.instructorId,
-            type: "course_completed",
-            title: `Student completed ${course.title}`,
-            body: `${user.name?.trim() || "A learner"} just finished all lessons.`,
-            href: "/dashboard/instructor/courses",
-            actorId: user._id,
-          });
-        }
-      }
-    }
-
+    const { progressPercent } = await recordLessonCompletion(
+      ctx,
+      user._id,
+      args.courseId,
+      args.lessonId,
+      args.durationMinutes,
+    );
     return progressPercent;
   },
 });

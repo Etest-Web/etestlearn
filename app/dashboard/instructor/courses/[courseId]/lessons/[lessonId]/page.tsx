@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
@@ -26,9 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Boxes, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
-import { VideoUpload } from "@/components/video-upload";
 import { VideoUploader } from "@/components/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -63,6 +62,7 @@ export default function LessonEditPage() {
   const createQuiz = useMutation(api.quizzes.createQuiz);
   const deleteQuizQuestion = useMutation(api.quizzes.deleteQuizQuestion);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const extractAndStoreScormPackage = useAction(api.scormPackageActions.extractAndStoreScormPackage);
   const generateArticleImageUploadUrl = useMutation(api.files.generateArticleImageUploadUrl);
   const validateArticleImageUpload = useMutation(api.files.validateArticleImageUpload);
   const registerLessonAttachment = useMutation(api.lessonAttachments.registerLessonAttachment);
@@ -75,54 +75,7 @@ export default function LessonEditPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
-  const [uploadedVideoStorageId, setUploadedVideoStorageId] = useState<string | null>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   
-  const validateUpload = useQuery(
-    api.files.validateAndResolveUpload,
-    uploadedVideoStorageId
-      ? { storageId: uploadedVideoStorageId as any, kind: "video", maxBytes: 500 * 1024 * 1024 }
-      : "skip",
-  );
-
-  useEffect(() => {
-    if (validateUpload) {
-      setFormData((prev) => ({ ...prev, content: validateUpload }));
-    }
-  }, [validateUpload]);
-
-  async function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("video/")) {
-      toast.error("Please choose a video file");
-      return;
-    }
-    const MAX = 500 * 1024 * 1024;
-    if (file.size > MAX) {
-      toast.error("Video must be under 500 MB");
-      return;
-    }
-    setIsUploadingVideo(true);
-    try {
-      const postUrl = await generateUploadUrl({});
-      const res = await fetch(postUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const { storageId } = (await res.json()) as { storageId: string };
-      setUploadedVideoStorageId(storageId);
-      toast.success("Video uploaded — save to attach it to the lesson");
-    } catch {
-      toast.error("Video upload failed. Please try again.");
-    } finally {
-      setIsUploadingVideo(false);
-      if (videoInputRef.current) videoInputRef.current.value = "";
-    }
-  }
-
   async function handlePresentationUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -151,19 +104,50 @@ export default function LessonEditPage() {
       if (presentationInputRef.current) presentationInputRef.current.value = "";
     }
   }
+
+  const handleScormUpload = async (file: File) => {
+    if (!courseId) return;
+    setIsUploadingScorm(true);
+    try {
+      const postUrl = await generateUploadUrl({});
+      const res = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/zip" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { storageId } = (await res.json()) as { storageId: string };
+      const pkg = await extractAndStoreScormPackage({
+        courseId: courseId as Id<"courses">,
+        zipStorageId: storageId as Id<"_storage">,
+      });
+      setUploadedScormPackageId(pkg.packageId);
+      setFormData((prev) => ({ ...prev, scormFileName: file.name }));
+      toast.success("SCORM package unpacked — save to attach it to the lesson");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "SCORM upload failed. Please try again.");
+    } finally {
+      setIsUploadingScorm(false);
+      if (scormInputRef.current) scormInputRef.current.value = "";
+    }
+  };
   
   const [formData, setFormData] = useState({
     title: "",
-    contentType: "video" as "video" | "article" | "quiz" | "presentation",
+    contentType: "video" as "video" | "article" | "quiz" | "presentation" | "scorm",
     durationMinutes: "",
-    content: "", // For article/video url
+    content: "", // Article body / legacy video URL
     contentFormat: "markdown" as "markdown" | "html",
     videoFileName: "",
     presentationFileName: "",
+    scormFileName: "",
     section: "",
   });
   const [uploadedPresentationStorageId, setUploadedPresentationStorageId] = useState<string | null>(null);
+  const [uploadedScormPackageId, setUploadedScormPackageId] = useState<string | null>(null);
+  const [isUploadingScorm, setIsUploadingScorm] = useState(false);
   const presentationInputRef = useRef<HTMLInputElement>(null);
+  const scormInputRef = useRef<HTMLInputElement>(null);
 
   const htmlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -176,14 +160,16 @@ export default function LessonEditPage() {
     if (lesson) {
       setFormData({
         title: lesson.title,
-        contentType: lesson.contentType as "video" | "article" | "quiz" | "presentation",
+        contentType: lesson.contentType as "video" | "article" | "quiz" | "presentation" | "scorm",
         durationMinutes: lesson.durationMinutes?.toString() || "",
         content: lesson.content || "",
         contentFormat: (lesson.contentFormat as "markdown" | "html") || "markdown",
         videoFileName: lesson.videoFileName || "",
         presentationFileName: (lesson as any).presentationFileName || "",
+        scormFileName: "",
         section: (lesson as any).section || "",
       });
+      setUploadedScormPackageId((lesson as any).scormPackageId ?? null);
     }
   }, [lesson]);
 
@@ -202,11 +188,13 @@ export default function LessonEditPage() {
         contentType: formData.contentType,
         durationMinutes: formData.durationMinutes ? parseInt(formData.durationMinutes) : undefined,
         content: formData.content,
-        videoStorageId: uploadedVideoStorageId ? (uploadedVideoStorageId as Id<"_storage">) : undefined,
         videoFileName: formData.videoFileName,
         contentFormat: formData.contentFormat,
         presentationStorageId: uploadedPresentationStorageId ? (uploadedPresentationStorageId as Id<"_storage">) : undefined,
         presentationFileName: formData.presentationFileName || undefined,
+        scormPackageId: formData.contentType === "scorm" && uploadedScormPackageId
+          ? (uploadedScormPackageId as Id<"scormPackages">)
+          : undefined,
         section: formData.section,
       });
       toast.success("Lesson updated successfully");
@@ -377,7 +365,7 @@ export default function LessonEditPage() {
               <Label htmlFor="contentType">Content Type</Label>
               <Select
                 value={formData.contentType}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" | "presentation" }))}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" | "presentation" | "scorm" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -407,27 +395,19 @@ export default function LessonEditPage() {
                       <span>Presentation</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="scorm">
+                    <div className="flex items-center gap-2">
+                      <Boxes className="h-4 w-4" />
+                      <span>SCORM package</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {formData.contentType === "video" && (
               <div className="space-y-4">
-                <VideoUpload lessonId={lessonId as Id<"lessons">} />
                 <VideoUploader lessonId={lessonId as Id<"lessons">} />
-                {!formData.videoFileName && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="content">Video URL</Label>
-                    <Input
-                      id="content"
-                      name="content"
-                      placeholder="https://... (or YouTube, Vimeo, direct MP4)"
-                      value={formData.content}
-                      onChange={handleChange}
-                    />
-                    <p className="text-xs leading-[1.5] text-muted-foreground">Paste an external video link.</p>
-                  </div>
-                )}
                 {formData.videoFileName && (
                   <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
                     <File className="h-4 w-4" />
@@ -473,6 +453,52 @@ export default function LessonEditPage() {
                     </div>
                   )}
                   <p className="text-xs leading-[1.5] text-muted-foreground">Upload PPT, PPTX, or PDF. Students can download it from the lesson page.</p>
+                </div>
+              </div>
+            )}
+
+            {formData.contentType === "scorm" && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>SCORM Package</Label>
+                  <input
+                    type="file"
+                    accept=".zip,application/zip,application/x-zip-compressed"
+                    className="hidden"
+                    ref={scormInputRef}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleScormUpload(file);
+                    }}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => scormInputRef.current?.click()}
+                      disabled={isUploadingScorm}
+                    >
+                      {isUploadingScorm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                      {uploadedScormPackageId ? "Replace Package" : "Upload SCORM Package"}
+                    </Button>
+                    {uploadedScormPackageId && <span className="text-xs text-muted-foreground">Ready to save</span>}
+                  </div>
+                  {formData.scormFileName && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
+                      <Boxes className="h-4 w-4" />
+                      <span className="font-medium">Attached:</span>
+                      <span className="truncate max-w-xs font-mono text-xs" title={formData.scormFileName}>
+                        {formData.scormFileName}
+                      </span>
+                    </div>
+                  )}
+                  {!uploadedScormPackageId && (lesson as any).scormPackageId && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-2 text-sm text-green-700 dark:text-green-400">
+                      <Boxes className="h-4 w-4" />
+                      <span>Existing package attached — upload to replace.</span>
+                    </div>
+                  )}
+                  <p className="text-xs leading-[1.5] text-muted-foreground">Upload a SCORM 1.2 or 2004 zip. It is unpacked and served to students from the lesson page.</p>
                 </div>
               </div>
             )}

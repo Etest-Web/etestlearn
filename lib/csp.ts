@@ -129,6 +129,9 @@ export function buildContentSecurityPolicy(nonce: string, extraScriptHashes: str
       // which React renders without the nonce. See `readLayoutScriptHashes`.
       ...extraScriptHashes,
       "blob:",
+      // WASM compilation only — required by the dotlottie-web engine.
+      // Narrower than 'unsafe-eval': permits WebAssembly, not JS eval().
+      "'wasm-unsafe-eval'",
       ...SCRIPT_HOSTS,
     ].join(" "),
   );
@@ -208,9 +211,6 @@ export function connectSrcSources(uploadOrigin: string, cdnOrigin = ""): string[
     "https://*.uploadthing.com",
     "https://uploadthing.com",
     "https://unpkg.com",
-    "https://api.publit.io",
-    "https://*.publit.io",
-    "https://media.publit.io",
     "https://va.vercel-scripts.com",
     // Cloudflare Turnstile verification API calls.
     "https://challenges.cloudflare.com",
@@ -231,13 +231,7 @@ export function connectSrcSources(uploadOrigin: string, cdnOrigin = ""): string[
  * not explicitly set.
  */
 export function mediaSrcSources(cdnOrigin: string): string[] {
-  const sources = [
-    "'self'",
-    "blob:",
-    "https://*.convex.site",
-    "https://*.publit.io",
-    "https://media.publit.io",
-  ];
+  const sources = ["'self'", "blob:", "https://*.convex.site"];
   const origin = parseBareHttpsOrigin(cdnOrigin);
   if (origin && !sources.includes(origin)) sources.push(origin);
   return sources;
@@ -282,9 +276,15 @@ function buildPolicy(scriptSrc: string): string {
       ...SCRIPT_HOSTS,
       "https://hooks.stripe.com",
       "https://checkout.paystack.com",
-      "https://*.publit.io",
-      "https://media.publit.io",
-      "https://publit.io",
+      // SCORM packages are served from the Convex site origin and rendered in
+      // an iframe by `ScormPlayer` (the CMI bridge is injected inside it).
+      "https://*.convex.site",
+      // YouTube/Vimeo embeds — lessons created before direct upload was
+      // mandatory still hold these URLs, and `VideoPlayer` renders them as
+      // iframes that this directive would otherwise block.
+      "https://www.youtube-nocookie.com",
+      "https://www.youtube.com",
+      "https://player.vimeo.com",
     ].join(" "),
     // Clerk's own reference policy allows blob: workers; same-origin blob
     // workers are not an escalation (they inherit this origin, and reaching
@@ -384,7 +384,7 @@ async function sha256CspSource(text: string): Promise<string> {
  */
 export function buildStaticContentSecurityPolicy(scriptHashes: string[]): string {
   return buildPolicy(
-    ["script-src", "'self'", ...scriptHashes, "blob:", ...SCRIPT_HOSTS].join(" "),
+    ["script-src", "'self'", ...scriptHashes, "blob:", "'wasm-unsafe-eval'", ...SCRIPT_HOSTS].join(" "),
   );
 }
 
@@ -408,6 +408,6 @@ export function buildStaticContentSecurityPolicy(scriptHashes: string[]): string
  */
 export function buildDegradedStaticContentSecurityPolicy(): string {
   return buildPolicy(
-    ["script-src", "'self'", "'unsafe-inline'", "blob:", ...SCRIPT_HOSTS].join(" "),
+    ["script-src", "'self'", "'unsafe-inline'", "blob:", "'wasm-unsafe-eval'", ...SCRIPT_HOSTS].join(" "),
   );
 }

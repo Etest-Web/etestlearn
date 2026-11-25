@@ -8,6 +8,7 @@ import { z } from "zod";
 import { PAYMENT_MISMATCH } from "./payments";
 import { decodePlaybackToken, verifyPlaybackToken } from "../lib/video-playback-token";
 import { verifyScormToken } from "../lib/scorm/token";
+import { injectScormBridge } from "../lib/scorm/bridge-script";
 import { decorateMasterPlaylist, decorateMediaPlaylist } from "../lib/video-playlists";
 import {
   isAuthorizedTranscodeCall,
@@ -775,6 +776,8 @@ http.route({
       return new Response("Asset blob missing", { status: 404 });
     }
 
+    const isHtml = file.contentType === "text/html" || file.contentType === "application/xhtml+xml";
+
     const appOrigin = process.env.APP_ORIGIN;
     const headers: Record<string, string> = {
       "Content-Type": file.contentType,
@@ -784,6 +787,14 @@ http.route({
     if (appOrigin) {
       headers["Access-Control-Allow-Origin"] = appOrigin;
       headers["Vary"] = "Origin";
+    }
+
+    // HTML documents get the in-iframe CMI bridge injected as the first thing
+    // in <head>, so the LMS exists before any SCO code probes for it. Every
+    // other asset is streamed byte-exact.
+    if (isHtml) {
+      const html = injectScormBridge(await blob.text());
+      return new Response(html, { status: 200, headers });
     }
 
     return new Response(blob, {

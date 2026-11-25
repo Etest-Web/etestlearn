@@ -17,12 +17,14 @@ import {
 } from "@/components/ui";
 import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
+import { ScormPlayer } from "@/components/scorm-player";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 import { sanitizeArticleHtml } from "@/lib/sanitize-html";
 import {
   ArrowLeft,
   ArrowRight,
+  Boxes,
   CheckCircle2,
   Circle,
   Download,
@@ -58,6 +60,10 @@ function LessonContent({
     contentType === "video" ? { lessonId } : "skip",
   );
   const getFileUrl = useQuery(api.files.getFileUrl, presentationStorageId ? { storageId: presentationStorageId } : "skip");
+
+  if (contentType === "scorm") {
+    return <ScormPlayer lessonId={lessonId} onCompleted={onWatchedEnough} />;
+  }
 
   if (contentType === "quiz") {
     return null;
@@ -310,6 +316,7 @@ export default function LessonPage() {
             {lesson.contentType === "video" && <VideoIcon className="h-3 w-3" />}
             {lesson.contentType === "article" && <FileText className="h-3 w-3" />}
             {lesson.contentType === "presentation" && <Presentation className="h-3 w-3" />}
+            {lesson.contentType === "scorm" && <Boxes className="h-3 w-3" />}
             {lesson.contentType === "quiz" && <HelpCircle className="h-3 w-3" />}
             {lesson.contentType}
           </Badge>

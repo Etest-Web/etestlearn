@@ -11,18 +11,35 @@
  */
 
 export type QuizOption = { text: string; isCorrect: boolean };
-export type QuizQuestion = { prompt: string; options: QuizOption[] };
+export type QuestionType =
+  | "multiple-choice"
+  | "true-false"
+  | "multi-select"
+  | "fill-blank";
+export type QuizQuestion = {
+  prompt: string;
+  options: QuizOption[];
+  /** Absent means multiple-choice. */
+  type?: QuestionType;
+  /** Normalised accepted answers, only for fill-blank. */
+  acceptedAnswers?: string[];
+};
 export type QuizSpec = { title: string; passingScore: number; questions: QuizQuestion[] };
+
+/** One click-through slide: markdown body plus ordered reveal steps. */
+export type SlideSpec = { heading: string; body: string; reveals: string[] };
 
 export type LessonSpec = {
   title: string;
-  contentType: "article" | "quiz" | "presentation";
+  contentType: "article" | "quiz" | "presentation" | "slides";
   section: string;
   content?: string;
   /** Quiz payload when contentType === "quiz". */
   quiz?: QuizSpec;
   /** Toolkit file name + body when contentType === "presentation". */
   toolkit?: { fileName: string; body: string };
+  /** Click-through deck when contentType === "slides". */
+  slides?: SlideSpec[];
 };
 
 /**

@@ -1,7 +1,8 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { gradeQuiz } from "../lib/quiz";
+import { gradeQuiz, normalizeAnswerText, type GradeableQuestion } from "../lib/quiz";
+import { sanitizeSingleLine } from "../lib/sanitize-text";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
 import { requireUser } from "./helpers/auth";
@@ -38,7 +39,7 @@ export const getQuizForLesson = query({
     const isOwnerOrAdmin =
       user.role === "admin" || course.instructorId === user._id;
 
-    let hasFullAccess = isOwnerOrAdmin;
+    const hasFullAccess = isOwnerOrAdmin;
 
     if (!hasFullAccess) {
       const enrollment = await ctx.db
@@ -73,7 +74,10 @@ export const getQuizForLesson = query({
         // Nobody gets the answer key from this query — instructors use
         // getQuizAnswerKey instead. Students only ever see option text.
         const options = rawOptions.map(({ isCorrect: _isCorrect, ...rest }) => rest);
-        return { question: q, options };
+        // The accepted fill-blank strings are part of the answer key, not the
+        // question. getQuizAnswerKey is the only place they are exposed.
+        const { acceptedAnswers: _acceptedAnswers, ...publicQuestion } = q;
+        return { question: publicQuestion, options };
       }),
     );
 
@@ -114,6 +118,7 @@ export const getQuizAnswerKey = query({
       result.push({
         questionId: question._id,
         correctOptionIds: options.filter((o) => o.isCorrect).map((o) => o._id),
+        acceptedAnswers: question.acceptedAnswers ?? [],
       });
     }
     return result;
@@ -126,7 +131,11 @@ export const submitQuizAttempt = mutation({
     answers: v.array(
       v.object({
         questionId: v.id("quizQuestions"),
-        optionId: v.id("quizOptions"),
+        // Exactly one of the two must be present. text is for fill-blank;
+        // optionId covers multiple-choice, true-false and multi-select (one
+        // entry per selected option).
+        optionId: v.optional(v.id("quizOptions")),
+        text: v.optional(v.string()),
       }),
     ),
   },
@@ -217,44 +226,51 @@ export const submitQuizAttempt = mutation({
       ),
     );
 
-    const optionsByQuestion = new Map<string, string[]>();
-    for (const [question, opts] of questions.map((question, i) => [
-      question,
-      optionLists[i],
-    ] as const)) {
-      optionsByQuestion.set(
-        question._id,
-        opts.filter((o) => o.isCorrect).map((o) => o._id),
-      );
-    }
+    const questionById = new Map(questions.map((q) => [q._id as string, q] as const));
+    const optionsByQuestion = new Map(
+      questions.map((q, i) => [q._id as string, optionLists[i]] as const),
+    );
+    const gradeable: GradeableQuestion[] = questions.map((q) => ({
+      id: q._id,
+      type: q.type ?? "multiple-choice",
+      correctOptionIds: (optionsByQuestion.get(q._id) ?? [])
+        .filter((o) => o.isCorrect)
+        .map((o) => o._id),
+      acceptedAnswers: q.acceptedAnswers?.map(normalizeAnswerText),
+    }));
 
     // SECURITY: validate that every submitted answer references a question in
-    // this quiz and an option that belongs to that question. Without this a
-    // crafted payload can submit answers for questions from a different quiz
-    // and have them scored against this quiz's passing threshold.
-    const questionIds = new Set(questions.map((q) => q._id as string));
+    // this quiz and a valid choice for that question's type. Without this a
+    // crafted payload could score questions from another quiz, or pass a
+    // fill-blank by submitting an arbitrary option id.
     for (const answer of args.answers) {
-      if (!questionIds.has(answer.questionId as string)) {
+      const question = questionById.get(answer.questionId as string);
+      if (!question) {
         throw new Error("Answer references a question not in this quiz");
       }
-      const validOptionIds = new Set(
-        (optionLists[questions.findIndex((q) => q._id === answer.questionId)] ?? []).map(
-          (o) => o._id as string,
-        ),
-      );
-      if (!validOptionIds.has(answer.optionId as string)) {
-        throw new Error("Answer references an option not in this question");
+      const hasOption = answer.optionId !== undefined;
+      const hasText = answer.text !== undefined;
+      if (hasOption === hasText) {
+        throw new Error("Answer must contain exactly one of optionId or text");
+      }
+      if (question.type === "fill-blank") {
+        if (!hasText || !sanitizeSingleLine(answer.text ?? "", 200)) {
+          throw new Error("This question expects a non-empty text answer");
+        }
+      } else {
+        if (!hasOption) {
+          throw new Error("This question expects an option");
+        }
+        const valid = (optionsByQuestion.get(question._id) ?? []).some(
+          (o) => o._id === answer.optionId,
+        );
+        if (!valid) {
+          throw new Error("Answer references an option not in this question");
+        }
       }
     }
 
-    const grade = gradeQuiz(
-      [...optionsByQuestion].map(([id, correctOptionIds]) => ({
-        id,
-        correctOptionIds,
-      })),
-      args.answers,
-      quiz.passingScore,
-    );
+    const grade = gradeQuiz(gradeable, args.answers, quiz.passingScore);
     const { score, maxScore, percent, passed } = grade;
 
     const now = Date.now();
@@ -395,7 +411,7 @@ export const updateQuiz = mutation({
       throw new Error("Not authorized to update this quiz");
     }
 
-    const updates: any = {};
+    const updates: { title?: string; passingScore?: number } = {};
     if (args.title !== undefined) updates.title = args.title;
     if (args.passingScore !== undefined) {
       // Same 0–100 rule as creation: tightening the bar must not be able to

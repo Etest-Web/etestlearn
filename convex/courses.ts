@@ -213,7 +213,12 @@ export const getCourseBySlug = query({
         : lessons.map((lesson) =>
             isPreviewLesson(lesson)
               ? lesson
-              : { ...lesson, content: undefined, videoAssetId: undefined },
+              : {
+                  ...lesson,
+                  content: undefined,
+                  videoAssetId: undefined,
+                  slides: undefined,
+                },
           ),
       skills,
     };

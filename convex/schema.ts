@@ -254,7 +254,8 @@ export default defineSchema({
       v.literal("article"),
       v.literal("quiz"),
       v.literal("presentation"),
-      v.literal("scorm")
+      v.literal("scorm"),
+      v.literal("slides")
     ),
     order: v.number(),
     durationMinutes: v.optional(v.number()),
@@ -271,6 +272,17 @@ export default defineSchema({
     scormPackageId: v.optional(v.id("scormPackages")),
     // Content format for article lessons: "markdown" | "html". Default "markdown".
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
+    // In-app click-through slide decks. Each slide is a heading, a markdown
+    // body, and ordered reveal steps shown one click at a time before "next".
+    slides: v.optional(
+      v.array(
+        v.object({
+          heading: v.string(),
+          body: v.string(),
+          reveals: v.array(v.string()),
+        }),
+      ),
+    ),
     // Optional section/group label for curriculum organization.
     section: v.optional(v.string()),
     // Original uploaded file name, preserved for display on the lesson page.
@@ -563,6 +575,18 @@ export default defineSchema({
     quizId: v.id("quizzes"),
     prompt: v.string(),
     order: v.number(),
+    // Absent means multiple-choice, so all pre-existing questions keep working.
+    // true-false and multi-select store their choices as quizOptions;
+    // fill-blank stores normalised strings here and has no options.
+    type: v.optional(
+      v.union(
+        v.literal("multiple-choice"),
+        v.literal("true-false"),
+        v.literal("multi-select"),
+        v.literal("fill-blank"),
+      ),
+    ),
+    acceptedAnswers: v.optional(v.array(v.string())),
   }).index("by_quiz_order", ["quizId", "order"]),
 
   quizOptions: defineTable({

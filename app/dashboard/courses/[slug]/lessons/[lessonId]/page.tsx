@@ -18,6 +18,7 @@ import {
 import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import { ScormPlayer } from "@/components/scorm-player";
+import { SlideDeck, type DeckSlide } from "@/components/slide-deck";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 import { sanitizeArticleHtml } from "@/lib/sanitize-html";
@@ -30,6 +31,7 @@ import {
   Download,
   FileText,
   HelpCircle,
+  Layers3,
   Loader2,
   Lock,
   Presentation,
@@ -45,9 +47,11 @@ function LessonContent({
   contentFormat,
   presentationStorageId,
   presentationFileName,
+  slides,
 }: {
   contentType: string;
   content?: string;
+  slides?: DeckSlide[];
   lessonId: Id<"lessons">;
   isCompleted: boolean;
   onWatchedEnough: () => void;
@@ -158,6 +162,18 @@ function LessonContent({
   }
 
   // article
+  if (contentType === "slides") {
+    return slides?.length ? (
+      <SlideDeck slides={slides} />
+    ) : (
+      <EmptyState
+        icon={Presentation}
+        title="No slides yet"
+        description="The slide deck for this lesson has not been added."
+      />
+    );
+  }
+
   if (!content) {
     return (
       <EmptyState
@@ -316,6 +332,7 @@ export default function LessonPage() {
             {lesson.contentType === "video" && <VideoIcon className="h-3 w-3" />}
             {lesson.contentType === "article" && <FileText className="h-3 w-3" />}
             {lesson.contentType === "presentation" && <Presentation className="h-3 w-3" />}
+            {lesson.contentType === "slides" && <Layers3 className="h-3 w-3" />}
             {lesson.contentType === "scorm" && <Boxes className="h-3 w-3" />}
             {lesson.contentType === "quiz" && <HelpCircle className="h-3 w-3" />}
             {lesson.contentType}
@@ -364,6 +381,7 @@ export default function LessonPage() {
             <LessonContent
               contentType={lesson.contentType}
               content={lesson.content ?? undefined}
+              slides={lesson.slides ?? undefined}
               lessonId={lesson._id}
               isCompleted={isCompleted}
               onWatchedEnough={() => {
@@ -373,8 +391,8 @@ export default function LessonPage() {
                   (err) => toast.error(getErrorMessage(err, "Failed to update progress")),
                 );
               }}
-              presentationStorageId={(lesson as any).presentationStorageId ?? undefined}
-              presentationFileName={(lesson as any).presentationFileName ?? undefined}
+              presentationStorageId={lesson.presentationStorageId ?? undefined}
+              presentationFileName={lesson.presentationFileName ?? undefined}
             />
           )}
 

@@ -1,12 +1,24 @@
+/** The four question shapes the platform grades. Absent means multiple-choice. */
+export type QuestionType =
+  | "multiple-choice"
+  | "true-false"
+  | "multi-select"
+  | "fill-blank";
+
 export interface GradeableQuestion {
   id: string;
+  type?: QuestionType;
   correctOptionIds: string[];
+  /** fill-blank answers, stored normalised. */
+  acceptedAnswers?: string[];
 }
 
-export interface QuizAnswer {
+/** One answer is validated server-side; both fields are optional on the wire. */
+export type QuizAnswer = {
   questionId: string;
-  optionId: string;
-}
+  optionId?: string;
+  text?: string;
+};
 
 export interface QuizGrade {
   score: number;
@@ -15,9 +27,15 @@ export interface QuizGrade {
   passed: boolean;
 }
 
+export function normalizeAnswerText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 /**
- * Grades a multiple-choice quiz. Each question is worth one point and only a
- * correct option earns it; unanswered questions score zero.
+ * Grades a quiz. Each question is worth one point. Multiple-choice and
+ * true-false need one chosen correct option; multi-select needs the exact set
+ * of correct options (no missing, no extra, no duplicates); fill-blank compares
+ * normalised text against the accepted answers. Unanswered questions score zero.
  */
 export function gradeQuiz(
   questions: GradeableQuestion[],
@@ -25,14 +43,46 @@ export function gradeQuiz(
   passingScorePercent: number,
 ): QuizGrade {
   const maxScore = questions.length;
-  const answerByQuestion = new Map(
-    answers.map((a) => [a.questionId, a.optionId] as const),
-  );
+  const answersByQuestion = new Map<string, QuizAnswer[]>();
+  for (const answer of answers) {
+    const list = answersByQuestion.get(answer.questionId) ?? [];
+    list.push(answer);
+    answersByQuestion.set(answer.questionId, list);
+  }
 
   let score = 0;
   for (const question of questions) {
-    const chosen = answerByQuestion.get(question.id);
-    if (chosen !== undefined && question.correctOptionIds.includes(chosen)) {
+    const given = answersByQuestion.get(question.id) ?? [];
+    const type = question.type ?? "multiple-choice";
+
+    if (type === "fill-blank") {
+      const textAnswer = given.find((a) => a.text !== undefined)?.text;
+      if (
+        textAnswer !== undefined &&
+        question.acceptedAnswers?.some(
+          (accepted) => normalizeAnswerText(accepted) === normalizeAnswerText(textAnswer),
+        )
+      ) {
+        score += 1;
+      }
+      continue;
+    }
+
+    const chosen = given.flatMap((a) => (a.optionId === undefined ? [] : [a.optionId]));
+    if (type === "multi-select") {
+      const correct = new Set(question.correctOptionIds);
+      if (
+        chosen.length > 0 &&
+        chosen.length === correct.size &&
+        new Set(chosen).size === chosen.length &&
+        chosen.every((id) => correct.has(id))
+      ) {
+        score += 1;
+      }
+      continue;
+    }
+
+    if (chosen.length === 1 && question.correctOptionIds.includes(chosen[0])) {
       score += 1;
     }
   }

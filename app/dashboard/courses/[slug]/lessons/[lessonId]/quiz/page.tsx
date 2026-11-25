@@ -27,6 +27,8 @@ export default function LessonQuizPage() {
 
   const quizData = useQuery(api.quizzes.getQuizForLesson, { lessonId });
   const [selected, setSelected] = useState<Record<string, string>>({});
+  const [multiSelected, setMultiSelected] = useState<Record<string, string[]>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
   const submitAttempt = useMutation(api.quizzes.submitQuizAttempt);
   const [result, setResult] = useState<{
     score: number;
@@ -62,10 +64,31 @@ export default function LessonQuizPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const answers = Object.entries(selected).map(([questionId, optionId]) => ({
-        questionId: questionId as Id<"quizQuestions">,
-        optionId: optionId as Id<"quizOptions">,
-      }));
+      const answers: {
+        questionId: Id<"quizQuestions">;
+        optionId?: Id<"quizOptions">;
+        text?: string;
+      }[] = [];
+      for (const { question } of questions) {
+        const questionId = question._id;
+        const key = String(questionId);
+        const type = question.type ?? "multiple-choice";
+        if (type === "fill-blank") {
+          const text = textAnswers[key]?.trim();
+          if (text) answers.push({ questionId, text });
+        } else if (type === "multi-select") {
+          for (const optionId of multiSelected[key] ?? []) {
+            answers.push({ questionId, optionId: optionId as Id<"quizOptions"> });
+          }
+        } else {
+          const optionId = selected[key];
+          if (optionId) answers.push({ questionId, optionId: optionId as Id<"quizOptions"> });
+        }
+      }
+      if (answers.length < questions.length) {
+        toast.error("Please answer every question before submitting.");
+        return;
+      }
       const res = await submitAttempt({
         lessonId: quiz.lessonId,
         answers,
@@ -101,39 +124,75 @@ export default function LessonQuizPage() {
                 <span className="tabular text-muted-foreground">{index + 1}.</span>{" "}
                 {question.prompt}
               </p>
-              <div className="space-y-1" role="radiogroup">
-                {options.map((opt) => {
-                  const questionKey = String(question._id);
-                  const optionKey = String(opt._id);
-                  const checked = selected[questionKey] === optionKey;
-
+              {(() => {
+                const type = question.type ?? "multiple-choice";
+                const questionKey = String(question._id);
+                if (type === "fill-blank") {
                   return (
-                    <label
-                      key={opt._id}
-                      className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-sm transition-colors ${
-                        checked
-                          ? "border-brand bg-brand/5 font-medium"
-                          : "border-rule hover:bg-surface-sunken"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={`question-${questionKey}`}
-                        value={optionKey}
-                        checked={checked}
-                        onChange={() =>
-                          setSelected((prev) => ({
-                            ...prev,
-                            [questionKey]: optionKey,
-                          }))
-                        }
-                        className="accent-brand"
-                      />
-                      <span>{opt.text}</span>
-                    </label>
+                    <input
+                      type="text"
+                      value={textAnswers[questionKey] ?? ""}
+                      onChange={(e) =>
+                        setTextAnswers((prev) => ({
+                          ...prev,
+                          [questionKey]: e.target.value,
+                        }))
+                      }
+                      placeholder="Type your answer"
+                      className="w-full rounded-sm border border-rule bg-transparent px-3 py-1.5 text-sm"
+                    />
                   );
-                })}
-              </div>
+                }
+                const multi = type === "multi-select";
+                return (
+                  <div className="space-y-1" role={multi ? "group" : "radiogroup"}>
+                    {options.map((opt) => {
+                      const optionKey = String(opt._id);
+                      const checked = multi
+                        ? (multiSelected[questionKey] ?? []).includes(optionKey)
+                        : selected[questionKey] === optionKey;
+
+                      return (
+                        <label
+                          key={opt._id}
+                          className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-sm transition-colors ${
+                            checked
+                              ? "border-brand bg-brand/5 font-medium"
+                              : "border-rule hover:bg-surface-sunken"
+                          }`}
+                        >
+                          <input
+                            type={multi ? "checkbox" : "radio"}
+                            name={multi ? undefined : `question-${questionKey}`}
+                            value={optionKey}
+                            checked={checked}
+                            onChange={() => {
+                              if (multi) {
+                                setMultiSelected((prev) => {
+                                  const current = prev[questionKey] ?? [];
+                                  return {
+                                    ...prev,
+                                    [questionKey]: current.includes(optionKey)
+                                      ? current.filter((id) => id !== optionKey)
+                                      : [...current, optionKey],
+                                  };
+                                });
+                              } else {
+                                setSelected((prev) => ({
+                                  ...prev,
+                                  [questionKey]: optionKey,
+                                }));
+                              }
+                            }}
+                            className="accent-brand"
+                          />
+                          <span>{opt.text}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           ))}
 

@@ -56,7 +56,17 @@ import { getErrorMessage } from "@/lib/errors";
 import { useLocalization } from "@/components/localization-provider";
 import { averageRating, formatRating } from "@/lib/reviews";
 import { COUPON_CODE_MAX_LENGTH } from "@/lib/coupons";
+import { formatCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+
+function priceLabel(kobo: number, currency: string) {
+  if (kobo <= 0) return "Free";
+  try {
+    return formatCurrency(kobo / 100, currency);
+  } catch {
+    return formatCurrency(kobo / 100, "NGN");
+  }
+}
 
 export default function CoursePage() {
   const router = useRouter();
@@ -64,7 +74,6 @@ export default function CoursePage() {
   const slug = params.slug as string;
   const { isSignedIn } = useUser();
   const { currency, formatPrice } = useLocalization();
-  const [displayPrice, setDisplayPrice] = useState<string>("...");
 
   const data = useQuery(api.courses.getCourseBySlug, slug ? { slug } : "skip");
   const hasAccess = useQuery(
@@ -99,34 +108,39 @@ export default function CoursePage() {
       : "skip",
   );
 
-  useEffect(() => {
-    async function updatePrice() {
-      if (data?.course) {
-        const formatted = await formatPrice(data.course.price, data.course.currency ?? "NGN");
-        setDisplayPrice(formatted);
-      }
-    }
-    updatePrice();
-  }, [data, formatPrice]);
+  const coursePrice = data?.course?.price ?? 0;
+  const baseCurrency = data?.course?.currency ?? "NGN";
+  const discountedKobo =
+    couponPreview?.valid && coursePrice > 0
+      ? Math.max(0, coursePrice - couponPreview.discountKobo)
+      : null;
+  const discountedPrice =
+    discountedKobo === null ? null : priceLabel(discountedKobo, baseCurrency);
+  const basePriceLabel = priceLabel(coursePrice, baseCurrency);
 
-  const [discountedPrice, setDiscountedPrice] = useState<string | null>(null);
+  // Conversion is an enhancement, never a gate on showing a price. The old
+  // effect started at "..." and only replaced it after an external rate lookup;
+  // a blocked or slow rates API left that placeholder on screen indefinitely.
+  const [localizedPrice, setLocalizedPrice] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    async function update() {
-      if (!couponPreview?.valid || !data?.course?.price) {
-        setDiscountedPrice(null);
-        return;
-      }
-      const remaining = Math.max(0, data.course.price - couponPreview.discountKobo);
-      const formatted = await formatPrice(remaining, data.course.currency ?? "NGN");
-      if (!cancelled) setDiscountedPrice(formatted);
+    setLocalizedPrice(null);
+    if (coursePrice > 0 && discountedKobo === null) {
+      formatPrice(coursePrice, baseCurrency).then(
+        (formatted) => {
+          if (!cancelled) setLocalizedPrice(formatted);
+        },
+        () => {
+          if (!cancelled) setLocalizedPrice(null);
+        },
+      );
     }
-    update();
     return () => {
       cancelled = true;
     };
-  }, [couponPreview, data, formatPrice]);
+  }, [coursePrice, baseCurrency, discountedKobo, formatPrice]);
 
+  const displayPrice = localizedPrice ?? basePriceLabel;
   const appliedCouponCode = submittedCode || undefined;
   const payablePrice = discountedPrice ?? displayPrice;
 

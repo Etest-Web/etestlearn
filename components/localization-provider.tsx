@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { getExchangeRates, formatCurrency } from "@/lib/currency";
 
 type LocalizationSettings = {
@@ -69,7 +69,7 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
     });
   };
 
-  const formatPrice = async (amountKobo: number | null | undefined, baseCurrency: string = "NGN") => {
+  const formatPrice = useCallback(async (amountKobo: number | null | undefined, baseCurrency: string = "NGN") => {
     if (!amountKobo || amountKobo <= 0) return "Free";
 
     try {
@@ -88,7 +88,7 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
       // Fallback to base currency formatting
       return formatCurrency(amountKobo / 100, baseCurrency, settings.locale);
     }
-  };
+  }, [settings.currency, settings.locale]);
 
   return (
     <LocalizationContext.Provider 

@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { deckThemeValidator, slideValidator } from "./helpers/slides";
 
 /**
  * One certificate field's placement: where it sits as a fraction of the page,
@@ -272,17 +273,11 @@ export default defineSchema({
     scormPackageId: v.optional(v.id("scormPackages")),
     // Content format for article lessons: "markdown" | "html". Default "markdown".
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
-    // In-app click-through slide decks. Each slide is a heading, a markdown
-    // body, and ordered reveal steps shown one click at a time before "next".
-    slides: v.optional(
-      v.array(
-        v.object({
-          heading: v.string(),
-          body: v.string(),
-          reveals: v.array(v.string()),
-        }),
-      ),
-    ),
+    // In-app click-through slide decks. `kind` is optional at the mutation
+    // boundary and defaults to "bullets" for legacy rows; see lib/slides.ts.
+    slides: v.optional(v.array(slideValidator)),
+    // Deck-wide preset theme. Copy is per slide, look-and-feel is not.
+    slideTheme: v.optional(deckThemeValidator),
     // Optional section/group label for curriculum organization.
     section: v.optional(v.string()),
     // Original uploaded file name, preserved for display on the lesson page.

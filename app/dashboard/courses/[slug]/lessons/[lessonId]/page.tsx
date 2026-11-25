@@ -18,7 +18,7 @@ import {
 import { VideoPlayer } from "@/components/video-player";
 import { EncryptedVideoPlayer } from "@/components/encrypted-video-player";
 import { ScormPlayer } from "@/components/scorm-player";
-import { SlideDeck, type DeckSlide } from "@/components/slide-deck";
+import { SlideDeck, type DeckSlide, type DeckTheme } from "@/components/slide-deck";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 import { sanitizeArticleHtml } from "@/lib/sanitize-html";
@@ -48,10 +48,12 @@ function LessonContent({
   presentationStorageId,
   presentationFileName,
   slides,
+  slideTheme,
 }: {
   contentType: string;
   content?: string;
   slides?: DeckSlide[];
+  slideTheme?: DeckTheme;
   lessonId: Id<"lessons">;
   isCompleted: boolean;
   onWatchedEnough: () => void;
@@ -164,7 +166,7 @@ function LessonContent({
   // article
   if (contentType === "slides") {
     return slides?.length ? (
-      <SlideDeck slides={slides} />
+      <SlideDeck slides={slides} theme={slideTheme} />
     ) : (
       <EmptyState
         icon={Presentation}
@@ -217,7 +219,7 @@ export default function LessonPage() {
 
   if (data === undefined || enrollments === undefined || dbUser === undefined) {
     return (
-      <div className="mx-auto max-w-4xl py-8">
+      <div className="mx-auto max-w-6xl py-8">
         <p className="text-sm text-muted-foreground">Loading lesson...</p>
       </div>
     );
@@ -225,7 +227,7 @@ export default function LessonPage() {
 
   if (data === null) {
     return (
-      <div className="mx-auto max-w-4xl py-8 space-y-2">
+      <div className="mx-auto max-w-6xl py-8 space-y-2">
         <p className="text-sm text-muted-foreground">This course could not be found.</p>
         <Link href="/dashboard/courses" className="text-sm text-primary underline">
           Back to my courses
@@ -241,7 +243,7 @@ export default function LessonPage() {
 
   if (!lesson) {
     return (
-      <div className="mx-auto max-w-4xl py-8 space-y-2">
+      <div className="mx-auto max-w-6xl py-8 space-y-2">
         <p className="text-sm text-muted-foreground">This lesson could not be found.</p>
         <Link href={`/dashboard/courses/${course.slug}`} className="text-sm text-primary underline">
           Back to course overview
@@ -270,7 +272,7 @@ export default function LessonPage() {
 
   if (isPaywalled) {
     return (
-      <div className="mx-auto max-w-4xl py-8 space-y-2">
+      <div className="mx-auto max-w-6xl py-8 space-y-2">
         <p className="text-sm text-muted-foreground">
           This lesson is part of a course you haven&apos;t enrolled in yet.
         </p>
@@ -313,7 +315,7 @@ export default function LessonPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <Link
           href={`/dashboard/courses/${course.slug}`}
@@ -382,6 +384,7 @@ export default function LessonPage() {
               contentType={lesson.contentType}
               content={lesson.content ?? undefined}
               slides={lesson.slides ?? undefined}
+              slideTheme={lesson.slideTheme ?? undefined}
               lessonId={lesson._id}
               isCompleted={isCompleted}
               onWatchedEnough={() => {

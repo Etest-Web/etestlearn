@@ -3,9 +3,12 @@
 /**
  * Cloudflare Worker — media CDN for the B2 video pipeline.
  *
- * The bucket (`glypha-media`) is private. This Worker is the only reader of
- * the read-only key: it signs its own `GET`s with aws4fetch and streams the
- * object back. Browsers never see a B2 host, a signature or a credential.
+ * The buckets (`glypha-media` for HLS, a separate slides bucket for images)
+ * are private. This Worker is the only reader of the read-only key: it signs
+ * its own `GET`s with aws4fetch and streams the object back. Browsers never
+ * see a B2 host, a signature or a credential. The path prefix decides which
+ * bucket a request reads; a slide request with no slides bucket configured is
+ * a refusal, never a fall-through to the media bucket.
  *
  * Contract (see `docs/video-pipeline.md` and `README.md`):
  *   · GET and OPTIONS only; anything else is 405.
@@ -23,6 +26,7 @@ import {
   corsHeaders,
   isAllowedMediaPath,
   isAllowedMediaMethod,
+  isSlideImagePath,
   mediaCacheControl,
   mediaContentType,
   parseAllowedOrigins,
@@ -34,7 +38,9 @@ export interface Env {
   B2_ENDPOINT: string;
   B2_REGION: string;
   B2_BUCKET: string;
-  /** Read-only key, scoped to `glypha-media`. Secrets, never `[vars]`. */
+  /** Optional: only `/slides/...` requests need it. Keep video-only deploys working. */
+  B2_SLIDES_BUCKET?: string;
+  /** Read-only key, scoped to `glypha-media` and the slides bucket. Secrets, never `[vars]`. */
   B2_ACCESS_KEY_ID: string;
   B2_ACCESS_KEY: string;
   /** Comma-separated bare origins allowed to read media cross-origin. */
@@ -128,13 +134,22 @@ export default {
     const cached = await cache.match(cacheRequest);
     if (cached) return respond(cached.body, 200, cached.headers, cors);
 
+    // The path prefix decides the bucket. A slide request without a slides
+    // bucket configured is a refusal — never a fall-through to the video bucket.
+    const isSlide = isSlideImagePath(url.pathname);
+    const bucket = isSlide ? env.B2_SLIDES_BUCKET : env.B2_BUCKET;
+    if (isSlide && !bucket) {
+      console.error("cdn worker: missing slides bucket binding");
+      return errorResponse("Slide storage unavailable", 503, cors);
+    }
+
     const endpoint = env.B2_ENDPOINT.replace(/\/+$/, "");
     const key = url.pathname
       .replace(/^\/+/, "")
       .split("/")
       .map((segment) => encodeURIComponent(segment))
       .join("/");
-    const objectUrl = `${endpoint}/${encodeURIComponent(env.B2_BUCKET)}/${key}`;
+    const objectUrl = `${endpoint}/${encodeURIComponent(bucket!)}/${key}`;
 
     let upstream: Response;
     try {

@@ -92,6 +92,7 @@ export const insertCourse = internalMutation({
         ...(l.slides
           ? {
               slides: l.slides.map((s) => ({
+                kind: s.kind,
                 heading: sanitizeSingleLine(s.heading, TEXT_LIMITS.title),
                 body: sanitizeMultiline(s.body, TEXT_LIMITS.content),
                 reveals: s.reveals.map((r) => sanitizeMultiline(r, TEXT_LIMITS.content)),

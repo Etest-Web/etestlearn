@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Boxes, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Boxes, Layers3, Loader2, Save, Trash2, Video, File, FileText, HelpCircle, PlusCircle, CheckCircle, XCircle, SearchX, Upload, Image, Code2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { VideoUploader } from "@/components/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +34,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CourseSectionPicker, courseSections } from "@/components/course-section-picker";
 import { sanitizeArticleHtml } from "@/lib/sanitize-html";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { SlideBuilder } from "@/components/slide-builder";
+import { asDeckSlide, DEFAULT_DECK_THEME, type DeckSlide, type DeckTheme } from "@/lib/slides";
+
+type LessonContentType = "video" | "article" | "quiz" | "presentation" | "scorm" | "slides";
 
 export default function LessonEditPage() {
   const router = useRouter();
@@ -133,7 +137,7 @@ export default function LessonEditPage() {
   
   const [formData, setFormData] = useState({
     title: "",
-    contentType: "video" as "video" | "article" | "quiz" | "presentation" | "scorm",
+    contentType: "video" as LessonContentType,
     durationMinutes: "",
     content: "", // Article body / legacy video URL
     contentFormat: "markdown" as "markdown" | "html",
@@ -147,6 +151,8 @@ export default function LessonEditPage() {
   const [isUploadingScorm, setIsUploadingScorm] = useState(false);
   const presentationInputRef = useRef<HTMLInputElement>(null);
   const scormInputRef = useRef<HTMLInputElement>(null);
+  const [slides, setSlides] = useState<DeckSlide[]>([]);
+  const [slideTheme, setSlideTheme] = useState<DeckTheme>(DEFAULT_DECK_THEME);
 
   const htmlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -159,7 +165,7 @@ export default function LessonEditPage() {
     if (lesson) {
       setFormData({
         title: lesson.title,
-        contentType: lesson.contentType as "video" | "article" | "quiz" | "presentation" | "scorm",
+        contentType: lesson.contentType as LessonContentType,
         durationMinutes: lesson.durationMinutes?.toString() || "",
         content: lesson.content || "",
         contentFormat: (lesson.contentFormat as "markdown" | "html") || "markdown",
@@ -169,6 +175,8 @@ export default function LessonEditPage() {
         section: (lesson as any).section || "",
       });
       setUploadedScormPackageId((lesson as any).scormPackageId ?? null);
+      setSlides((lesson.slides ?? []).map((s) => asDeckSlide(s)));
+      setSlideTheme(lesson.slideTheme ?? DEFAULT_DECK_THEME);
     }
   }, [lesson]);
 
@@ -195,6 +203,8 @@ export default function LessonEditPage() {
           ? (uploadedScormPackageId as Id<"scormPackages">)
           : undefined,
         section: formData.section,
+        slides: formData.contentType === "slides" ? slides : undefined,
+        slideTheme: formData.contentType === "slides" ? slideTheme : undefined,
       });
       toast.success("Lesson updated successfully");
     } catch (error) {
@@ -364,7 +374,7 @@ export default function LessonEditPage() {
               <Label htmlFor="contentType">Content Type</Label>
               <Select
                 value={formData.contentType}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as "video" | "article" | "quiz" | "presentation" | "scorm" }))}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, contentType: value as LessonContentType }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -394,6 +404,12 @@ export default function LessonEditPage() {
                       <span>Presentation</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="slides">
+                    <div className="flex items-center gap-2">
+                      <Layers3 className="h-4 w-4" />
+                      <span>Slide deck</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="scorm">
                     <div className="flex items-center gap-2">
                       <Boxes className="h-4 w-4" />
@@ -403,6 +419,16 @@ export default function LessonEditPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.contentType === "slides" && lessonId && (
+              <SlideBuilder
+                lessonId={lessonId as Id<"lessons">}
+                slides={slides}
+                onSlidesChange={setSlides}
+                theme={slideTheme}
+                onThemeChange={setSlideTheme}
+              />
+            )}
 
             {formData.contentType === "video" && (
               <div className="space-y-4">

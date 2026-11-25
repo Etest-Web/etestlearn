@@ -3,6 +3,7 @@ import {
   corsHeaders,
   isAllowedMediaMethod,
   isAllowedMediaPath,
+  isSlideImagePath,
   mediaCacheControl,
   mediaContentType,
   parseAllowedOrigins,
@@ -23,6 +24,11 @@ describe("isAllowedMediaPath", () => {
     expect(isAllowedMediaPath(`/hls/${ASSET}/0/index.m3u8`)).toBe(true);
     expect(isAllowedMediaPath(`/hls/${ASSET}/1/seg_0.ts`)).toBe(true);
     expect(isAllowedMediaPath(`/hls/${ASSET}/01/seg_000123.ts`)).toBe(true);
+  });
+
+  it("also accepts slide image paths", () => {
+    const key = "/slides/course_abc/lesson_xyz/123e4567-e89b-4d3a-8456-426614174000.png";
+    expect(isAllowedMediaPath(key)).toBe(true);
   });
 
   it("rejects traversal and encoded separators", () => {
@@ -128,5 +134,40 @@ describe("media headers", () => {
     expect(mediaContentType("/hls/a/master.m3u8")).toBe("application/vnd.apple.mpegurl");
     expect(mediaContentType("/hls/a/1/index.m3u8")).toBe("application/vnd.apple.mpegurl");
     expect(mediaContentType("/hls/a/1/seg_4.ts")).toBe("video/mp2t");
+  });
+
+  it("maps slide image extensions to their content types", () => {
+    expect(mediaContentType("/slides/c/l/x.png")).toBe("image/png");
+    expect(mediaContentType("/slides/c/l/x.jpg")).toBe("image/jpeg");
+    expect(mediaContentType("/slides/c/l/x.jpeg")).toBe("image/jpeg");
+    expect(mediaContentType("/slides/c/l/x.webp")).toBe("image/webp");
+    expect(mediaContentType("/slides/c/l/x.gif")).toBe("image/gif");
+  });
+});
+
+describe("isSlideImagePath", () => {
+  const UUID = "123e4567-e89b-4d3a-8456-426614174000";
+
+  it("accepts the four image extensions under the slide prefix", () => {
+    for (const ext of ["png", "jpg", "jpeg", "webp", "gif"]) {
+      expect(isSlideImagePath(`/slides/course_abc/lesson_xyz/${UUID}.${ext}`), ext).toBe(true);
+    }
+  });
+
+  it("accepts alphanumeric and underscore ids", () => {
+    expect(isSlideImagePath(`/slides/abcDEF_123/lesson_1/${UUID}.png`)).toBe(true);
+  });
+
+  it("rejects traversal, wrong prefix and non-uuid names", () => {
+    for (const path of [
+      `/slides/../etc/${UUID}.png`,
+      `/slides/course/lesson/name.png`,
+      `/slides/course/lesson/${UUID}.svg`,
+      `/slides/course/lesson/${UUID}.PNG`,
+      `/hls/${UUID}.png`,
+      `/slides/course/lesson/${UUID}.png/extra`,
+    ]) {
+      expect(isSlideImagePath(path), path).toBe(false);
+    }
   });
 });

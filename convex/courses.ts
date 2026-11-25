@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { internalQuery, query, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { slugify } from "../lib/slug";
@@ -26,6 +26,12 @@ import {
   type ReadCtx,
   type WriteCtx,
 } from "./helpers/auth";
+import {
+  deckThemeValidator,
+  sanitizeDeckSlides,
+  sanitizeDeckTheme,
+  slideValidator,
+} from "./helpers/slides";
 
 function buildSearchText(title: string, description: string, category?: string) {
   return [title, description, category].filter(Boolean).join(" ").trim();
@@ -425,11 +431,13 @@ export const createLesson = mutation({
   args: {
     courseId: v.id("courses"),
     title: v.string(),
-    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm")),
+    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm"), v.literal("slides")),
     order: v.number(),
     section: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
     scormPackageId: v.optional(v.id("scormPackages")),
+    slides: v.optional(v.array(slideValidator)),
+    slideTheme: v.optional(deckThemeValidator),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -449,6 +457,8 @@ export const createLesson = mutation({
     const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
     if (!title) throw new Error("A lesson title is required");
     const section = args.section !== undefined ? sanitizeSingleLine(args.section, TEXT_LIMITS.section) : "";
+    const slides = sanitizeDeckSlides(args.slides);
+    const slideTheme = sanitizeDeckTheme(args.slideTheme);
 
     return await ctx.db.insert("lessons", {
       courseId: args.courseId,
@@ -458,6 +468,8 @@ export const createLesson = mutation({
       ...(section ? { section } : {}),
       ...(args.contentFormat ? { contentFormat: args.contentFormat } : {}),
       ...(args.scormPackageId ? { scormPackageId: args.scormPackageId } : {}),
+      ...(slides ? { slides } : {}),
+      ...(slideTheme ? { slideTheme } : {}),
       createdAt: Date.now(),
     });
   },
@@ -474,7 +486,7 @@ export const bulkCreateLessons = mutation({
           v.literal("article"),
           v.literal("quiz"),
           v.literal("presentation"),
-          v.literal("scorm"),
+          v.literal("scorm"), v.literal("slides"),
         ),
         order: v.number(),
         content: v.optional(v.string()),
@@ -484,6 +496,8 @@ export const bulkCreateLessons = mutation({
         presentationStorageId: v.optional(v.id("_storage")),
         presentationFileName: v.optional(v.string()),
         scormPackageId: v.optional(v.id("scormPackages")),
+        slides: v.optional(v.array(slideValidator)),
+        slideTheme: v.optional(deckThemeValidator),
         quiz: v.optional(
           v.object({
             title: v.string(),
@@ -548,6 +562,8 @@ export const bulkCreateLessons = mutation({
         ...(l.presentationFileName
           ? { presentationFileName: sanitizeSingleLine(l.presentationFileName, TEXT_LIMITS.fileName) }
           : {}),
+        ...(l.slides ? { slides: sanitizeDeckSlides(l.slides) } : {}),
+        ...(l.slideTheme ? { slideTheme: sanitizeDeckTheme(l.slideTheme) } : {}),
         createdAt: Date.now(),
       });
       created.push(lessonId);
@@ -610,7 +626,7 @@ export const updateLesson = mutation({
   args: {
     lessonId: v.id("lessons"),
     title: v.optional(v.string()),
-    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm"))),
+    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm"), v.literal("slides"))),
     order: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
@@ -621,6 +637,8 @@ export const updateLesson = mutation({
     videoFileName: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
     section: v.optional(v.string()),
+    slides: v.optional(v.array(slideValidator)),
+    slideTheme: v.optional(deckThemeValidator),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -675,6 +693,12 @@ export const updateLesson = mutation({
     }
     if (args.videoFileName !== undefined) {
       updates.videoFileName = sanitizeSingleLine(args.videoFileName, TEXT_LIMITS.fileName);
+    }
+    if (args.slides !== undefined) {
+      updates.slides = sanitizeDeckSlides(args.slides);
+    }
+    if (args.slideTheme !== undefined) {
+      updates.slideTheme = sanitizeDeckTheme(args.slideTheme);
     }
 
     await ctx.db.patch(args.lessonId, updates);
@@ -1513,5 +1537,22 @@ export const reviewPublishRequest = mutation({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Owner-or-admin gate for the slide-image presign action. Actions have no
+ * `ctx.db`, so the `"use node"` module calls this internal query and the full
+ * identity check runs where the lesson and course rows are readable.
+ */
+export const authorizeSlideImageUpload = internalQuery({
+  args: { lessonId: v.id("lessons") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const lesson = await ctx.db.get(args.lessonId);
+    if (!lesson) throw new Error("Lesson not found");
+    const course = await ctx.db.get(lesson.courseId);
+    if (!(await canManageCourse(ctx, user, course))) throw new Error("Not authorized");
+    return { courseId: lesson.courseId };
   },
 });

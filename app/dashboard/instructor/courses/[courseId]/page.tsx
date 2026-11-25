@@ -770,7 +770,7 @@ export default function CourseEditPage() {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="lesson-section" className="text-3xl">Module (optional)</Label>
+                          <Label htmlFor="lesson-section" >Module (optional)</Label>
                           <CourseSectionPicker
                             id="lesson-section"
                             value={newLessonData.section}
@@ -857,7 +857,7 @@ export default function CourseEditPage() {
                     return [...bySection.entries()].map(([sec, items]) => (
                       <div key={sec ?? "__none__"}>
                         <div className="mb-2 flex items-center justify-between gap-3">
-                          <h4 className="text-sm font-semibold text-muted-foreground">
+                          <h4 className="text-xl font-semibold text-muted-foreground">
                             {sec ?? "No module"}
                           </h4>
                           <Button

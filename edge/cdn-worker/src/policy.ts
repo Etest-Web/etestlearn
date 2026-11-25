@@ -22,8 +22,25 @@
 export const ALLOWED_MEDIA_PATH =
   /^\/hls\/[A-Za-z0-9_-]{1,64}\/(?:master\.m3u8|[0-9]{1,2}\/(?:index\.m3u8|seg_[0-9]{1,6}\.ts))$/;
 
+/**
+ * Slide images, stored in the separate slides bucket and never transcoded:
+ *
+ *   /slides/<courseId>/<lessonId>/<uuid>.<ext>
+ *
+ * Both ids are Convex ids (alphanumeric and `_`), the uuid is a v4 hex string
+ * and the extension is one of the four the presign action accepts. Anchored,
+ * character-class only — no dots or slashes inside an id segment, so traversal
+ * cannot match. This is the second half of the same strict allowlist.
+ */
+export const ALLOWED_SLIDE_IMAGE_PATH =
+  /^\/slides\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:png|jpe?g|webp|gif)$/;
+
+export function isSlideImagePath(pathname: string): boolean {
+  return ALLOWED_SLIDE_IMAGE_PATH.test(pathname);
+}
+
 export function isAllowedMediaPath(pathname: string): boolean {
-  return ALLOWED_MEDIA_PATH.test(pathname);
+  return ALLOWED_MEDIA_PATH.test(pathname) || isSlideImagePath(pathname);
 }
 
 /** The Worker is read-only; OPTIONS exists only for CORS preflight. */
@@ -86,7 +103,19 @@ export function mediaCacheControl(): string {
 }
 
 export function mediaContentType(pathname: string): string {
-  return pathname.endsWith(".m3u8")
-    ? "application/vnd.apple.mpegurl"
-    : "video/mp2t";
+  if (pathname.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
+  if (pathname.endsWith(".ts")) return "video/mp2t";
+  switch (pathname.split(".").pop()?.toLowerCase()) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    case "gif":
+      return "image/gif";
+    default:
+      return "application/octet-stream";
+  }
 }

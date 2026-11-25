@@ -42,6 +42,7 @@ import type * as helpers_encryption from "../helpers/encryption.js";
 import type * as helpers_notifications from "../helpers/notifications.js";
 import type * as helpers_rateLimit from "../helpers/rateLimit.js";
 import type * as helpers_relationships from "../helpers/relationships.js";
+import type * as helpers_slides from "../helpers/slides.js";
 import type * as helpers_users from "../helpers/users.js";
 import type * as http from "../http.js";
 import type * as inbox from "../inbox.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/notifications": typeof helpers_notifications;
   "helpers/rateLimit": typeof helpers_rateLimit;
   "helpers/relationships": typeof helpers_relationships;
+  "helpers/slides": typeof helpers_slides;
   "helpers/users": typeof helpers_users;
   http: typeof http;
   inbox: typeof inbox;

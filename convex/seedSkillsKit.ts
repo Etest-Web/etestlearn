@@ -194,7 +194,7 @@ function autoSlides(m: ModuleBlueprint): SlideEntry[] {
 
 function slidesLesson(title: string, section: string, m: ModuleBlueprint): LessonSpec {
   const slides: SlideSpec[] = (m.slides ?? autoSlides(m)).map(
-    ([heading, body, ...reveals]) => ({ heading, body, reveals }),
+    ([heading, body, ...reveals]) => ({ kind: "bullets", heading, body, reveals }),
   );
   return { title, section, contentType: "slides", slides };
 }

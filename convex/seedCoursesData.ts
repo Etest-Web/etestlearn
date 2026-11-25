@@ -26,8 +26,10 @@ export type QuizQuestion = {
 };
 export type QuizSpec = { title: string; passingScore: number; questions: QuizQuestion[] };
 
+import type { SlideKind } from "../lib/slides";
+
 /** One click-through slide: markdown body plus ordered reveal steps. */
-export type SlideSpec = { heading: string; body: string; reveals: string[] };
+export type SlideSpec = { kind: SlideKind; heading: string; body: string; reveals: string[] };
 
 export type LessonSpec = {
   title: string;

@@ -9,6 +9,12 @@ import {
 } from "../lib/publishing";
 import { logAudit, type AuditEntry } from "./helpers/audit";
 import {
+  sanitizeMultiline,
+  sanitizeSingleLine,
+  sanitizeStoredUrl,
+  TEXT_LIMITS,
+} from "../lib/sanitize-text";
+import {
   AnyCtx,
   canManageCourse,
   getCurrentUser,
@@ -275,24 +281,31 @@ export const createCourse = mutation({
 
     validatePriceAndCurrency(args.price, args.currency);
 
+    const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
+    const description = sanitizeMultiline(args.description, TEXT_LIMITS.description);
+    const category = args.category !== undefined ? sanitizeSingleLine(args.category, TEXT_LIMITS.category) : undefined;
+    const level = args.level !== undefined ? sanitizeSingleLine(args.level, TEXT_LIMITS.level) : undefined;
+    if (!title) throw new Error("A course title is required");
+    if (!description) throw new Error("A course description is required");
+
     const slug = await requireAvailableSlug(ctx, args.slug);
 
     const now = Date.now();
 
     return await ctx.db.insert("courses", {
-      title: args.title,
+      title,
       slug,
-      description: args.description,
+      description,
       instructorId: user._id,
-      category: args.category,
+      category: category || undefined,
       skillIds: args.skillIds,
-      level: args.level,
+      level: level || undefined,
       published: false,
-      thumbnailUrl: args.thumbnailUrl,
-      previewVideoUrl: args.previewVideoUrl,
+      thumbnailUrl: sanitizeStoredUrl(args.thumbnailUrl, "Thumbnail URL"),
+      previewVideoUrl: sanitizeStoredUrl(args.previewVideoUrl, "Preview video URL"),
       price: args.price,
       currency: args.currency,
-      searchText: buildSearchText(args.title, args.description, args.category),
+      searchText: buildSearchText(title, description, category || undefined),
       createdAt: now,
       updatedAt: now,
     });
@@ -342,7 +355,12 @@ export const updateCourse = mutation({
     validatePriceAndCurrency(args.price, args.currency);
 
     const updates: any = {};
-    if (args.title !== undefined) updates.title = args.title;
+    // Empty string clears the field (patch removes it); `undefined` leaves it alone.
+    if (args.title !== undefined) {
+      const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
+      if (!title) throw new Error("A course title is required");
+      updates.title = title;
+    }
     // Excluding this course lets an edit keep its own slug; every other
     // course's slug stays off-limits, same rule as creation.
     if (args.slug !== undefined) {
@@ -350,12 +368,24 @@ export const updateCourse = mutation({
         excludeCourseId: args.courseId,
       });
     }
-    if (args.description !== undefined) updates.description = args.description;
-    if (args.category !== undefined) updates.category = args.category;
+    if (args.description !== undefined) {
+      const description = sanitizeMultiline(args.description, TEXT_LIMITS.description);
+      if (!description) throw new Error("A course description is required");
+      updates.description = description;
+    }
+    if (args.category !== undefined) {
+      updates.category = sanitizeSingleLine(args.category, TEXT_LIMITS.category) || undefined;
+    }
     if (args.skillIds !== undefined) updates.skillIds = args.skillIds;
-    if (args.level !== undefined) updates.level = args.level;
-    if (args.thumbnailUrl !== undefined) updates.thumbnailUrl = args.thumbnailUrl;
-    if (args.previewVideoUrl !== undefined) updates.previewVideoUrl = args.previewVideoUrl;
+    if (args.level !== undefined) {
+      updates.level = sanitizeSingleLine(args.level, TEXT_LIMITS.level) || undefined;
+    }
+    if (args.thumbnailUrl !== undefined) {
+      updates.thumbnailUrl = sanitizeStoredUrl(args.thumbnailUrl, "Thumbnail URL");
+    }
+    if (args.previewVideoUrl !== undefined) {
+      updates.previewVideoUrl = sanitizeStoredUrl(args.previewVideoUrl, "Preview video URL");
+    }
     if (args.price !== undefined) updates.price = args.price;
     if (args.currency !== undefined) updates.currency = args.currency;
 
@@ -364,9 +394,12 @@ export const updateCourse = mutation({
       args.description !== undefined ||
       args.category !== undefined
     ) {
-      const title = args.title ?? course.title;
-      const description = args.description ?? course.description;
-      const category = "category" in args ? args.category : course.category;
+      const title = args.title !== undefined ? updates.title : course.title;
+      const description = args.description !== undefined ? updates.description : course.description;
+      const category =
+        args.category !== undefined
+          ? updates.category
+          : course.category;
       updates.searchText = buildSearchText(title, description, category);
     }
 
@@ -380,10 +413,11 @@ export const createLesson = mutation({
   args: {
     courseId: v.id("courses"),
     title: v.string(),
-    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation")),
+    contentType: v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm")),
     order: v.number(),
     section: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
+    scormPackageId: v.optional(v.id("scormPackages")),
   },
   handler: async (ctx, args) => {
     // requireUser, not an inline identity lookup: suspension has to revoke
@@ -400,13 +434,18 @@ export const createLesson = mutation({
       throw new Error("Not authorized to add lessons to this course");
     }
 
+    const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
+    if (!title) throw new Error("A lesson title is required");
+    const section = args.section !== undefined ? sanitizeSingleLine(args.section, TEXT_LIMITS.section) : "";
+
     return await ctx.db.insert("lessons", {
       courseId: args.courseId,
-      title: args.title,
+      title,
       contentType: args.contentType,
       order: args.order,
-      ...(args.section ? { section: args.section.trim() } : {}),
+      ...(section ? { section } : {}),
       ...(args.contentFormat ? { contentFormat: args.contentFormat } : {}),
+      ...(args.scormPackageId ? { scormPackageId: args.scormPackageId } : {}),
       createdAt: Date.now(),
     });
   },
@@ -423,6 +462,7 @@ export const bulkCreateLessons = mutation({
           v.literal("article"),
           v.literal("quiz"),
           v.literal("presentation"),
+          v.literal("scorm"),
         ),
         order: v.number(),
         content: v.optional(v.string()),
@@ -431,6 +471,7 @@ export const bulkCreateLessons = mutation({
         videoStorageId: v.optional(v.id("_storage")),
         presentationStorageId: v.optional(v.id("_storage")),
         presentationFileName: v.optional(v.string()),
+        scormPackageId: v.optional(v.id("scormPackages")),
         quiz: v.optional(
           v.object({
             title: v.string(),
@@ -468,8 +509,10 @@ export const bulkCreateLessons = mutation({
     const created: Id<"lessons">[] = [];
 
     for (const l of args.lessons) {
-      const title = l.title.trim();
+      const title = sanitizeSingleLine(l.title, TEXT_LIMITS.title);
       if (!title) throw new Error("Lesson title is required");
+      const quizTitle = l.quiz ? sanitizeSingleLine(l.quiz.title, TEXT_LIMITS.title) || title : title;
+      const section = l.section !== undefined ? sanitizeSingleLine(l.section, TEXT_LIMITS.section) : "";
 
       // Resolve an uploaded video blob to a playable URL server-side, so the
       // client never needs a second query per file.
@@ -484,14 +527,14 @@ export const bulkCreateLessons = mutation({
         title,
         contentType: l.contentType,
         order: l.order,
-        ...(resolvedContent ? { content: resolvedContent } : {}),
-        ...(l.section ? { section: l.section.trim() } : {}),
+        ...(resolvedContent ? { content: sanitizeMultiline(resolvedContent, TEXT_LIMITS.content) } : {}),
+        ...(section ? { section } : {}),
         ...(l.contentFormat ? { contentFormat: l.contentFormat } : {}),
         ...(l.presentationStorageId
           ? { presentationStorageId: l.presentationStorageId }
           : {}),
         ...(l.presentationFileName
-          ? { presentationFileName: l.presentationFileName }
+          ? { presentationFileName: sanitizeSingleLine(l.presentationFileName, TEXT_LIMITS.fileName) }
           : {}),
         createdAt: Date.now(),
       });
@@ -508,15 +551,18 @@ export const bulkCreateLessons = mutation({
         }
         const quizId = await ctx.db.insert("quizzes", {
           lessonId,
-          title: q.title.trim() || title,
+          title: quizTitle,
           passingScore: q.passingScore,
           createdAt: Date.now(),
         });
         for (const question of q.questions) {
-          const prompt = question.prompt.trim();
+          const prompt = sanitizeMultiline(question.prompt, TEXT_LIMITS.title);
           if (!prompt) continue;
           const opts = question.options
-            .map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
+            .map((o) => ({
+              text: sanitizeSingleLine(o.text, TEXT_LIMITS.title),
+              isCorrect: o.isCorrect,
+            }))
             .filter((o) => o.text.length > 0);
           if (opts.length < 2) continue;
           const texts = opts.map((o) => o.text.toLowerCase());
@@ -552,13 +598,14 @@ export const updateLesson = mutation({
   args: {
     lessonId: v.id("lessons"),
     title: v.optional(v.string()),
-    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"))),
+    contentType: v.optional(v.union(v.literal("video"), v.literal("article"), v.literal("quiz"), v.literal("presentation"), v.literal("scorm"))),
     order: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     content: v.optional(v.string()),
     videoStorageId: v.optional(v.id("_storage")),
     presentationStorageId: v.optional(v.id("_storage")),
     presentationFileName: v.optional(v.string()),
+    scormPackageId: v.optional(v.id("scormPackages")),
     videoFileName: v.optional(v.string()),
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
     section: v.optional(v.string()),
@@ -582,15 +629,19 @@ export const updateLesson = mutation({
     }
 
     const updates: any = {};
-    if (args.title !== undefined) updates.title = args.title;
+    if (args.title !== undefined) {
+      const title = sanitizeSingleLine(args.title, TEXT_LIMITS.title);
+      if (!title) throw new Error("A lesson title is required");
+      updates.title = title;
+    }
     if (args.contentType !== undefined) updates.contentType = args.contentType;
     if (args.order !== undefined) updates.order = args.order;
     if (args.durationMinutes !== undefined) updates.durationMinutes = args.durationMinutes;
     if (args.content !== undefined) {
-      updates.content = args.content;
+      updates.content = sanitizeMultiline(args.content, TEXT_LIMITS.content);
       // When a direct/cloud video URL is provided, clear any legacy pending
       // videoAssetId on the lesson so the player immediately serves the URL.
-      if (args.content && lesson.videoAssetId) {
+      if (updates.content && lesson.videoAssetId) {
         updates.videoAssetId = undefined;
       }
     }
@@ -598,17 +649,20 @@ export const updateLesson = mutation({
       updates.contentFormat = args.contentFormat;
     }
     if (args.section !== undefined) {
-      const s = args.section.trim();
+      const s = sanitizeSingleLine(args.section, TEXT_LIMITS.section);
       updates.section = s.length > 0 ? s : undefined;
     }
     if (args.presentationStorageId !== undefined) {
       updates.presentationStorageId = args.presentationStorageId;
     }
     if (args.presentationFileName !== undefined) {
-      updates.presentationFileName = args.presentationFileName;
+      updates.presentationFileName = sanitizeSingleLine(args.presentationFileName, TEXT_LIMITS.fileName);
+    }
+    if (args.scormPackageId !== undefined) {
+      updates.scormPackageId = args.scormPackageId;
     }
     if (args.videoFileName !== undefined) {
-      updates.videoFileName = args.videoFileName;
+      updates.videoFileName = sanitizeSingleLine(args.videoFileName, TEXT_LIMITS.fileName);
     }
 
     await ctx.db.patch(args.lessonId, updates);

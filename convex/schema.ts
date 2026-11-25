@@ -251,7 +251,8 @@ export default defineSchema({
       v.literal("video"),
       v.literal("article"),
       v.literal("quiz"),
-      v.literal("presentation")
+      v.literal("presentation"),
+      v.literal("scorm")
     ),
     order: v.number(),
     durationMinutes: v.optional(v.number()),
@@ -264,15 +265,18 @@ export default defineSchema({
     // Optional presentation file stored in Convex storage.
     presentationStorageId: v.optional(v.id("_storage")),
     presentationFileName: v.optional(v.string()),
+    // Optional SCORM package reference.
+    scormPackageId: v.optional(v.id("scormPackages")),
     // Content format for article lessons: "markdown" | "html". Default "markdown".
     contentFormat: v.optional(v.union(v.literal("markdown"), v.literal("html"))),
     // Optional section/group label for curriculum organization.
     section: v.optional(v.string()),
-    // Original video filename when uploaded via Publit.io, preserved for display
+    // Original uploaded file name, preserved for display on the lesson page.
     videoFileName: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_course_order", ["courseId", "order"])
-    .index("by_video_asset", ["videoAssetId"]),
+    .index("by_video_asset", ["videoAssetId"])
+    .index("by_scorm_package", ["scormPackageId"]),
 
   /**
    * A transcoded, AES-128-encrypted HLS ladder for a lesson video.
@@ -1531,6 +1535,66 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_lesson", ["lessonId", "order"]),
+
+  // ════════════════════════════════════════════════════════════════════════
+  // BEGIN SCORM engine block
+  // ════════════════════════════════════════════════════════════════════════
+
+  // SCORM course packages — extracted IMS manifest packages (1.2 and 2004).
+  scormPackages: defineTable({
+    courseId: v.id("courses"),
+    lessonId: v.optional(v.id("lessons")),
+    title: v.string(),
+    version: v.union(
+      v.literal("1.2"),
+      v.literal("2004_2nd"),
+      v.literal("2004_3rd"),
+      v.literal("2004_4th")
+    ),
+    entryPoint: v.string(),
+    storagePrefix: v.string(),
+    packageSize: v.number(),
+    masteryScore: v.optional(v.number()),
+    manifestData: v.optional(v.string()),
+    zipStorageId: v.optional(v.id("_storage")),
+    createdAt: v.number(),
+  })
+    .index("by_course", ["courseId"])
+    .index("by_lesson", ["lessonId"]),
+
+  // SCORM learner runtime tracking state (CMI tree & suspend data).
+  scormTracking: defineTable({
+    userId: v.id("users"),
+    courseId: v.id("courses"),
+    lessonId: v.id("lessons"),
+    scormPackageId: v.id("scormPackages"),
+    lessonStatus: v.union(
+      v.literal("passed"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("incomplete"),
+      v.literal("browsed"),
+      v.literal("not_attempted")
+    ),
+    rawScore: v.optional(v.number()),
+    minScore: v.optional(v.number()),
+    maxScore: v.optional(v.number()),
+    scaledScore: v.optional(v.number()),
+    location: v.optional(v.string()),
+    suspendData: v.optional(v.string()),
+    totalTimeSeconds: v.optional(v.number()),
+    cmiState: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    lastAccessedAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user_lesson", ["userId", "lessonId"])
+    .index("by_user_course", ["userId", "courseId"])
+    .index("by_package", ["scormPackageId"]),
+
+  // ════════════════════════════════════════════════════════════════════════
+  // END SCORM engine block
+  // ════════════════════════════════════════════════════════════════════════
 
   // ════════════════════════════════════════════════════════════════════════
   // END admin console block

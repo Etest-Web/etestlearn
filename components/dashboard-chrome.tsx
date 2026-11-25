@@ -8,10 +8,11 @@ import { ReactNode } from "react";
 
 import { api } from "@/convex/_generated/api";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { HeaderSearch } from "@/components/header-search";
 import { TourProvider } from "@/components/product-tour";
 import { inboxApi } from "@/lib/inbox-api";
 
-import { Button, Input, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui";
+import { Button, SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui";
 
 /**
  * The dashboard chrome: sidebar on the left, page header above the content.
@@ -93,23 +94,7 @@ export function DashboardChrome({ children }: { children: ReactNode }) {
                         </div>
 
                         <div className="hidden md:flex min-w-0 md:flex-[2] items-center justify-center gap-2">
-                            <form
-                                action="/dashboard/search"
-                                method="get"
-                                data-tour="search"
-                                className="relative hidden w-full max-w-md min-w-0 md:block"
-                            >
-                                <Search
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                                    size={18}
-                                />
-                                <Input
-                                    name="q"
-                                    type="search"
-                                    placeholder="Search courses, instructors, people..."
-                                    className="h-12 rounded-sm border-rule pl-11 text-[15px]"
-                                />
-                            </form>
+                            <HeaderSearch />
                             {/* Students only: instructors and admins already
                                 have the console, and `/become-instructor`
                                 answers the pending / approved / rejected case

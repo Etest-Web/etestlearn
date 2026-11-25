@@ -32,9 +32,8 @@ import { VideoUploader } from "@/components/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CourseSectionPicker, courseSections } from "@/components/course-section-picker";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { sanitizeArticleHtml } from "@/lib/sanitize-html";
+import { MarkdownEditor } from "@/components/markdown-editor";
 
 export default function LessonEditPage() {
   const router = useRouter();
@@ -541,23 +540,18 @@ export default function LessonEditPage() {
                       {formData.contentFormat === "html" ? "HTML" : "Markdown"}
                     </span>
                   </div>
-                  <Tabs defaultValue="write">
-                    <TabsList variant="segmented" className="touch-target">
-                      <TabsTrigger value="write">Write</TabsTrigger>
-                      <TabsTrigger value="preview">Preview</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="write">
-                      {formData.contentFormat === "markdown" ? (
-                        <Textarea
-                          id="content"
-                          name="content"
-                          rows={24}
-                          placeholder={"# Hello World\n\nWrite your article here using markdown."}
-                          value={formData.content}
-                          onChange={handleChange}
-                          className="font-mono text-sm h-64 min-h-[400px] overflow-y-auto border border-rule rounded-md bg-surface-sunken dark:bg-surface-900 dark:border-surface-800"
-                        />
-                      ) : (
+                  {formData.contentFormat === "markdown" ? (
+                    <MarkdownEditor
+                      value={formData.content}
+                      onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
+                    />
+                  ) : (
+                    <Tabs defaultValue="write">
+                      <TabsList variant="segmented" className="touch-target">
+                        <TabsTrigger value="write">Write</TabsTrigger>
+                        <TabsTrigger value="preview">Preview</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="write">
                         <div className="space-y-2">
                           <Textarea
                             ref={htmlTextareaRef}
@@ -630,29 +624,23 @@ export default function LessonEditPage() {
                             {isUploadingVideo && <Loader2 className="h-3 w-3 animate-spin" />}
                           </div>
                         </div>
-                      )}
-                    </TabsContent>
-                    <TabsContent value="preview">
-                      {formData.content.trim() ? (
-                        <div className="min-h-[400px] overflow-y-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
-                          {formData.contentFormat === "html" ? (
+                      </TabsContent>
+                      <TabsContent value="preview">
+                        {formData.content.trim() ? (
+                          <div className="min-h-[400px] overflow-y-auto border border-rule bg-surface-sunken p-4 prose prose-sm dark:prose-invert max-w-none">
                             <div
                               className="prose prose-sm dark:prose-invert max-w-none"
                               dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(formData.content) }}
                             />
-                          ) : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {formData.content}
-                            </ReactMarkdown>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex min-h-[400px] items-center justify-center border border-rule text-sm text-muted-foreground">
-                          Nothing to preview yet — start writing in the Write tab.
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                          </div>
+                        ) : (
+                          <div className="flex min-h-[400px] items-center justify-center border border-rule text-sm text-muted-foreground">
+                            Nothing to preview yet — start writing in the Write tab.
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  )}
                 </div>
               </div>
             )}

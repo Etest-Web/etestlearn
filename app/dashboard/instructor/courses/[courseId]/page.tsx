@@ -770,7 +770,7 @@ export default function CourseEditPage() {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="lesson-section">Module (optional)</Label>
+                          <Label htmlFor="lesson-section" className="text-3xl">Module (optional)</Label>
                           <CourseSectionPicker
                             id="lesson-section"
                             value={newLessonData.section}

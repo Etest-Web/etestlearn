@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Course Thumbnail PNG Exporter</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    header {
+      max-width: 1200px;
+      margin: 0 auto 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 22px; }
+    .btn {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:hover { background: #2563eb; }
+    .btn-all { background: #10b981; padding: 12px 22px; font-size: 15px; }
+    .btn-all:hover { background: #059669; }
+    .grid {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+    }
+    .card {
+      background: #1e293b;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+    }
+    .card svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+    }
+    .card-footer {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .filename {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Course Thumbnails (1280×720 PNG Exporter)</h1>
+    <button class="btn btn-all" onclick="downloadAll()">Download All 6 PNGs</button>
+  </header>
+
+  <div class="grid">
+    <!-- 1 -->
+    <div class="card" data-filename="prompt-engineering.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <defs>
+          <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#090D1A"/>
+            <stop offset="100%" stop-color="#171336"/>
+          </linearGradient>
+          <linearGradient id="accent1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#22D3EE"/>
+            <stop offset="100%" stop-color="#8B5CF6"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#bg1)"/>
+        <circle cx="960" cy="360" r="240" fill="#7C3AED" opacity="0.14"/>
+        <text x="88" y="270" fill="#F8FAFC" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Prompt</text>
+        <text x="88" y="343" fill="#F8FAFC" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Engineering</text>
+        <text x="88" y="416" fill="url(#accent1)" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Mastery</text>
+        <rect x="88" y="462" width="90" height="6" rx="3" fill="url(#accent1)"/>
+        <rect x="700" y="310" width="210" height="100" rx="18" fill="#111827" stroke="url(#accent1)" stroke-width="3"/>
+        <path d="M742 344 L766 360 L742 376" fill="none" stroke="#22D3EE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="784" y1="376" x2="824" y2="376" stroke="#8B5CF6" stroke-width="6" stroke-linecap="round"/>
+        <line x1="910" y1="360" x2="985" y2="360" stroke="url(#accent1)" stroke-width="4" stroke-dasharray="8 8"/>
+        <polygon points="1080,225 1175,360 1080,495 985,360" fill="url(#accent1)" opacity="0.22" stroke="url(#accent1)" stroke-width="3"/>
+        <polygon points="1080,225 1130,360 1080,495 1030,360" fill="none" stroke="#22D3EE" stroke-width="2" opacity="0.8"/>
+        <line x1="985" y1="360" x2="1175" y2="360" stroke="#E0F2FE" stroke-width="2" opacity="0.6"/>
+        <path d="M1155 215 L1161 232 L1178 238 L1161 244 L1155 261 L1149 244 L1132 238 L1149 232 Z" fill="#22D3EE"/>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">prompt-engineering.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="card" data-filename="spreadsheets-for-work.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <defs>
+          <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#051B16"/>
+            <stop offset="100%" stop-color="#0B2E26"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#bg2)"/>
+        <circle cx="965" cy="360" r="230" fill="#10B981" opacity="0.12"/>
+        <text x="88" y="275" fill="#ECFDF5" font-family="Inter, system-ui, sans-serif" font-size="60" font-weight="800">Spreadsheets</text>
+        <text x="88" y="346" fill="#ECFDF5" font-family="Inter, system-ui, sans-serif" font-size="60" font-weight="800">That Run</text>
+        <text x="88" y="417" fill="#34D399" font-family="Inter, system-ui, sans-serif" font-size="60" font-weight="800">Your Work</text>
+        <rect x="88" y="462" width="90" height="6" rx="3" fill="#10B981"/>
+        <g transform="translate(740,175)">
+          <rect x="0" y="0" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="150" y="0" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="300" y="0" width="130" height="100" rx="14" fill="#0F3A30" stroke="#34D399" stroke-width="2.5"/>
+          <rect x="0" y="125" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="150" y="125" width="130" height="100" rx="14" fill="#10B981"/>
+          <polygon points="203,154 203,196 239,175" fill="#051B16"/>
+          <rect x="300" y="125" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="0" y="250" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="150" y="250" width="130" height="100" rx="14" fill="#0F3A30" stroke="#10B981" stroke-width="2" opacity="0.7"/>
+          <rect x="300" y="250" width="130" height="100" rx="14" fill="#064E3B" stroke="#6EE7B7" stroke-width="3"/>
+          <path d="M215 125 L215 50 L365 50" fill="none" stroke="#6EE7B7" stroke-width="4" stroke-linecap="round"/>
+          <path d="M280 175 L365 175 L365 300" fill="none" stroke="#6EE7B7" stroke-width="4" stroke-linecap="round"/>
+          <path d="M342 300 L358 316 L390 284" fill="none" stroke="#6EE7B7" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">spreadsheets-for-work.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="card" data-filename="cybersecurity-basics.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <defs>
+          <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0B1120"/>
+            <stop offset="100%" stop-color="#172033"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#bg3)"/>
+        <circle cx="955" cy="360" r="220" fill="#3B82F6" opacity="0.12"/>
+        <text x="88" y="325" fill="#F8FAFC" font-family="Inter, system-ui, sans-serif" font-size="68" font-weight="800">Personal</text>
+        <text x="88" y="403" fill="#60A5FA" font-family="Inter, system-ui, sans-serif" font-size="68" font-weight="800">Cybersecurity</text>
+        <rect x="88" y="450" width="90" height="6" rx="3" fill="#F59E0B"/>
+        <path d="M955 150 L1120 215 V355 C1120 465 1045 535 955 570 C865 535 790 465 790 355 V215 Z" fill="#1E293B" stroke="#3B82F6" stroke-width="5"/>
+        <circle cx="955" cy="345" r="105" fill="none" stroke="#60A5FA" stroke-width="3" stroke-dasharray="140 35"/>
+        <circle cx="955" cy="345" r="76" fill="none" stroke="#3B82F6" stroke-width="3" stroke-dasharray="110 28"/>
+        <circle cx="955" cy="345" r="48" fill="none" stroke="#93C5FD" stroke-width="3" stroke-dasharray="70 22"/>
+        <circle cx="955" cy="332" r="20" fill="#F59E0B"/>
+        <polygon points="943,344 967,344 973,395 937,395" fill="#F59E0B"/>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">cybersecurity-basics.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="card" data-filename="email-marketing.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <defs>
+          <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#190B11"/>
+            <stop offset="100%" stop-color="#2D121D"/>
+          </linearGradient>
+          <linearGradient id="coral4" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#FB7185"/>
+            <stop offset="100%" stop-color="#F97316"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#bg4)"/>
+        <circle cx="955" cy="360" r="220" fill="#FB7185" opacity="0.12"/>
+        <text x="88" y="273" fill="#FFF1F2" font-family="Inter, system-ui, sans-serif" font-size="62" font-weight="800">Email</text>
+        <text x="88" y="344" fill="#FFF1F2" font-family="Inter, system-ui, sans-serif" font-size="62" font-weight="800">Marketing</text>
+        <text x="88" y="415" fill="url(#coral4)" font-family="Inter, system-ui, sans-serif" font-size="62" font-weight="800">That Converts</text>
+        <rect x="88" y="462" width="90" height="6" rx="3" fill="url(#coral4)"/>
+        <rect x="750" y="340" width="240" height="165" rx="18" fill="#321420" stroke="#FB7185" stroke-width="4"/>
+        <path d="M750 350 L870 435 L990 350" fill="none" stroke="#FB7185" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M870 375 Q925 270 1045 230" fill="none" stroke="#FBBF24" stroke-width="4" stroke-dasharray="10 10" stroke-linecap="round"/>
+        <polygon points="1030,220 1165,175 1095,295 1070,250" fill="url(#coral4)"/>
+        <polygon points="1070,250 1165,175 1085,265" fill="#FFF1F2" opacity="0.7"/>
+        <circle cx="1125" cy="445" r="58" fill="none" stroke="#FBBF24" stroke-width="3" opacity="0.45"/>
+        <circle cx="1125" cy="445" r="34" fill="none" stroke="#FBBF24" stroke-width="3" opacity="0.75"/>
+        <circle cx="1125" cy="445" r="14" fill="#FBBF24"/>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">email-marketing.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="card" data-filename="notion-systems.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <rect width="1280" height="720" fill="#F7F6F3"/>
+        <line x1="720" y1="0" x2="720" y2="720" stroke="#E5E4DF" stroke-width="2"/>
+        <line x1="0" y1="580" x2="1280" y2="580" stroke="#E5E4DF" stroke-width="2"/>
+        <text x="88" y="270" fill="#191919" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Notion</text>
+        <text x="88" y="343" fill="#191919" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Systems</text>
+        <text x="88" y="416" fill="#EB5757" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">for Work</text>
+        <rect x="88" y="462" width="90" height="6" rx="3" fill="#191919"/>
+        <g transform="translate(765,165)">
+          <rect x="0" y="0" width="265" height="120" rx="16" fill="#FFFFFF" stroke="#191919" stroke-width="4"/>
+          <circle cx="42" cy="42" r="12" fill="#EB5757"/>
+          <rect x="72" y="34" width="145" height="16" rx="8" fill="#191919"/>
+          <rect x="30" y="74" width="190" height="12" rx="6" fill="#D4D2CA"/>
+          <rect x="285" y="0" width="125" height="120" rx="16" fill="#EB5757" stroke="#191919" stroke-width="4"/>
+          <path d="M325 60 L342 78 L374 42" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="0" y="140" width="180" height="230" rx="16" fill="#191919"/>
+          <rect x="28" y="175" width="124" height="14" rx="7" fill="#F7F6F3"/>
+          <rect x="28" y="210" width="95" height="12" rx="6" fill="#787774"/>
+          <rect x="28" y="265" width="124" height="72" rx="10" fill="#2E2E2E" stroke="#555" stroke-width="2"/>
+          <rect x="200" y="140" width="210" height="105" rx="16" fill="#FFFFFF" stroke="#191919" stroke-width="4"/>
+          <polygon points="235,178 235,208 260,193" fill="#191919"/>
+          <rect x="278" y="185" width="100" height="16" rx="8" fill="#191919"/>
+          <rect x="200" y="265" width="210" height="105" rx="16" fill="#EAE8E1" stroke="#191919" stroke-width="4" stroke-dasharray="10 6"/>
+          <circle cx="305" cy="317" r="20" fill="#FFFFFF" stroke="#191919" stroke-width="3"/>
+          <line x1="295" y1="317" x2="315" y2="317" stroke="#191919" stroke-width="3" stroke-linecap="round"/>
+          <line x1="305" y1="307" x2="305" y2="327" stroke="#191919" stroke-width="3" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">notion-systems.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="card" data-filename="ai-video-content.png">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+        <defs>
+          <linearGradient id="bg6" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#11061D"/>
+            <stop offset="100%" stop-color="#250B2E"/>
+          </linearGradient>
+          <linearGradient id="neon6" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#F97316"/>
+            <stop offset="100%" stop-color="#EC4899"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="720" fill="url(#bg6)"/>
+        <circle cx="1010" cy="360" r="220" fill="#EC4899" opacity="0.14"/>
+        <text x="88" y="280" fill="#FDF2F8" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">AI Video</text>
+        <text x="88" y="352" fill="#FDF2F8" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="800">Content</text>
+        <text x="88" y="414" fill="url(#neon6)" font-family="Inter, system-ui, sans-serif" font-size="34" font-weight="700">Idea to Published Short</text>
+        <rect x="88" y="458" width="90" height="6" rx="3" fill="url(#neon6)"/>
+        <circle cx="775" cy="335" r="46" fill="url(#neon6)" opacity="0.25" stroke="#F97316" stroke-width="4"/>
+        <circle cx="775" cy="335" r="20" fill="#F97316"/>
+        <rect x="757" y="388" width="36" height="14" rx="7" fill="#FDBA74"/>
+        <rect x="845" y="330" width="8" height="60" rx="4" fill="#F97316"/>
+        <rect x="867" y="305" width="8" height="110" rx="4" fill="#F43F5E"/>
+        <rect x="889" y="320" width="8" height="80" rx="4" fill="#EC4899"/>
+        <rect x="911" y="340" width="8" height="40" rx="4" fill="#EC4899"/>
+        <rect x="955" y="155" width="220" height="390" rx="28" fill="#180A29" stroke="url(#neon6)" stroke-width="5"/>
+        <rect x="1030" y="176" width="70" height="8" rx="4" fill="#4C1D95"/>
+        <circle cx="1065" cy="340" r="48" fill="url(#neon6)"/>
+        <polygon points="1052,318 1052,362 1090,340" fill="#FFFFFF"/>
+        <rect x="990" y="475" width="150" height="10" rx="5" fill="#4C1D95"/>
+        <rect x="990" y="475" width="95" height="10" rx="5" fill="#EC4899"/>
+      </svg>
+      <div class="card-footer">
+        <span class="filename">ai-video-content.png</span>
+        <button class="btn" onclick="downloadCard(this)">Download PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function exportSvgToPng(svgEl, filename) {
+      return new Promise((resolve, reject) => {
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svgEl);
+        if (!source.includes('xmlns="http://www.w3.org/2000/svg"')) {
+          source = source.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        const svgBlob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1280;
+          canvas.height = 720;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, 1280, 720);
+          URL.revokeObjectURL(url);
+          canvas.toBlob((pngBlob) => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(pngBlob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            resolve();
+          }, 'image/png');
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function downloadCard(btn) {
+      const card = btn.closest('.card');
+      return exportSvgToPng(card.querySelector('svg'), card.dataset.filename);
+    }
+
+    async function downloadAll() {
+      const cards = document.querySelectorAll('.card');
+      for (const card of cards) {
+        await exportSvgToPng(card.querySelector('svg'), card.dataset.filename);
+        await new Promise((r) => setTimeout(r, 350));
+      }
+    }
+  </script>
+</body>
+</html>

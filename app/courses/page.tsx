@@ -19,6 +19,7 @@ import { Suspense } from "react";
 import { StarRating } from "@/components/star-rating";
 import { BookmarkListButton } from "@/components/bookmark-button";
 import { averageRating, formatRating } from "@/lib/reviews";
+import { formatCurrency } from "@/lib/currency";
 
 function CoursesWrapper() {
   const router = useRouter();
@@ -112,6 +113,16 @@ function CoursesWrapper() {
                   )}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-4">
+                  <div className="flex items-center justify-between gap-2 border-t border-rule pt-3">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Price
+                    </span>
+                    <span className="text-base font-semibold tabular-nums">
+                      {course.price && course.price > 0
+                        ? formatCurrency(course.price / 100, course.currency ?? "NGN")
+                        : "Free"}
+                    </span>
+                  </div>
                   <p className="text-sm leading-body text-muted-foreground line-clamp-3">
                     {course.description}
                   </p>

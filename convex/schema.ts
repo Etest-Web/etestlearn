@@ -1562,6 +1562,18 @@ export default defineSchema({
     .index("by_course", ["courseId"])
     .index("by_lesson", ["lessonId"]),
 
+  // SCORM individual extracted static assets (html, js, css, media).
+  scormPackageFiles: defineTable({
+    packageId: v.id("scormPackages"),
+    path: v.string(),
+    storageId: v.id("_storage"),
+    contentType: v.string(),
+    sizeBytes: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_package_path", ["packageId", "path"])
+    .index("by_package", ["packageId"]),
+
   // SCORM learner runtime tracking state (CMI tree & suspend data).
   scormTracking: defineTable({
     userId: v.id("users"),

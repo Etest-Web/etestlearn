@@ -22,6 +22,7 @@ export interface ParsedScormManifest {
   version: ScormVersion;
   title: string;
   launchPath: string;
+  entryPoint: string;
   masteryScore?: number;
   items: ScormManifestItem[];
   resources: ScormManifestResource[];
@@ -290,6 +291,7 @@ export function parseScormManifest(xmlContent: string): ParsedScormManifest {
     version,
     title,
     launchPath,
+    entryPoint: launchPath,
     masteryScore,
     items,
     resources,

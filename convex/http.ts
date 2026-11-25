@@ -7,6 +7,7 @@ import { z } from "zod";
 // The mismatch marker the settlement check throws (M-2) — see `payments.ts`.
 import { PAYMENT_MISMATCH } from "./payments";
 import { decodePlaybackToken, verifyPlaybackToken } from "../lib/video-playback-token";
+import { verifyScormToken } from "../lib/scorm/token";
 import { decorateMasterPlaylist, decorateMediaPlaylist } from "../lib/video-playlists";
 import {
   isAuthorizedTranscodeCall,
@@ -707,6 +708,88 @@ http.route({
     } catch (error) {
       return transcodeError(error);
     }
+  }),
+});
+
+/* ── SCORM Package Asset Delivery Route ───────────────────────────────────
+ * Serves unpacked SCORM module assets directly to the player iframe.
+ * URL pattern: /scorm/:token/:packageId/*path
+ * Token is verified using HMAC-SHA256 and bounds access to the package.
+ */
+http.route({
+  pathPrefix: "/scorm/",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    const raw = url.pathname.replace(/^\/scorm\//, "");
+    const firstSlash = raw.indexOf("/");
+    if (firstSlash === -1) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const token = raw.slice(0, firstSlash);
+    const rest = raw.slice(firstSlash + 1);
+    const secondSlash = rest.indexOf("/");
+
+    const packageIdStr = secondSlash === -1 ? rest : rest.slice(0, secondSlash);
+    const rawFilePath = secondSlash === -1 ? "" : rest.slice(secondSlash + 1);
+
+    if (!packageIdStr || !rawFilePath) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    // Decode URL-encoded path segments safely
+    let filePath: string;
+    try {
+      filePath = decodeURIComponent(rawFilePath).replace(/^\/+/, "");
+    } catch {
+      return new Response("Bad request", { status: 400 });
+    }
+
+    // Verify token validity
+    try {
+      await verifyScormToken(token, { packageId: packageIdStr });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unauthorized";
+      return new Response(msg, { status: 401 });
+    }
+
+    // Lookup file record
+    const file = await ctx.runQuery(internal.scorm.getPackageFile, {
+      packageId: packageIdStr as Id<"scormPackages">,
+      path: filePath,
+    });
+
+    if (!file) {
+      return new Response("Asset not found", { status: 404 });
+    }
+
+    const blob = await ctx.storage.get(file.storageId);
+    if (!blob) {
+      return new Response("Asset blob missing", { status: 404 });
+    }
+
+    const appOrigin = process.env.APP_ORIGIN;
+    const headers: Record<string, string> = {
+      "Content-Type": file.contentType,
+      "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+    };
+    if (appOrigin) {
+      headers["Access-Control-Allow-Origin"] = appOrigin;
+      headers["Vary"] = "Origin";
+    }
+
+    return new Response(blob, {
+      status: 200,
+      headers,
+    });
   }),
 });
 

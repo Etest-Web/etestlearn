@@ -711,6 +711,13 @@ export const deleteLesson = mutation({
       }
     }
 
+    // Cascade: SCORM package clean up
+    if (lesson.scormPackageId) {
+      await ctx.runMutation(internal.scorm.deleteScormPackageInternal, {
+        packageId: lesson.scormPackageId,
+      });
+    }
+
     // Cascade: quiz → questions → options; quiz attempts keyed by quizId.
     // Without this, deleting a lesson leaves its quiz and every attempt behind
     // — orphaned rows that still count toward quiz stats for a course the

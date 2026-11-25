@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -14,7 +15,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/ui";
-import { HelpCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errors";
 
@@ -35,8 +36,16 @@ export default function LessonQuizPage() {
     maxScore: number;
     percent: number;
     passed: boolean;
+    nextLessonHref: string | null;
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [retryIn, setRetryIn] = useState(0);
+
+  useEffect(() => {
+    if (retryIn <= 0) return;
+    const id = setTimeout(() => setRetryIn(retryIn - 1), 1000);
+    return () => clearTimeout(id);
+  }, [retryIn]);
 
   if (quizData === undefined) {
     return (
@@ -94,6 +103,9 @@ export default function LessonQuizPage() {
         answers,
       });
       setResult(res);
+      // The server allows one attempt per quiz every 30s. Start the clock on
+      // the accepted submission so "Try again" never becomes a dead click.
+      setRetryIn(30);
     } catch (err) {
       // Without this the promise rejection escapes the click handler: the button
       // re-enables and the attempt looks like it did nothing.
@@ -101,6 +113,13 @@ export default function LessonQuizPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleRetry() {
+    setResult(null);
+    setSelected({});
+    setMultiSelected({});
+    setTextAnswers({});
   }
 
   return (
@@ -222,8 +241,48 @@ export default function LessonQuizPage() {
               <p className="text-xs text-muted-foreground">
                 {result.passed
                   ? "You passed this quiz. Great work!"
-                  : "You didn&apos;t reach the passing score yet. Review the material and try again."}
+                  : "You didn't reach the passing score yet. Review the material and try again."}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {result.passed ? (
+                  <Button
+                    size="sm"
+                    render={
+                      <Link
+                        href={
+                          result.nextLessonHref ??
+                          `/dashboard/courses/${params.slug}`
+                        }
+                      />
+                    }
+                  >
+                    {result.nextLessonHref ? (
+                      <>
+                        Continue to next lesson <ArrowRight className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Back to course <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={handleRetry} disabled={retryIn > 0}>
+                    {retryIn > 0 ? `Try again in ${retryIn}s` : "Try again"}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  render={
+                    <Link
+                      href={`/dashboard/courses/${params.slug}/lessons/${lessonId}`}
+                    />
+                  }
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back to lesson
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

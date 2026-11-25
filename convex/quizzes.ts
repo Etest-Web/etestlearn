@@ -6,6 +6,7 @@ import { sanitizeSingleLine } from "../lib/sanitize-text";
 import { requireRateLimit } from "./helpers/rateLimit";
 import { createNotification } from "./helpers/notifications";
 import { requireUser } from "./helpers/auth";
+import { recordLessonCompletion } from "./enrollments";
 
 /**
  * Convex has no range validator — `v.number()` exposes only `.optional()`,
@@ -172,16 +173,15 @@ export const submitQuizAttempt = mutation({
     const isOwnerOrAdmin =
       user.role === "admin" || course.instructorId === user._id;
 
-    if (!isOwnerOrAdmin) {
-      const enrollment = await ctx.db
-        .query("enrollments")
-        .withIndex("by_user_course", (q) =>
-          q.eq("userId", user._id).eq("courseId", course._id),
-        )
-        .unique();
-      if (!enrollment) {
-        throw new Error("You must be enrolled in this course to take this quiz");
-      }
+    const enrollment = await ctx.db
+      .query("enrollments")
+      .withIndex("by_user_course", (q) =>
+        q.eq("userId", user._id).eq("courseId", course._id),
+      )
+      .unique();
+
+    if (!isOwnerOrAdmin && !enrollment) {
+      throw new Error("You must be enrolled in this course to take this quiz");
     }
 
     // Rate limit: max one attempt per 30 seconds per user per quiz.
@@ -300,9 +300,26 @@ export const submitQuizAttempt = mutation({
       createdAt: now,
     });
 
+    // A first-time pass already counts the study streak inside
+    // recordLessonCompletion. Track that so the same day isn't counted twice.
+    let studyStreakCounted = false;
+
     // Only increment pass_quizzes on a passing attempt. A failed attempt
     // does not count as a lesson completion — it's an attempt.
     if (passed) {
+      // Passing the quiz finishes the lesson it hangs off. Without this the
+      // learner sat on a result screen with no way forward, and the quiz
+      // lesson stayed incomplete even though its knowledge check was passed.
+      // Staff previewing a course have no enrollment to update.
+      if (enrollment) {
+        const { isNewCompletion } = await recordLessonCompletion(
+          ctx,
+          user._id,
+          course._id,
+          lesson._id,
+        );
+        studyStreakCounted = isNewCompletion;
+      }
       await ctx.runMutation(internal.goals.incrementGoalProgress, {
         userId: user._id,
         type: "pass_quizzes",
@@ -311,13 +328,16 @@ export const submitQuizAttempt = mutation({
       });
     }
 
-    // Also increment study streak for quiz activity
-    await ctx.runMutation(internal.goals.incrementGoalProgress, {
-      userId: user._id,
-      type: "study_streak_days",
-      amount: 1,
-      date: now,
-    });
+    // Increment study streak for quiz activity that wasn't already counted
+    // as a first-time lesson completion above.
+    if (!studyStreakCounted) {
+      await ctx.runMutation(internal.goals.incrementGoalProgress, {
+        userId: user._id,
+        type: "study_streak_days",
+        amount: 1,
+        date: now,
+      });
+    }
 
     // Passing a quiz can be the last thing standing between the learner and
     // their certificate, so re-check eligibility here too.
@@ -334,7 +354,22 @@ export const submitQuizAttempt = mutation({
       href: `/courses/${course.slug}/lessons/${lesson._id}`,
     });
 
-    return { score, maxScore, percent, passed };
+    // The result screen needs somewhere to send the learner. Compute the next
+    // lesson while the ordered rows are already here, so the client doesn't
+    // need a second query just to draw one button.
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_course_order", (q) => q.eq("courseId", course._id))
+      .collect();
+    const lessonIndex = lessons.findIndex((l) => l._id === lesson._id);
+    const nextLesson = lessonIndex >= 0 ? lessons[lessonIndex + 1] : undefined;
+    const nextLessonHref = nextLesson
+      ? `/dashboard/courses/${course.slug}/lessons/${nextLesson._id}${
+          nextLesson.contentType === "quiz" ? "/quiz" : ""
+        }`
+      : null;
+
+    return { score, maxScore, percent, passed, nextLessonHref };
   },
 });
 

@@ -378,4 +378,58 @@ describe("SCORM Package Management and Gating", () => {
     expect(activity).not.toBeNull();
     expect(activity?.lessonId).toEqual(lesson1Id);
   });
+
+  test("initializeSession and commitSession are rate limited per user", async () => {
+    const t = convexTest(testSchema, modules);
+    const instructorId = await insertUser(t, "ins_rl", "instructor");
+    const studentId = await insertUser(t, "stu_rl", "student");
+
+    const courseId = await insertCourse(t, "scorm-rl-test", instructorId);
+    const lessonId = await insertLesson(t, courseId, "SCORM RL Lesson", 1);
+
+    const packageId = await t.run((ctx: TestCtx) =>
+      ctx.db.insert("scormPackages", {
+        courseId,
+        lessonId,
+        title: "RL Package",
+        version: "1.2",
+        entryPoint: "index.html",
+        storagePrefix: `scorm/${courseId}/rl`,
+        packageSize: 1000,
+        createdAt: Date.now(),
+      })
+    );
+    await t.run((ctx: TestCtx) => ctx.db.patch(lessonId, { scormPackageId: packageId }));
+
+    await t.run((ctx: TestCtx) =>
+      ctx.db.insert("enrollments", {
+        userId: studentId,
+        courseId,
+        progressPercent: 0,
+        completedLessonIds: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    // initializeSession allows 30/min; the 31st is rejected.
+    for (let i = 0; i < 30; i++) {
+      await as(t, "stu_rl").mutation(api.scorm.initializeSession, { lessonId, packageId });
+    }
+    await expect(
+      as(t, "stu_rl").mutation(api.scorm.initializeSession, { lessonId, packageId })
+    ).rejects.toThrow(/Too many requests/);
+
+    // commitSession allows 60/min; the 61st is rejected.
+    for (let i = 0; i < 60; i++) {
+      await as(t, "stu_rl").mutation(api.scorm.commitSession, {
+        lessonId,
+        lessonStatus: "incomplete",
+        totalTimeSeconds: i,
+      });
+    }
+    await expect(
+      as(t, "stu_rl").mutation(api.scorm.commitSession, { lessonId, lessonStatus: "incomplete" })
+    ).rejects.toThrow(/Too many requests/);
+  });
 });

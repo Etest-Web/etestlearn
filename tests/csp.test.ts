@@ -148,6 +148,12 @@ describe("buildContentSecurityPolicy", () => {
       expect(connectSrc).toContain(origin);
     }
   });
+
+  it("frames SCORM packages from the Convex site origin", () => {
+    // ScormPlayer renders the package in an iframe served from the Convex site;
+    // without this the browser blocks the frame and the module never loads.
+    expect(sources(csp, "frame-src")).toContain("https://*.convex.site");
+  });
 });
 
 /**

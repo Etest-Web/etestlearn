@@ -10,6 +10,7 @@ import {
 } from "./helpers/auth";
 import { signScormToken } from "../lib/scorm/token";
 import { recordLessonCompletion } from "./enrollments";
+import { requireRateLimit } from "./helpers/rateLimit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Permissions & Auth Helpers
@@ -215,6 +216,9 @@ export const initializeSession = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    // A player reloading or a SCO probing repeatedly must not spin the tracking
+    // table. 30/min per user is well above one load but caps a runaway loop.
+    await requireRateLimit(ctx, `scormInit:${user._id}`, 30, 60_000);
 
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) throw new Error("Lesson not found");
@@ -298,6 +302,10 @@ export const commitSession = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    // The in-iframe bridge debounces commits at 1.5s and flushes on pagehide,
+    // so bursts are normal. 60/min per user clears active play but stops a
+    // scripted loop hammering the tracking table.
+    await requireRateLimit(ctx, `scormCommit:${user._id}`, 60, 60_000);
 
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) throw new Error("Lesson not found");
